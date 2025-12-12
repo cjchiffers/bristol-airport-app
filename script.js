@@ -1,23 +1,13 @@
-// Function to get the current time minus 1 hour
-function getCurrentTimeMinusOneHour() {
-    const currentDate = new Date();
-    currentDate.setHours(currentDate.getHours() - 1); // Subtract 1 hour from the current time
-    return currentDate;
-}
-
-// Convert UTC time to London time
-function convertToLondonTime(utcTime) {
-    const date = new Date(utcTime);
-    // Convert to London time (handling daylight saving time)
-    const londonTime = date.toLocaleString("en-GB", { timeZone: "Europe/London" });
-    return londonTime;
+// Function to get airline logo URL (change this as needed)
+function getAirlineLogoUrl(airlineIataCode) {
+    return `/assets/logos/${airlineIataCode}.png`; // Adjust this path to where you store your logos
 }
 
 // Fetch departure data
 fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=BRS&type=departure')
     .then(response => response.json())
     .then(data => {
-        console.log('Departure data:', data);  // Log full response for departures
+        console.log('Departure data:', data);
         if (data && Array.isArray(data)) {
             const filteredDepartures = filterFlightsByTime(data);
             displayDepartures(filteredDepartures);
@@ -31,7 +21,7 @@ fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=
 fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=BRS&type=arrival')
     .then(response => response.json())
     .then(data => {
-        console.log('Arrival data:', data);  // Log full response for arrivals
+        console.log('Arrival data:', data);
         if (data && Array.isArray(data)) {
             const filteredArrivals = filterFlightsByTime(data);
             displayArrivals(filteredArrivals);
@@ -45,7 +35,6 @@ fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=
 function filterFlightsByTime(flights) {
     const currentTimeMinusOneHour = getCurrentTimeMinusOneHour();
     return flights.filter(flight => {
-        // Convert scheduled time to a JavaScript Date object and compare
         const scheduledTime = new Date(flight.departure.scheduledTime || flight.arrival.scheduledTime);
         return scheduledTime >= currentTimeMinusOneHour;
     });
@@ -58,7 +47,7 @@ function displayDepartures(departures) {
         let row = departureTable.insertRow();
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
-            <td>${flight.airline.name || 'N/A'}</td>
+            <td><img src="${getAirlineLogoUrl(flight.airline.iataCode)}" alt="${flight.airline.name} logo" class="airline-logo">${flight.airline.name || 'N/A'}</td>
             <td>${flight.arrival.iataCode || 'N/A'}</td>
             <td>${convertToLondonTime(flight.departure.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
@@ -73,7 +62,7 @@ function displayArrivals(arrivals) {
         let row = arrivalTable.insertRow();
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
-            <td>${flight.airline.name || 'N/A'}</td>
+            <td><img src="${getAirlineLogoUrl(flight.airline.iataCode)}" alt="${flight.airline.name} logo" class="airline-logo">${flight.airline.name || 'N/A'}</td>
             <td>${flight.departure.iataCode || 'N/A'}</td>
             <td>${convertToLondonTime(flight.arrival.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>

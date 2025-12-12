@@ -9,16 +9,16 @@ body {
 
 /* Header */
 header {
-    background-color: #003366;  /* Bristol Airport's blue */
+    background-color: #003366;
     color: white;
     text-align: center;
     padding: 20px 0;
-    border-bottom: 5px solid #00509E; /* A bolder blue line */
+    border-bottom: 5px solid #00509E;
     position: relative;
 }
 
 header img {
-    width: 80px; /* Adjust the logo size */
+    width: 80px;
     position: absolute;
     left: 20px;
     top: 20px;
@@ -28,6 +28,14 @@ header h1 {
     margin: 0;
     font-size: 1.8em;
     font-weight: bold;
+}
+
+/* Airline logo inside the table */
+.airline-logo {
+    width: 30px;
+    height: auto;
+    vertical-align: middle;
+    margin-right: 10px;
 }
 
 /* Button styles */
@@ -44,14 +52,6 @@ button {
 
 button:hover {
     background-color: #00509E;
-}
-
-/* Section titles */
-h2 {
-    font-size: 1.5em;
-    font-weight: bold;
-    margin-top: 20px;
-    color: #003366;
 }
 
 /* Tables */
@@ -92,7 +92,7 @@ td {
     text-decoration: underline;
 }
 
-/* Mobile-friendly layout (make sure it fits well on iPhone screen) */
+/* Mobile-friendly layout */
 @media only screen and (max-width: 768px) {
     body {
         padding: 10px;
@@ -124,13 +124,4 @@ td {
     h2 {
         font-size: 1.3em;
     }
-}
-
-/* Add shadows to the entire page for depth */
-.container {
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-    background-color: white;
-    padding: 20px;
-    margin: 20px;
 }
