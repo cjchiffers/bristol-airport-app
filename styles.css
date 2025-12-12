@@ -12,16 +12,20 @@ header {
     background-color: #3399ff;  /* Bristol Airport's blue */
     color: white;
     text-align: center;
-    padding: 20px 0;
+    padding: 20px 14px;
     border-bottom: 5px solid #00509E; /* A bolder blue line */
     position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
 }
 
 header img {
-    width: 80px; /* Adjust the logo size */
-    position: absolute;
-    left: 20px;
-    top: 20px;
+    width: 60px; /* Adjust the logo size for better fit */
+    height: auto;
+    object-fit: contain;
+    flex: 0 0 auto;
 }
 
 header h1 {
@@ -29,6 +33,14 @@ header h1 {
     font-size: 1.8em;
     font-weight: bold;
     color: #f5f5f5; /* Light grey, almost white */
+    text-align: center;
+    line-height: 1.1;
+    flex: 1;
+}
+
+header h1 span {
+    font-size: 1.2em;
+    font-weight: normal;
 }
 
 /* Airline logo inside the table */
@@ -100,8 +112,23 @@ td {
     }
 
     header {
-        padding: 10px;
-        font-size: 1.6em;
+        flex-direction: column;
+        padding: 12px;
+    }
+
+    header img {
+        width: 50px; /* Make logo slightly smaller on mobile */
+        height: auto;
+    }
+
+    header h1 {
+        font-size: 1.5em;
+        text-align: center;
+    }
+
+    header h1 span {
+        font-size: 1.1em;
+        font-weight: normal;
     }
 
     table {
@@ -119,7 +146,7 @@ td {
     }
 
     header h1 {
-        font-size: 1.5em;
+        font-size: 1.6em;
     }
 
     h2 {
