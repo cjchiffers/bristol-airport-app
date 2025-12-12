@@ -8,44 +8,47 @@
 </head>
 <body>
     <header>
+        <img src="/assets/bristol-logo.png" alt="Bristol Airport Logo">
         <h1>Bristol Airport - Live Departures & Arrivals</h1>
     </header>
 
-    <section id="departures">
-        <h2>Departures</h2>
-        <table id="departureTable">
-            <thead>
-                <tr>
-                    <th>Flight</th>
-                    <th>Airline</th>
-                    <th>Destination</th> <!-- Added Destination header -->
-                    <th>Time</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Dynamic data will be inserted here -->
-            </tbody>
-        </table>
-    </section>
+    <div class="container">
+        <section id="departures">
+            <h2>Departures</h2>
+            <table id="departureTable">
+                <thead>
+                    <tr>
+                        <th>Flight</th>
+                        <th>Airline</th>
+                        <th>Destination</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dynamic data will be inserted here -->
+                </tbody>
+            </table>
+        </section>
 
-    <section id="arrivals">
-        <h2>Arrivals</h2>
-        <table id="arrivalTable">
-            <thead>
-                <tr>
-                    <th>Flight</th>
-                    <th>Airline</th>
-                    <th>Origin</th> <!-- Changed to "Origin" for arrivals -->
-                    <th>Time</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Dynamic data will be inserted here -->
-            </tbody>
-        </table>
-    </section>
+        <section id="arrivals">
+            <h2>Arrivals</h2>
+            <table id="arrivalTable">
+                <thead>
+                    <tr>
+                        <th>Flight</th>
+                        <th>Airline</th>
+                        <th>Origin</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dynamic data will be inserted here -->
+                </tbody>
+            </table>
+        </section>
+    </div>
 
     <script src="script.js"></script>
 </body>

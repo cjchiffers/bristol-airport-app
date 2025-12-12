@@ -1,51 +1,136 @@
 /* General body styles */
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
     margin: 0;
     padding: 0;
     background-color: #f4f4f4;
+    color: #333;
 }
 
-/* Header section */
+/* Header */
 header {
-    background-color: #003366;
+    background-color: #003366;  /* Bristol Airport's blue */
     color: white;
     text-align: center;
-    padding: 10px;
+    padding: 20px 0;
+    border-bottom: 5px solid #00509E; /* A bolder blue line */
+    position: relative;
+}
+
+header img {
+    width: 80px; /* Adjust the logo size */
+    position: absolute;
+    left: 20px;
+    top: 20px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.8em;
+    font-weight: bold;
 }
 
 /* Button styles */
 button {
     background-color: #003366;
     color: white;
-    padding: 10px 20px;
+    padding: 12px 20px;
     border: none;
+    border-radius: 5px;
     cursor: pointer;
+    font-size: 1em;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 button:hover {
     background-color: #00509E;
 }
 
-/* Heading styles */
-h1, h2 {
-    margin: 10px 0;
+/* Section titles */
+h2 {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-top: 20px;
+    color: #003366;
 }
 
-/* Paragraph styles */
-p {
-    font-size: 1.2em;
-    margin: 10px 0;
+/* Tables */
+table {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
 }
 
-/* Make links in tables clickable and styled */
+th, td {
+    padding: 12px;
+    text-align: center;
+}
+
+th {
+    background-color: #003366;
+    color: white;
+    font-size: 1.1em;
+}
+
+td {
+    background-color: white;
+    font-size: 1em;
+    color: #555;
+    border-bottom: 1px solid #ddd;
+}
+
+/* Making flight links look like buttons */
 .flight-link {
-    color: #003366; /* Dark blue color for links */
-    text-decoration: none; /* Remove the underline */
-    cursor: pointer; /* Make it look clickable */
+    color: #003366;
+    text-decoration: none;
+    font-weight: bold;
+    cursor: pointer;
 }
 
 .flight-link:hover {
-    text-decoration: underline; /* Underline the link on hover */
-    color: #00509E; /* Change color on hover */
+    color: #00509E;
+    text-decoration: underline;
+}
+
+/* Mobile-friendly layout (make sure it fits well on iPhone screen) */
+@media only screen and (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    header {
+        padding: 10px;
+        font-size: 1.6em;
+    }
+
+    table {
+        font-size: 0.9em;
+    }
+
+    th, td {
+        padding: 10px;
+    }
+
+    button {
+        width: 100%;
+        padding: 15px;
+        font-size: 1.2em;
+    }
+
+    header h1 {
+        font-size: 1.5em;
+    }
+
+    h2 {
+        font-size: 1.3em;
+    }
+}
+
+/* Add shadows to the entire page for depth */
+.container {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    background-color: white;
+    padding: 20px;
+    margin: 20px;
 }
