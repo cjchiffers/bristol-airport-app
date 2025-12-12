@@ -40,6 +40,7 @@ function displayDepartures(departures) {
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
             <td>${flight.airline.name || 'N/A'}</td>
+            <td>${flight.arrival.iataCode || 'N/A'}</td> <!-- Added destination (arrival airport) -->
             <td>${convertToLondonTime(flight.departure.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
         `;
@@ -54,6 +55,7 @@ function displayArrivals(arrivals) {
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
             <td>${flight.airline.name || 'N/A'}</td>
+            <td>${flight.departure.iataCode || 'N/A'}</td> <!-- Changed to origin (departure airport) -->
             <td>${convertToLondonTime(flight.arrival.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
         `;
