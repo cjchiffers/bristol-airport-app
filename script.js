@@ -106,10 +106,14 @@ function getAirlineLogo(iataCode, airlineName) {
     `;
 }
 
-// Helper function to determine flight status (on time, delayed, cancelled, etc.)
+// Helper function to determine flight status (on time, delayed, cancelled, go to gate, boarding, etc.)
 function getFlightStatus(flight) {
     if (flight.cancelled) {
         return "Cancelled";
+    } else if (flight.boarding) {
+        return "Boarding";
+    } else if (flight.gate) {
+        return `Go to Gate ${flight.gate}`; // If gate info is available
     } else if (flight.delay) {
         return `Delayed ${flight.delay} minutes`;
     } else if (new Date(flight.scheduledTime) > new Date()) {
