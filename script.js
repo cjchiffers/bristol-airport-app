@@ -17,6 +17,13 @@ function getCityName(airportCode) {
     return airportCodeToCityName[airportCode] || airportCode; // Return the city name or fallback to the code
 }
 
+// Function to get current time minus 1 hour (returns timestamp)
+function getCurrentTimeMinusOneHour() {
+    const now = new Date();
+    now.setHours(now.getHours() - 1);  // Subtract 1 hour from the current time
+    return now.getTime();  // Return timestamp in milliseconds
+}
+
 // Fetch departure data
 fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=BRS&type=departure')
     .then(response => response.json())
@@ -64,7 +71,7 @@ function displayDepartures(departures) {
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getCityName(flight.arrival.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.departure.scheduledTime) || 'N/A'}</td>
-            <td>${flight.status || 'N/A'}</td>
+            <td>${getFlightStatus(flight.departure) || 'N/A'}</td> <!-- Enhanced status -->
         `;
     });
 }
@@ -79,7 +86,7 @@ function displayArrivals(arrivals) {
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getCityName(flight.departure.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.arrival.scheduledTime) || 'N/A'}</td>
-            <td>${flight.status || 'N/A'}</td>
+            <td>${getFlightStatus(flight.arrival) || 'N/A'}</td> <!-- Enhanced status -->
         `;
     });
 }
@@ -97,4 +104,16 @@ function getAirlineLogo(iataCode, airlineName) {
         <img src="${logoUrl}" alt="${airlineName} logo" class="airline-logo" onError="this.onerror=null; this.src='default-logo.png';" />
         ${iataCode ? '' : airlineName} <!-- If logo fails, show airline text -->
     `;
+}
+
+// Helper function to determine flight status (on time, delayed, cancelled, etc.)
+function getFlightStatus(flight) {
+    if (flight.cancelled) {
+        return "Cancelled";
+    } else if (flight.delay) {
+        return `Delayed ${flight.delay} minutes`;
+    } else if (new Date(flight.scheduledTime) > new Date()) {
+        return "On time";
+    }
+    return "Active"; // Default fallback
 }
