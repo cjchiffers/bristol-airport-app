@@ -1,27 +1,20 @@
-// Mapping of airport codes to airport names
-const airportCodeToAirportName = {
-    "BRS": "Bristol Airport",
-    "LHR": "London Heathrow Airport",
-    "LGW": "London Gatwick Airport",
-    "DUB": "Dublin Airport",
-    "JFK": "John F. Kennedy International Airport",
-    "SFO": "San Francisco International Airport",
-    "ORD": "Chicago O'Hare International Airport",
-    "CDG": "Charles de Gaulle Airport",
-    "AMS": "Amsterdam Schiphol Airport",
-    // Add more airport codes and names as needed
+// Mapping of airport codes to city names
+const airportCodeToCityName = {
+    "BRS": "Bristol",
+    "LHR": "London Heathrow",
+    "LGW": "London Gatwick",
+    "DUB": "Dublin",
+    "JFK": "New York",
+    "SFO": "San Francisco",
+    "ORD": "Chicago",
+    "CDG": "Paris",
+    "AMS": "Amsterdam",
+    // Add more airport codes and cities as needed
 };
 
-// Function to get airport name from airport code
-function getAirportName(airportCode) {
-    return airportCodeToAirportName[airportCode] || airportCode; // Return the airport name or fallback to the code
-}
-
-// Function to get current time minus 1 hour (returns timestamp)
-function getCurrentTimeMinusOneHour() {
-    const now = new Date();
-    now.setHours(now.getHours() - 1);  // Subtract 1 hour from the current time
-    return now.getTime();  // Return timestamp in milliseconds
+// Function to get city name from airport code
+function getCityName(airportCode) {
+    return airportCodeToCityName[airportCode] || airportCode; // Return the city name or fallback to the code
 }
 
 // Fetch departure data
@@ -69,7 +62,7 @@ function displayDepartures(departures) {
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
-            <td>${getAirportName(flight.arrival.iataCode) || 'N/A'}</td> <!-- Show airport name instead of code -->
+            <td>${getCityName(flight.arrival.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.departure.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
         `;
@@ -84,7 +77,7 @@ function displayArrivals(arrivals) {
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
-            <td>${getAirportName(flight.departure.iataCode) || 'N/A'}</td> <!-- Show airport name instead of code -->
+            <td>${getCityName(flight.departure.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.arrival.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
         `;
