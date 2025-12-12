@@ -20,9 +20,9 @@ function displayDepartures(departures) {
     departures.forEach(flight => {
         let row = departureTable.insertRow();
         row.innerHTML = `
-            <td>${flight.flight.iata}</td>
-            <td>${flight.destination.iata}</td>
-            <td>${flight.scheduledDeparture}</td>
+            <td>${flight.flight.iataNumber}</td>
+            <td>${flight.departure.iataCode}</td>
+            <td>${flight.departure.scheduledTime}</td>
             <td>${flight.status}</td>
         `;
     });
@@ -34,9 +34,9 @@ function displayArrivals(arrivals) {
     arrivals.forEach(flight => {
         let row = arrivalTable.insertRow();
         row.innerHTML = `
-            <td>${flight.flight.iata}</td>
-            <td>${flight.origin.iata}</td>
-            <td>${flight.scheduledArrival}</td>
+            <td>${flight.flight.iataNumber}</td>
+            <td>${flight.arrival.iataCode}</td>
+            <td>${flight.arrival.scheduledTime}</td>
             <td>${flight.status}</td>
         `;
     });
