@@ -1,6 +1,20 @@
-// Function to get airline logo URL (change this as needed)
-function getAirlineLogoUrl(airlineIataCode) {
-    return `/assets/logos/${airlineIataCode}.png`; // Adjust this path to where you store your logos
+// Mapping of airport codes to airport names
+const airportCodeToAirportName = {
+    "BRS": "Bristol Airport",
+    "LHR": "London Heathrow Airport",
+    "LGW": "London Gatwick Airport",
+    "DUB": "Dublin Airport",
+    "JFK": "John F. Kennedy International Airport",
+    "SFO": "San Francisco International Airport",
+    "ORD": "Chicago O'Hare International Airport",
+    "CDG": "Charles de Gaulle Airport",
+    "AMS": "Amsterdam Schiphol Airport",
+    // Add more airport codes and names as needed
+};
+
+// Function to get airport name from airport code
+function getAirportName(airportCode) {
+    return airportCodeToAirportName[airportCode] || airportCode; // Return the airport name or fallback to the code
 }
 
 // Fetch departure data
@@ -48,7 +62,7 @@ function displayDepartures(departures) {
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
             <td><img src="${getAirlineLogoUrl(flight.airline.iataCode)}" alt="${flight.airline.name} logo" class="airline-logo">${flight.airline.name || 'N/A'}</td>
-            <td>${flight.arrival.iataCode || 'N/A'}</td>
+            <td>${getAirportName(flight.arrival.iataCode) || 'N/A'}</td> <!-- Show airport name instead of code -->
             <td>${convertToLondonTime(flight.departure.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
         `;
@@ -63,7 +77,7 @@ function displayArrivals(arrivals) {
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
             <td><img src="${getAirlineLogoUrl(flight.airline.iataCode)}" alt="${flight.airline.name} logo" class="airline-logo">${flight.airline.name || 'N/A'}</td>
-            <td>${flight.departure.iataCode || 'N/A'}</td>
+            <td>${getAirportName(flight.departure.iataCode) || 'N/A'}</td> <!-- Show airport name instead of code -->
             <td>${convertToLondonTime(flight.arrival.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
         `;
