@@ -68,7 +68,7 @@ function displayDepartures(departures) {
         let row = departureTable.insertRow();
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
-            <td><img src="${getAirlineLogoUrl(flight.airline.iataCode)}" alt="${flight.airline.name} logo" class="airline-logo">${flight.airline.name || 'N/A'}</td>
+            <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getAirportName(flight.arrival.iataCode) || 'N/A'}</td> <!-- Show airport name instead of code -->
             <td>${convertToLondonTime(flight.departure.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
@@ -83,7 +83,7 @@ function displayArrivals(arrivals) {
         let row = arrivalTable.insertRow();
         row.innerHTML = `
             <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
-            <td><img src="${getAirlineLogoUrl(flight.airline.iataCode)}" alt="${flight.airline.name} logo" class="airline-logo">${flight.airline.name || 'N/A'}</td>
+            <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getAirportName(flight.departure.iataCode) || 'N/A'}</td> <!-- Show airport name instead of code -->
             <td>${convertToLondonTime(flight.arrival.scheduledTime) || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
@@ -93,11 +93,15 @@ function displayArrivals(arrivals) {
 
 // Helper function to convert UTC time to London Time (with timezone offset)
 function convertToLondonTime(utcTime) {
-    const options = { timeZone: "Europe/London", hour12: true };
-    return new Date(utcTime).toLocaleString('en-GB', options);
+    const options = { timeZone: "Europe/London", hour12: false, hour: "2-digit", minute: "2-digit" };
+    return new Date(utcTime).toLocaleString('en-GB', options); // Show time in 24-hour format
 }
 
-// Helper function to get airline logo URL (using IATA code)
-function getAirlineLogoUrl(iataCode) {
-    return `https://www.gstatic.com/flights/airline_logos/70px/${iataCode}.png`; // Assuming airline logos are available here.
+// Helper function to get airline logo URL (using IATA code) and display it
+function getAirlineLogo(iataCode, airlineName) {
+    const logoUrl = `https://www.gstatic.com/flights/airline_logos/70px/${iataCode}.png`;
+    return `
+        <img src="${logoUrl}" alt="${airlineName} logo" class="airline-logo" onError="this.onerror=null; this.src='default-logo.png';" />
+        ${iataCode ? '' : airlineName} <!-- If logo fails, show airline text -->
+    `;
 }
