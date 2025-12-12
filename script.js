@@ -30,7 +30,7 @@ function displayDepartures(departures) {
     departures.forEach(flight => {
         let row = departureTable.insertRow();
         row.innerHTML = `
-            <td><a href="flight-details.html?flight=${flight.flight.iataNumber}">${flight.flight.iataNumber || 'N/A'}</a></td>
+            <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
             <td>${flight.departure.iataCode || 'N/A'}</td>
             <td>${flight.departure.scheduledTime || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>
@@ -44,7 +44,7 @@ function displayArrivals(arrivals) {
     arrivals.forEach(flight => {
         let row = arrivalTable.insertRow();
         row.innerHTML = `
-            <td><a href="flight-details.html?flight=${flight.flight.iataNumber}">${flight.flight.iataNumber || 'N/A'}</a></td>
+            <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
             <td>${flight.arrival.iataCode || 'N/A'}</td>
             <td>${flight.arrival.scheduledTime || 'N/A'}</td>
             <td>${flight.status || 'N/A'}</td>

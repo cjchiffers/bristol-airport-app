@@ -1,3 +1,4 @@
+/* General body styles */
 body {
     font-family: Arial, sans-serif;
     margin: 0;
@@ -5,6 +6,7 @@ body {
     background-color: #f4f4f4;
 }
 
+/* Header section */
 header {
     background-color: #003366;
     color: white;
@@ -12,6 +14,7 @@ header {
     padding: 10px;
 }
 
+/* Button styles */
 button {
     background-color: #003366;
     color: white;
@@ -24,11 +27,25 @@ button:hover {
     background-color: #00509E;
 }
 
+/* Heading styles */
 h1, h2 {
     margin: 10px 0;
 }
 
+/* Paragraph styles */
 p {
     font-size: 1.2em;
     margin: 10px 0;
+}
+
+/* Make links in tables clickable and styled */
+.flight-link {
+    color: #003366; /* Dark blue color for links */
+    text-decoration: none; /* Remove the underline */
+    cursor: pointer; /* Make it look clickable */
+}
+
+.flight-link:hover {
+    text-decoration: underline; /* Underline the link on hover */
+    color: #00509E; /* Change color on hover */
 }
