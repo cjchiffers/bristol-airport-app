@@ -2,7 +2,7 @@
 fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=BRS&type=departure')
     .then(response => response.json())
     .then(data => {
-        console.log('Departure data:', data);  // Log full response
+        console.log('Departure data:', data);  // Log full response for departures
         if (data && Array.isArray(data)) {
             displayDepartures(data);
         } else {
@@ -15,7 +15,7 @@ fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=
 fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=BRS&type=arrival')
     .then(response => response.json())
     .then(data => {
-        console.log('Arrival data:', data);  // Log full response
+        console.log('Arrival data:', data);  // Log full response for arrivals
         if (data && Array.isArray(data)) {
             displayArrivals(data);
         } else {
@@ -28,7 +28,6 @@ fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=
 function displayDepartures(departures) {
     let departureTable = document.getElementById('departureTable').getElementsByTagName('tbody')[0];
     departures.forEach(flight => {
-        console.log(flight);  // Log each flight data
         let row = departureTable.insertRow();
         row.innerHTML = `
             <td>${flight.flight.iataNumber || 'N/A'}</td>
@@ -43,7 +42,6 @@ function displayDepartures(departures) {
 function displayArrivals(arrivals) {
     let arrivalTable = document.getElementById('arrivalTable').getElementsByTagName('tbody')[0];
     arrivals.forEach(flight => {
-        console.log(flight);  // Log each flight data
         let row = arrivalTable.insertRow();
         row.innerHTML = `
             <td>${flight.flight.iataNumber || 'N/A'}</td>
