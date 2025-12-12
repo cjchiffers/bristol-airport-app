@@ -9,37 +9,26 @@ header {
     background-color: #003366;
     color: white;
     text-align: center;
-    padding: 10px 0;
-}
-
-h1 {
-    font-size: 1.5em;
-    margin: 0;
-}
-
-section {
     padding: 10px;
 }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-}
-
-th, td {
-    padding: 8px;
-    text-align: left;
-    border: 1px solid #ddd;
-}
-
-th {
+button {
     background-color: #003366;
     color: white;
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
 }
 
-@media (max-width: 600px) {
-    th, td {
-        font-size: 0.9em;
-    }
+button:hover {
+    background-color: #00509E;
+}
+
+h1, h2 {
+    margin: 10px 0;
+}
+
+p {
+    font-size: 1.2em;
+    margin: 10px 0;
 }

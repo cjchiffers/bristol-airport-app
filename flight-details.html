@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Details</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Flight Details</h1>
+        <button onclick="window.history.back()">Back</button>
+    </header>
+
+    <section id="flightDetails">
+        <!-- Detailed information will be inserted here -->
+    </section>
+
+    <script>
+        // Get the flight number from the URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const flightNumber = urlParams.get('flight');
+
+        // Check if we have the flight number
+        if (flightNumber) {
+            // Fetch flight details based on flight number
+            fetch(`https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=BRS&type=departure`)
+                .then(response => response.json())
+                .then(data => {
+                    const flight = data.find(flight => flight.flight.iataNumber === flightNumber);
+                    if (flight) {
+                        displayFlightDetails(flight);
+                    } else {
+                        document.getElementById('flightDetails').innerHTML = `<p>Flight not found.</p>`;
+                    }
+                })
+                .catch(error => console.error('Error fetching flight details:', error));
+        }
+
+        function displayFlightDetails(flight) {
+            const flightDetailsSection = document.getElementById('flightDetails');
+            flightDetailsSection.innerHTML = `
+                <h2>${flight.flight.iataNumber} - ${flight.airline.name}</h2>
+                <p><strong>Aircraft:</strong> ${flight.aircraft.icaoCode}</p>
+                <p><strong>Departure Airport:</strong> ${flight.departure.iataCode} (${flight.departure.scheduledTime})</p>
+                <p><strong>Arrival Airport:</strong> ${flight.arrival.iataCode} (${flight.arrival.scheduledTime})</p>
+                <p><strong>Status:</strong> ${flight.status}</p>
+                <p><strong>Delay:</strong> ${flight.departure.delay || 'No delay'}</p>
+                <p><strong>Gate:</strong> ${flight.departure.gate || 'Not available'}</p>
+                <p><strong>Terminal:</strong> ${flight.departure.terminal || 'Not available'}</p>
+                <p><strong>Baggage:</strong> ${flight.departure.baggage || 'Not available'}</p>
+            `;
+        }
+    </script>
+</body>
+</html>
