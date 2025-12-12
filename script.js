@@ -17,6 +17,13 @@ function getAirportName(airportCode) {
     return airportCodeToAirportName[airportCode] || airportCode; // Return the airport name or fallback to the code
 }
 
+// Function to get current time minus 1 hour (returns timestamp)
+function getCurrentTimeMinusOneHour() {
+    const now = new Date();
+    now.setHours(now.getHours() - 1);  // Subtract 1 hour from the current time
+    return now.getTime();  // Return timestamp in milliseconds
+}
+
 // Fetch departure data
 fetch('https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=BRS&type=departure')
     .then(response => response.json())
@@ -82,4 +89,15 @@ function displayArrivals(arrivals) {
             <td>${flight.status || 'N/A'}</td>
         `;
     });
+}
+
+// Helper function to convert UTC time to London Time (with timezone offset)
+function convertToLondonTime(utcTime) {
+    const options = { timeZone: "Europe/London", hour12: true };
+    return new Date(utcTime).toLocaleString('en-GB', options);
+}
+
+// Helper function to get airline logo URL (using IATA code)
+function getAirlineLogoUrl(iataCode) {
+    return `https://www.gstatic.com/flights/airline_logos/70px/${iataCode}.png`; // Assuming airline logos are available here.
 }
