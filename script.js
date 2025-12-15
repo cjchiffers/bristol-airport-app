@@ -13,6 +13,10 @@ const airportCodeToCityName = {
 };
 
 // --- FlightAPI key helper (stores in localStorage) ---
+function safeSetSession(key, value){
+  try { sessionStorage.setItem(key, value); return true; } catch { return false; }
+}
+
 function getFlightApiKey() {
   let k = localStorage.getItem("flightapi_key");
   if (!k) {
@@ -25,7 +29,7 @@ function getFlightApiKey() {
 // Store selected flight + context and open details page
 function openFlightDetailsWithStorage(flight, context) {
   const key = `flight_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  sessionStorage.setItem(key, JSON.stringify({ flight, context }));
+  safeSetSession(key, JSON.stringify({ flight, context }));
   window.location.href = `flight-details.html?key=${encodeURIComponent(key)}`;
 }
 
@@ -86,13 +90,22 @@ function displayDepartures(departures) {
     departures.forEach(flight => {
         let row = departureTable.insertRow();
         row.innerHTML = `
-            <td><button class="btn ghost" onclick=\'openFlightDetailsWithStorage(flight, {mode:"departures", airport:"BRS", day:1})'>${(flight.flight && flight.flight.iataNumber) ? flight.flight.iataNumber : (flight.flight_iata || flight.flightNumber || "N/A")}</button></td>
+            <td><button class="btn ghost flight-open">${(flight.flight && flight.flight.iataNumber) ? flight.flight.iataNumber : (flight.flight_iata || flight.flightNumber || "N/A")}</button></td>
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getCityName(flight.arrival.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.departure.scheduledTime) || 'N/A'}</td>
             <td>${getFlightStatus(flight.departure) || 'N/A'}</td> <!-- Enhanced status -->
         `;
-    });
+    
+        const openBtn = row.querySelector('.flight-open');
+        if (openBtn) {
+            openBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openFlightDetailsWithStorage(flight, {mode:"departures", airport:"BRS", day:1});
+            });
+        }
+});
 }
 
 // Display arrival data in table
@@ -101,13 +114,22 @@ function displayArrivals(arrivals) {
     arrivals.forEach(flight => {
         let row = arrivalTable.insertRow();
         row.innerHTML = `
-            <td><button class="btn ghost" onclick=\'openFlightDetailsWithStorage(flight, {mode:"arrivals", airport:"BRS", day:1})'>${(flight.flight && flight.flight.iataNumber) ? flight.flight.iataNumber : (flight.flight_iata || flight.flightNumber || "N/A")}</button></td>
+            <td><button class="btn ghost flight-open">${(flight.flight && flight.flight.iataNumber) ? flight.flight.iataNumber : (flight.flight_iata || flight.flightNumber || "N/A")}</button></td>
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getCityName(flight.departure.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.arrival.scheduledTime) || 'N/A'}</td>
             <td>${getFlightStatus(flight.arrival) || 'N/A'}</td> <!-- Enhanced status -->
         `;
-    });
+    
+        const openBtn = row.querySelector('.flight-open');
+        if (openBtn) {
+            openBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openFlightDetailsWithStorage(flight, {mode:"arrivals", airport:"BRS", day:1});
+            });
+        }
+});
 }
 
 // Helper function to convert UTC time to London Time (with timezone offset)

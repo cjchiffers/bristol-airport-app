@@ -8,7 +8,20 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
 </head>
+
 <body>
   <header class="app-header">
     <div class="brand">
@@ -25,9 +38,13 @@
     </div>
   </header>
 
+  
   <main class="container">
     <div class="page-title">
-      <h2 id="headline">Loading…</h2>
+      <div>
+        <h2 id="headline">Loading…</h2>
+        <div class="small" id="subhead">—</div>
+      </div>
       <div class="meta">
         <span id="lastUpdated">—</span>
         <span> • </span>
@@ -42,29 +59,47 @@
           <span id="statusBadge" class="badge neutral">—</span>
         </div>
 
-        <div class="kpis" id="kpis"></div>
+        <div class="hero">
+          <div class="airline">
+            <img id="airlineLogo" class="airline-logo xl" alt="" />
+            <div>
+              <div class="hero-title" id="airlineName">—</div>
+              <div class="small" id="airlineCodeLine">—</div>
+            </div>
+          </div>
+
+          <div class="aircraft">
+            <div class="hero-title" id="aircraftType">—</div>
+            <div class="small" id="aircraftReg">—</div>
+          </div>
+        </div>
+
+        <div class="aircraft-image-wrap" id="aircraftImageWrap" style="display:none;">
+          <img id="aircraftImage" class="aircraft-image" alt="Aircraft" />
+          <div class="small" id="aircraftImageCredit"></div>
+        </div>
 
         <div style="height:10px"></div>
+        <div class="kpis" id="kpis"></div>
 
-        <div class="section-title">
-          <h3>Departure</h3>
-        </div>
+        <div style="height:14px"></div>
+
+        <div class="section-title"><h3>Departure</h3></div>
         <div class="kv" id="depKv"></div>
 
         <div style="height:10px"></div>
 
-        <div class="section-title">
-          <h3>Arrival</h3>
-        </div>
+        <div class="section-title"><h3>Arrival</h3></div>
         <div class="kv" id="arrKv"></div>
       </section>
 
       <aside class="card pad">
         <div class="section-title">
-          <h3>All fields</h3>
-          <span class="small">Changes highlighted on refresh</span>
+          <h3>Route map</h3>
+          <span class="small" id="mapHint">Origin and destination</span>
         </div>
-        <div id="allFields"></div>
+
+        <div id="map" class="map"></div>
 
         <details class="raw">
           <summary>Raw JSON</summary>
@@ -73,6 +108,7 @@
       </aside>
     </div>
   </main>
+
 
   <script src="flight-details.js"></script>
 </body>

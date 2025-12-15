@@ -8,7 +8,17 @@
     kpis: document.getElementById("kpis"),
     depKv: document.getElementById("depKv"),
     arrKv: document.getElementById("arrKv"),
-    allFields: document.getElementById("allFields"),
+    subhead: document.getElementById("subhead"),
+    airlineLogo: document.getElementById("airlineLogo"),
+    airlineName: document.getElementById("airlineName"),
+    airlineCodeLine: document.getElementById("airlineCodeLine"),
+    aircraftType: document.getElementById("aircraftType"),
+    aircraftReg: document.getElementById("aircraftReg"),
+    aircraftImageWrap: document.getElementById("aircraftImageWrap"),
+    aircraftImage: document.getElementById("aircraftImage"),
+    aircraftImageCredit: document.getElementById("aircraftImageCredit"),
+    mapHint: document.getElementById("mapHint"),
+    mapEl: document.getElementById("map"),
     rawJson: document.getElementById("rawJson"),
     backBtn: document.getElementById("backBtn"),
     refreshBtn: document.getElementById("refreshBtn"),
@@ -23,6 +33,9 @@
     auto: true,
     timer: null,
     intervalMs: 30000,
+    map: null,
+    mapLayer: null,
+    markers: null,
   };
 
   els.backBtn.addEventListener("click", () => window.history.back());
@@ -43,7 +56,7 @@
 
     let payload = null;
     if (key) {
-      const raw = sessionStorage.getItem(key);
+      const raw = safeGetSession(key);
       if (raw) {
         try { payload = JSON.parse(raw); } catch {}
       }
@@ -55,7 +68,7 @@
       els.headline.textContent = flightParam ? `Flight ${flightParam}` : "Flight details";
       els.statusBadge.textContent = "Unavailable";
       els.sourceLine.textContent = "No stored flight context";
-      els.allFields.innerHTML = `<div class="small">Open this page from the list to see full details.</div>`;
+      els.subhead.textContent = "Open this page from the list to see full details.";
       stopAuto();
       return;
     }
@@ -76,11 +89,25 @@
     state.timer = null;
   }
 
+
+  function safeGetLocal(key){
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+  function safeSetLocal(key, value){
+    try { localStorage.setItem(key, value); return true; } catch { return false; }
+  }
+  function safeGetSession(key){
+    try { return sessionStorage.getItem(key); } catch { return null; }
+  }
+  function safeSetSession(key, value){
+    try { sessionStorage.setItem(key, value); return true; } catch { return false; }
+  }
+
   function getFlightApiKey(){
-    let k = localStorage.getItem("flightapi_key");
+    let k = safeGetLocal("flightapi_key");
     if (!k) {
       k = prompt("Enter your FlightAPI.io API key:");
-      if (k) localStorage.setItem("flightapi_key", k);
+      if (k) safeSetLocal("flightapi_key", k);
     }
     return k;
   }
@@ -103,7 +130,7 @@
 
       // Persist back to sessionStorage so back/forward keeps latest
       try{
-        sessionStorage.setItem(state.storageKey, JSON.stringify({ flight: state.current, context: state.context }));
+        safeSetSession(state.storageKey, JSON.stringify({ flight: state.current, context: state.context }));
       } catch {}
 
       render(state.current, prev);
@@ -252,22 +279,126 @@
   function render(flight, prev){
     const now = new Date();
     els.lastUpdated.textContent = `Last updated: ${now.toLocaleString()}`;
-    els.sourceLine.textContent = state.context ? `Source: FlightAPI schedule (${state.context.airport || "BRS"} • ${state.context.mode || "departures"})` : "Source: stored flight";
-
-    const id = deriveIdentity(flight);
-    const route = `${id.dep || "—"} → ${id.arr || "—"}`;
-    const displayNo = id.flightNo || "—";
-    els.headline.textContent = `${displayNo} • ${route}`;
+    els.sourceLine.textContent = state.context
+      ? `Source: FlightAPI schedule (${state.context.airport || "BRS"} • ${state.context.mode || "departures"})`
+      : "Source: stored flight";
 
     const flat = flattenObject(flight);
     const prevFlat = prev ? flattenObject(prev) : null;
     const changed = prevFlat ? diffKeys(prevFlat, flat) : new Set();
     state.flattened = flat;
 
+    const id = deriveIdentity(flight);
+    const route = `${id.dep || "—"} → ${id.arr || "—"}`;
+    const displayNo = id.flightNo || "—";
+    els.headline.textContent = `${displayNo} • ${route}`;
+
+    // Subhead: local scheduled times summary
+    const depTime = fmtTime(pickAny(flat, [
+      "flight.time.scheduled.departure",
+      "time.scheduled.departure",
+      "departure.scheduledTime",
+      "departure.scheduled",
+      "scheduled_departure",
+      "departure_time",
+      "scheduledDeparture"
+    ]));
+    const arrTime = fmtTime(pickAny(flat, [
+      "flight.time.scheduled.arrival",
+      "time.scheduled.arrival",
+      "arrival.scheduledTime",
+      "arrival.scheduled",
+      "scheduled_arrival",
+      "arrival_time",
+      "scheduledArrival"
+    ]));
+    els.subhead.textContent = depTime && arrTime ? `${depTime} → ${arrTime}` : (depTime ? `Departs ${depTime}` : "—");
+
+    // Airline logo + name
+    const airlineNameVal = pickAny(flat, ["flight.airline.name","airline.name","airlineName","airline"]) || "—";
+    const airlineIata = pickAny(flat, ["flight.airline.code.iata","airline.iata","airline_iata","airlineCode","airline.iataCode"]) || "";
+    els.airlineName.textContent = airlineNameVal;
+    els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
+
+    const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0,2) : "");
+    if (logoIata) {
+      els.airlineLogo.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(logoIata)}.png`;
+      els.airlineLogo.alt = `${airlineNameVal} logo`;
+      els.airlineLogo.onerror = () => { els.airlineLogo.style.display = "none"; };
+      els.airlineLogo.style.display = "";
+    } else {
+      els.airlineLogo.style.display = "none";
+    }
+
+    // Aircraft type + image if provided by API
+    const acCode = pickAny(flat, ["flight.aircraft.model.code","aircraft.model.code","aircraftCode","aircraft.code"]) || "";
+    const acText = pickAny(flat, ["flight.aircraft.model.text","aircraft.model.text","aircraftType","aircraft.text","aircraft.model"]) || "";
+    els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : (acCode ? `Aircraft ${acCode}` : "Aircraft —");
+
+    const reg = pickAny(flat, ["flight.aircraft.registration","aircraft.registration","registration"]) || "";
+    els.aircraftReg.textContent = reg ? `Registration: ${reg}` : "Registration: —";
+
+    // aircraft image: FlightAPI may return flight.aircraft.images (array or object)
+    const imgSrc =
+      pickAny(flat, [
+        "flight.aircraft.images.large[0].src",
+        "flight.aircraft.images.medium[0].src",
+        "flight.aircraft.images.thumbnails[0].src",
+        "aircraft.images.large[0].src",
+        "aircraft.images.medium[0].src",
+        "aircraft.images.thumbnails[0].src"
+      ]);
+    const imgCredit =
+      pickAny(flat, [
+        "flight.aircraft.images.large[0].copyright",
+        "flight.aircraft.images.large[0].source",
+        "aircraft.images.large[0].copyright",
+        "aircraft.images.large[0].source"
+      ]) || "";
+    if (imgSrc) {
+      els.aircraftImage.src = imgSrc;
+      els.aircraftImageWrap.style.display = "";
+      els.aircraftImageCredit.textContent = imgCredit ? `Image: ${imgCredit}` : "";
+    } else {
+      els.aircraftImageWrap.style.display = "none";
+    }
+
+    // Map: plot origin/destination and route line (if coords exist)
+    const oLat = pickNumber(flat, [
+      "flight.airport.origin.info.position.latitude",
+      "flight.airport.origin.position.latitude",
+      "airport.origin.position.latitude",
+      "origin.position.latitude",
+      "departure.position.latitude"
+    ]);
+    const oLng = pickNumber(flat, [
+      "flight.airport.origin.info.position.longitude",
+      "flight.airport.origin.position.longitude",
+      "airport.origin.position.longitude",
+      "origin.position.longitude",
+      "departure.position.longitude"
+    ]);
+    const dLat = pickNumber(flat, [
+      "flight.airport.destination.position.latitude",
+      "airport.destination.position.latitude",
+      "destination.position.latitude",
+      "arrival.position.latitude"
+    ]);
+    const dLng = pickNumber(flat, [
+      "flight.airport.destination.position.longitude",
+      "airport.destination.position.longitude",
+      "destination.position.longitude",
+      "arrival.position.longitude"
+    ]);
+
+    const originCode = pickAny(flat, ["flight.airport.origin.code.iata","departure.iataCode","departure.iata","dep_iata","origin","from"]) || "—";
+    const destCode = pickAny(flat, ["flight.airport.destination.code.iata","arrival.iataCode","arrival.iata","arr_iata","destination","to"]) || "—";
+    els.mapHint.textContent = `${originCode} → ${destCode}`;
+    renderMap(oLat, oLng, dLat, dLng, originCode, destCode);
+
     renderStatusBadge(flight, flat);
     renderKpis(flight, flat, changed);
     renderKvPanels(flight, flat, changed);
-    renderAllFields(flat, changed);
     els.rawJson.textContent = JSON.stringify(flight, null, 2);
   }
 
@@ -296,7 +427,8 @@
       { label:"Scheduled", value: fmtTime(pickAny(flat, ["departure.scheduledTime","departure.scheduled","scheduled_departure","departure_time","scheduledDeparture"])) || "—" },
       { label:"Estimated", value: fmtTime(pickAny(flat, ["departure.estimatedTime","departure.estimated","estimated_departure","estimatedDeparture"])) || "—" },
       { label:"Gate", value: pickAny(flat, ["departure.gate","depGate","gate","departure_gate"]) || "—", keyHint: ["departure.gate","depGate","gate","departure_gate"] },
-      { label:"Terminal", value: pickAny(flat, ["departure.terminal","depTerminal","terminal","departure_terminal"]) || "—", keyHint: ["departure.terminal","depTerminal","terminal","departure_terminal"] },
+      { label: "Terminal",
+        value: bristolTerminal(), keyHint: ["departure.terminal","depTerminal","terminal","departure_terminal"] },
     ];
 
     els.kpis.innerHTML = kpis.map(k => {
@@ -335,24 +467,6 @@
   function kvRow(p, changed){
     const changedCls = p.paths.some(x => changed.has(x)) ? "changed" : "";
     return `<div class="k">${escapeHtml(p.k)}</div><div class="v ${changedCls}">${escapeHtml(String(p.v))}</div>`;
-  }
-
-  function renderAllFields(flat, changed){
-    // Group by top-level prefix for readability
-    const entries = Object.entries(flat);
-    entries.sort((a,b)=>a[0].localeCompare(b[0]));
-
-    const html = entries.map(([k,v]) => {
-      const cls = changed.has(k) ? "changed" : "";
-      return `
-        <div class="kv">
-          <div class="k mono">${escapeHtml(k)}</div>
-          <div class="v ${cls}">${escapeHtml(formatValue(v))}</div>
-        </div>
-      `;
-    }).join("");
-
-    els.allFields.innerHTML = html || `<div class="small">No fields to display.</div>`;
   }
 
   function flattenObject(obj, prefix = "", out = {}){
@@ -423,6 +537,57 @@
   function pair(k,v){
     return { k, v, paths: [] };
   }
+
+  
+  function pickNumber(flat, paths){
+    for (const p of paths){
+      if (flat[p] !== undefined && flat[p] !== null && String(flat[p]).trim() !== "") {
+        const n = Number(flat[p]);
+        if (!Number.isNaN(n)) return n;
+      }
+    }
+    return null;
+  }
+
+  function renderMap(oLat, oLng, dLat, dLng, originCode, destCode){
+    if (!els.mapEl) return;
+
+    // If we don't have coordinates, show a friendly message and skip map init.
+    if (oLat === null || oLng === null || dLat === null || dLng === null) {
+      els.mapEl.innerHTML = `<div class="small" style="padding:12px">Map unavailable (missing coordinates in API response).</div>`;
+      return;
+    }
+
+    // Initialize map once
+    if (!state.map) {
+      state.map = L.map(els.mapEl, {
+        zoomControl: true,
+        attributionControl: true,
+      });
+      // OSM tiles (light). Leaflet has no built-in dark tiles without extra providers.
+      state.mapLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(state.map);
+      state.markers = {
+        origin: L.marker([oLat, oLng]).addTo(state.map),
+        dest: L.marker([dLat, dLng]).addTo(state.map),
+        line: L.polyline([[oLat, oLng],[dLat, dLng]]).addTo(state.map),
+      };
+    } else {
+      // Update positions
+      state.markers.origin.setLatLng([oLat, oLng]);
+      state.markers.dest.setLatLng([dLat, dLng]);
+      state.markers.line.setLatLngs([[oLat, oLng],[dLat, dLng]]);
+    }
+
+    state.markers.origin.bindPopup(`<b>${escapeHtml(originCode)}</b>`);
+    state.markers.dest.bindPopup(`<b>${escapeHtml(destCode)}</b>`);
+
+    const bounds = L.latLngBounds([[oLat, oLng],[dLat, dLng]]);
+    state.map.fitBounds(bounds.pad(0.25));
+  }
+
 
   function escapeHtml(s){
     return String(s)
