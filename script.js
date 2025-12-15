@@ -1,3 +1,16 @@
+
+// Stores current airport coordinates from the last schedule response (FlightAPI schedule wrapper)
+window.__brsAirportPos = window.__brsAirportPos || null;
+function extractAirportPosFromScheduleResponse(data){
+  try{
+    const pos = data?.airport?.pluginData?.details?.position;
+    if (pos && typeof pos.latitude === "number" && typeof pos.longitude === "number") {
+      return { lat: pos.latitude, lng: pos.longitude };
+    }
+  } catch {}
+  return null;
+}
+
 // Mapping of airport codes to city names
 const airportCodeToCityName = {
     "BRS": "Bristol",
@@ -91,6 +104,7 @@ function displayDepartures(departures) {
         let row = departureTable.insertRow();
         row.innerHTML = `
             <td><button class="btn ghost flight-open">${(flight.flight && flight.flight.iataNumber) ? flight.flight.iataNumber : (flight.flight_iata || flight.flightNumber || "N/A")}</button></td>
+            <td><button class="btn ghost flight-save" title="Save">☆</button></td>
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getCityName(flight.arrival.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.departure.scheduledTime) || 'N/A'}</td>
@@ -102,7 +116,16 @@ function displayDepartures(departures) {
             openBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                openFlightDetailsWithStorage(flight, {mode:"departures", airport:"BRS", day:1});
+                openFlightDetailsWithStorage(flight, {mode:"departures", airport:"BRS", day:1, airportPos: window.__brsAirportPos});
+            });
+        }
+        const saveBtn = row.querySelector('.flight-save');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                saveFlight(flight, {mode:"departures", airport:"BRS", day:1, airportPos: window.__brsAirportPos});
+                saveBtn.textContent = "★";
             });
         }
 });
@@ -115,6 +138,7 @@ function displayArrivals(arrivals) {
         let row = arrivalTable.insertRow();
         row.innerHTML = `
             <td><button class="btn ghost flight-open">${(flight.flight && flight.flight.iataNumber) ? flight.flight.iataNumber : (flight.flight_iata || flight.flightNumber || "N/A")}</button></td>
+            <td><button class="btn ghost flight-save" title="Save">☆</button></td>
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getCityName(flight.departure.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.arrival.scheduledTime) || 'N/A'}</td>
@@ -126,7 +150,16 @@ function displayArrivals(arrivals) {
             openBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                openFlightDetailsWithStorage(flight, {mode:"arrivals", airport:"BRS", day:1});
+                openFlightDetailsWithStorage(flight, {mode:"arrivals", airport:"BRS", day:1, airportPos: window.__brsAirportPos});
+            });
+        }
+        const saveBtn = row.querySelector('.flight-save');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                saveFlight(flight, {mode:"arrivals", airport:"BRS", day:1, airportPos: window.__brsAirportPos});
+                saveBtn.textContent = "★";
             });
         }
 });
@@ -162,3 +195,193 @@ function getFlightStatus(flight) {
     }
     return "Active"; // Default fallback
 }
+
+
+
+// --- Tabs: Departures / Arrivals ---
+(function initTabs(){
+  const btns = document.querySelectorAll(".tab-btn");
+  const panels = {
+    departures: document.getElementById("tab-departures"),
+    arrivals: document.getElementById("tab-arrivals"),
+  };
+  if (!btns.length || !panels.departures || !panels.arrivals) return;
+
+  function setTab(name){
+    btns.forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+    Object.entries(panels).forEach(([k, el]) => el.classList.toggle("active", k === name));
+  }
+
+  btns.forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  setTab("departures");
+})();
+
+// =======================
+// Product features (MVP+)
+// =======================
+function safeGetLocal(key){ try { return localStorage.getItem(key);} catch { return null; } }
+function safeSetLocal(key, value){ try { localStorage.setItem(key,value); return true;} catch { return false; } }
+function escapeHtml(s){ return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
+
+// Search filtering
+(function initSearch(){
+  const input = document.getElementById("searchInput");
+  const meta = document.getElementById("searchMeta");
+  if (!input) return;
+  const normalize = (s) => String(s || "").toLowerCase();
+  function filterTables(q){
+    const qn = normalize(q).trim();
+    const tables = [document.getElementById("departureTable"), document.getElementById("arrivalTable")].filter(Boolean);
+    let shown = 0, total = 0;
+    tables.forEach(tbl => {
+      Array.from(tbl.querySelectorAll("tbody tr")).forEach(r => {
+        total += 1;
+        const ok = !qn || normalize(r.innerText).includes(qn);
+        r.style.display = ok ? "" : "none";
+        if (ok) shown += 1;
+      });
+    });
+    if (meta) meta.textContent = qn ? `${shown} of ${total} flights` : "";
+  }
+  input.addEventListener("input", () => filterTables(input.value));
+})();
+
+// Saved flights
+function getSavedFlights(){
+  const raw = safeGetLocal("brs_saved_flights");
+  if (!raw) return [];
+  try { const x = JSON.parse(raw); return Array.isArray(x) ? x : []; } catch { return []; }
+}
+function setSavedFlights(list){ safeSetLocal("brs_saved_flights", JSON.stringify(list.slice(0, 30))); }
+function saveFlight(flight, context){
+  const tripLabel = prompt('Trip label (optional) — e.g. “Barcelona hen do”') || '';
+  const idObj = (typeof deriveIdentity === "function") ? deriveIdentity(flight) : {};
+  const flightNo = idObj.flightNo || (flight.flight && flight.flight.iataNumber) || flight.flight_iata || flight.flightNumber || "—";
+  const dep = idObj.dep || (flight.departure && (flight.departure.iataCode || flight.departure.iata)) || "—";
+  const arr = idObj.arr || (flight.arrival && (flight.arrival.iataCode || flight.arrival.iata)) || "—";
+  const label = `${flightNo} • ${dep}→${arr}` + (tripLabel.trim() ? ` • ${tripLabel.trim()}` : '');
+  const key = `saved_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const list = getSavedFlights();
+  const next = [{ id:key, label, tripLabel: tripLabel.trim(), context, flight }, ...list.filter(x => x.label !== label)];
+  setSavedFlights(next);
+  renderSavedBar();
+}
+function removeSaved(id){ setSavedFlights(getSavedFlights().filter(x => x.id !== id)); renderSavedBar(); }
+function renderSavedBar(){
+  const bar = document.getElementById("savedBar");
+  if (!bar) return;
+  const list = getSavedFlights();
+  if (!list.length){ bar.style.display="none"; bar.innerHTML=""; return; }
+  bar.style.display="";
+  bar.innerHTML = list.map(item => `
+    <div class="chip" data-id="${item.id}">
+      <span>${escapeHtml(item.label)}</span>
+      <span class="x" title="Remove">×</span>
+    </div>
+  `).join("");
+  bar.querySelectorAll(".chip").forEach(ch => {
+    ch.addEventListener("click", (e) => {
+      const id = ch.getAttribute("data-id");
+      if (e.target && e.target.classList && e.target.classList.contains("x")) return removeSaved(id);
+      const item = getSavedFlights().find(x => x.id === id);
+      if (item) openFlightDetailsWithStorage(item.flight, item.context || {mode:"departures", airport:"BRS", day:1, airportPos: window.__brsAirportPos});
+    });
+  });
+}
+(function initSavedUI(){
+  const btn = document.getElementById("savedBtn");
+  const bar = document.getElementById("savedBar");
+  if (!btn || !bar) return;
+  btn.addEventListener("click", () => {
+    const show = bar.style.display === "none";
+    bar.style.display = show ? "" : "none";
+    if (show) renderSavedBar();
+  });
+  renderSavedBar();
+})();
+
+// Install prompt
+(function initInstall(){
+  const btn = document.getElementById("installBtn");
+  if (!btn) return;
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    btn.style.display = "";
+  });
+  btn.addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    try { await deferredPrompt.userChoice; } catch {}
+    deferredPrompt = null;
+    btn.style.display = "none";
+  });
+})();
+
+// Security wait time (local samples)
+function getSecuritySamples(){
+  const raw = safeGetLocal("brs_security_samples");
+  if (!raw) return [];
+  try { const x = JSON.parse(raw); return Array.isArray(x) ? x : []; } catch { return []; }
+}
+function addSecuritySample(minutes){ 
+  const list = getSecuritySamples();
+  list.unshift({ minutes: Number(minutes), when: new Date().toISOString() });
+  safeSetLocal("brs_security_samples", JSON.stringify(list.slice(0, 60)));
+}
+function computeSecurityEstimate(){
+  const list = getSecuritySamples();
+  if (!list.length) return null;
+  const cutoff = Date.now() - 14*24*60*60*1000;
+  const recent = list.filter(s => Date.parse(s.when) >= cutoff);
+  const use = recent.length >= 3 ? recent : list;
+  const avg = use.reduce((a,b)=>a+b.minutes,0)/use.length;
+  return Math.round(avg);
+}
+(function initSecurity(){
+  const btn = document.getElementById("securityBtn");
+  const panel = document.getElementById("securityPanel");
+  if (!btn || !panel) return;
+  function render(){
+    const est = computeSecurityEstimate();
+    const last = getSecuritySamples()[0];
+    panel.innerHTML = `
+      <div class="security-grid">
+        <div class="card pad" style="box-shadow:none;">
+          <div class="section-title"><h3>Estimated security wait</h3></div>
+          <div class="kpi">
+            <div class="label">Typical (local samples)</div>
+            <div class="value mono">${est !== null ? `${est} min` : "—"}</div>
+          </div>
+          <div class="small">${last ? `Last report: ${new Date(last.when).toLocaleString()} (${last.minutes} min)` : "No reports yet — be the first."}</div>
+        </div>
+        <div class="card pad" style="box-shadow:none;">
+          <div class="section-title"><h3>Report your wait</h3></div>
+          <div class="row">
+            <input id="secMinutes" type="number" min="0" max="120" placeholder="Minutes (e.g., 12)" />
+            <button class="btn primary" id="secSubmit" type="button">Submit</button>
+          </div>
+          <div class="small">Stored on your device only. No account.</div>
+        </div>
+      </div>
+    `;
+    const submit = panel.querySelector("#secSubmit");
+    const input = panel.querySelector("#secMinutes");
+    if (submit && input){
+      submit.addEventListener("click", () => {
+        const v = Number(input.value);
+        if (Number.isFinite(v) && v >= 0 && v <= 120){
+          addSecuritySample(v);
+          input.value = "";
+          render();
+        }
+      });
+    }
+  }
+  btn.addEventListener("click", () => {
+    const show = panel.style.display === "none";
+    panel.style.display = show ? "" : "none";
+    if (show) render();
+  });
+})();

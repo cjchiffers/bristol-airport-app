@@ -8,6 +8,7 @@
     <meta http-equiv="Expires" content="0" />
     <title>Bristol Airport - Live Departures & Arrivals</title>
     <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json" />
 </head>
 <body>
    <header class="app-header">
@@ -21,13 +22,22 @@
 </header>
 
     <div class="container">
-        <section id="departures">
+        
+<section class="card pad">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="departures" type="button">Departures</button>
+    <button class="tab-btn" data-tab="arrivals" type="button">Arrivals</button>
+  </div>
+
+  <div class="tab-panels">
+    <div class="tab-panel active" id="tab-departures">
+      <section id="departures">
             <h2>Departures</h2>
             <table class="table" id="departureTable">
                 <thead>
                     <tr>
                         <th>Flight</th>
-                        <th>Airline</th>
+                        <th></th><th>Airline</th>
                         <th>Destination</th>
                         <th>Time</th>
                         <th>Status</th>
@@ -38,14 +48,15 @@
                 </tbody>
             </table>
         </section>
-
-        <section id="arrivals">
+    </div>
+    <div class="tab-panel" id="tab-arrivals">
+      <section id="arrivals">
             <h2>Arrivals</h2>
             <table class="table" id="arrivalTable">
                 <thead>
                     <tr>
                         <th>Flight</th>
-                        <th>Airline</th>
+                        <th></th><th>Airline</th>
                         <th>Origin</th>
                         <th>Time</th>
                         <th>Status</th>
@@ -57,7 +68,17 @@
             </table>
         </section>
     </div>
+  </div>
+</section>
+
+    </div>
 
     <script src="script.js"></script>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(console.warn);
+  }
+</script>
 </body>
 </html>

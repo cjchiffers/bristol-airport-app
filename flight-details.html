@@ -33,6 +33,11 @@
     </div>
     <div class="header-actions">
       <button class="btn ghost" id="backBtn">Back</button>
+      <button class="btn ghost" id="compactBtn" type="button">Focus mode</button>
+      <button class="btn" id="groupBtn" type="button">Group mode</button>
+      <button class="btn" id="shareBtn" type="button">Share</button>
+      <button class="btn" id="calendarBtn" type="button">Add to calendar</button>
+      <button class="btn primary" id="notifyBtn" type="button">Notify me</button>
       <button class="btn" id="refreshBtn">Refresh</button>
       <button class="btn primary" id="autoBtn" aria-pressed="true">Auto-refresh: On</button>
     </div>
@@ -82,9 +87,29 @@
         <div style="height:10px"></div>
         <div class="kpis" id="kpis"></div>
 
+        <div class="leave-card" id="leaveCard"></div>
+        <div class="small" id="inboundLinkLine" style="margin-top:8px;"></div>
+
         <div style="height:14px"></div>
 
-        <div class="section-title"><h3>Departure</h3></div>
+        
+        <div style="height:14px"></div>
+        <div style="height:14px"></div>
+
+        <div class="section-title"><h3>Today’s checklist</h3><span class="small">Plain-English updates</span></div>
+        <div class="callout" id="nudges"></div>
+
+        <div style="height:14px"></div>
+<div class="section-title"><h3>Destination weather</h3><span class="small" id="wxHint">Bristol & destination</span></div>
+        <div class="callout" id="weatherBox"></div>
+
+        <div style="height:14px"></div>
+
+        <div class="section-title"><h3>Bristol tips</h3><span class="small">What helps most on the day</span></div>
+        <div class="callout" id="tipsBox"></div>
+
+        <div style="height:14px"></div>
+<div class="section-title"><h3>Departure</h3></div>
         <div class="kv" id="depKv"></div>
 
         <div style="height:10px"></div>
@@ -111,5 +136,26 @@
 
 
   <script src="flight-details.js"></script>
+
+  <div class="modal-backdrop" id="groupModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Group mode">
+      <div class="modal-head">
+        <div>
+          <div class="hero-title" id="groupTitle">—</div>
+          <div class="small" id="groupSubtitle">—</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn" id="groupShareBtn" type="button">Share</button>
+          <button class="btn ghost" id="groupCloseBtn" type="button">Close</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="countdown-big" id="groupCountdown">—</div>
+        <div class="countdown-sub" id="groupNext">—</div>
+        <div class="pills-row" id="groupPills"></div>
+        <div class="small" style="margin-top:12px;">Tip: add this app to your home screen for an app-like experience.</div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
