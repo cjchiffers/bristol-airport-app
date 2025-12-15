@@ -1,155 +1,287 @@
-/* General body styles */
-body {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f4f4f4;
-    color: #333;
+
+:root{
+  --bg:#0b1220;
+  --panel:#0f1a2e;
+  --panel2:#101f36;
+  --text:#e7eefc;
+  --muted:#9db0d0;
+  --accent:#4ea1ff;
+  --good:#36c18c;
+  --warn:#ffb020;
+  --bad:#ff5d5d;
+  --border:rgba(255,255,255,.08);
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --radius:16px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
 }
 
-/* Header */
-header {
-    background-color: #3399ff;  /* Bristol Airport's blue */
-    color: white;
-    text-align: center;
-    padding: 20px 14px;
-    border-bottom: 5px solid #00509E; /* A bolder blue line */
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color:var(--text);
+  background: radial-gradient(1200px 800px at 20% 0%, rgba(78,161,255,.18), transparent 60%),
+              radial-gradient(1000px 700px at 90% 10%, rgba(54,193,140,.12), transparent 55%),
+              var(--bg);
 }
 
-header img {
-    width: 60px; /* Adjust the logo size for better fit */
-    height: auto;
-    object-fit: contain;
-    flex: 0 0 auto;
+a{ color:inherit; text-decoration:none; }
+a:hover{ text-decoration:underline; }
+
+/* Existing header styles compatibility */
+header, .app-header{
+  position:sticky;
+  top:0;
+  z-index:5;
+  background: rgba(11,18,32,.75);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
 }
 
-header h1 {
-    margin: 0;
-    font-size: 1.8em;
-    font-weight: bold;
-    color: #f5f5f5; /* Light grey, almost white */
-    text-align: center;
-    line-height: 1.1;
-    flex: 1;
+.app-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 18px;
+  gap:14px;
 }
 
-header h1 span {
-    font-size: 1.2em;
-    font-weight: normal;
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width: 240px;
 }
 
-/* Airline logo inside the table */
-.airline-logo {
-    width: 30px;
-    height: auto;
-    vertical-align: middle;
-    margin-right: 10px;
+.brand img{
+  width:44px;
+  height:44px;
+  object-fit:contain;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,.35));
 }
 
-/* Button styles */
-button {
-    background-color: #003366;
-    color: white;
-    padding: 12px 20px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+.brand h1{
+  margin:0;
+  font-size:16px;
+  line-height:1.2;
+  letter-spacing:.2px;
 }
 
-button:hover {
-    background-color: #00509E;
+.brand .sub{
+  display:block;
+  font-size:12px;
+  color:var(--muted);
+  margin-top:2px;
 }
 
-/* Tables */
-table {
-    width: 100%;
-    margin-top: 20px;
-    border-collapse: collapse;
+.header-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
 }
 
-th, td {
-    padding: 12px;
-    text-align: center;
+.btn{
+  appearance:none;
+  border:1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+  color:var(--text);
+  padding:10px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:600;
+  font-size:13px;
+  transition: transform .08s ease, border-color .15s ease, background .15s ease;
+}
+.btn:hover{ border-color: rgba(255,255,255,.16); }
+.btn:active{ transform: translateY(1px); }
+.btn.primary{
+  border-color: rgba(78,161,255,.35);
+  background: linear-gradient(180deg, rgba(78,161,255,.25), rgba(78,161,255,.12));
+}
+.btn.ghost{
+  background: transparent;
 }
 
-th {
-    background-color: #003366;
-    color: white;
-    font-size: 1.1em;
+.container{
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 18px;
 }
 
-td {
-    background-color: white;
-    font-size: 1em;
-    color: #555;
-    border-bottom: 1px solid #ddd;
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
-/* Making flight links look like buttons */
-.flight-link {
-    color: #003366;
-    text-decoration: none;
-    font-weight: bold;
-    cursor: pointer;
+.card.pad{ padding: 16px; }
+
+.grid{
+  display:grid;
+  gap:14px;
+}
+.grid.two{
+  grid-template-columns: 1.1fr .9fr;
+}
+@media (max-width: 900px){
+  .grid.two{ grid-template-columns: 1fr; }
 }
 
-.flight-link:hover {
-    color: #00509E;
-    text-decoration: underline;
+.kpis{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+@media (max-width: 900px){
+  .kpis{ grid-template-columns: repeat(2, 1fr); }
 }
 
-/* Mobile-friendly layout */
-@media only screen and (max-width: 768px) {
-    body {
-        padding: 10px;
-    }
+.kpi{
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(15,26,46,.55);
+}
+.kpi .label{
+  font-size:11px;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.kpi .value{
+  margin-top:6px;
+  font-size:18px;
+  font-weight:700;
+  letter-spacing:.2px;
+}
+.kpi .value.mono{ font-family: var(--mono); font-weight:650; }
 
-    header {
-        flex-direction: column;
-        padding: 12px;
-    }
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight:700;
+  letter-spacing:.2px;
+  background: rgba(15,26,46,.55);
+}
+.badge.good{ border-color: rgba(54,193,140,.35); color: #c9ffea; }
+.badge.warn{ border-color: rgba(255,176,32,.35); color: #ffe4b8; }
+.badge.bad{ border-color: rgba(255,93,93,.35); color: #ffd0d0; }
+.badge.neutral{ color: var(--text); }
 
-    header img {
-        width: 50px; /* Make logo slightly smaller on mobile */
-        height: auto;
-    }
+.table{
+  width:100%;
+  border-collapse: separate;
+  border-spacing:0;
+  overflow:hidden;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.table th, .table td{
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.table th{
+  text-align:left;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing:.03em;
+  background: rgba(15,26,46,.5);
+}
+.table tr:last-child td{ border-bottom:none; }
+.table tr:hover td{ background: rgba(78,161,255,.06); }
 
-    header h1 {
-        font-size: 1.5em;
-        text-align: center;
-    }
+.small{ font-size: 12px; color: var(--muted); }
+.mono{ font-family: var(--mono); }
 
-    header h1 span {
-        font-size: 1.1em;
-        font-weight: normal;
-    }
+/* Flight Details page */
+.page-title{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:10px;
+  margin: 8px 0 14px;
+}
+.page-title h2{
+  margin:0;
+  font-size: 20px;
+  letter-spacing:.2px;
+}
+.page-title .meta{
+  font-size: 12px;
+  color: var(--muted);
+}
 
-    table {
-        font-size: 0.9em;
-    }
+.section-title{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin: 0 0 10px;
+}
+.section-title h3{
+  margin:0;
+  font-size: 14px;
+  color: var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
 
-    th, td {
-        padding: 10px;
-    }
+.kv{
+  display:grid;
+  grid-template-columns: 180px 1fr;
+  gap: 10px 14px;
+  padding: 4px 0;
+}
+@media (max-width: 520px){
+  .kv{ grid-template-columns: 1fr; }
+}
+.kv .k{ color: var(--muted); font-size: 12px; }
+.kv .v{ font-size: 13px; }
 
-    button {
-        width: 100%;
-        padding: 15px;
-        font-size: 1.2em;
-    }
+.changed{
+  outline: 2px solid rgba(255,176,32,.35);
+  background: rgba(255,176,32,.08) !important;
+  border-radius: 10px;
+  padding: 2px 6px;
+}
 
-    header h1 {
-        font-size: 1.6em;
-    }
+details.raw{
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(15,26,46,.55);
+  padding: 10px 12px;
+}
+details.raw summary{
+  cursor:pointer;
+  font-weight: 700;
+  color: var(--text);
+}
+pre{
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #d7e3ff;
+}
 
-    h2 {
-        font-size: 1.3em;
-    }
+/* Keep any existing classes used */
+.airline-logo{
+  width: 26px;
+  height: 26px;
+  vertical-align: middle;
+  margin-right: 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.08);
+  padding: 2px;
 }

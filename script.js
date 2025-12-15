@@ -12,6 +12,25 @@ const airportCodeToCityName = {
     // Add more airport codes and cities as needed
 };
 
+// --- FlightAPI key helper (stores in localStorage) ---
+function getFlightApiKey() {
+  let k = localStorage.getItem("flightapi_key");
+  if (!k) {
+    k = prompt("Enter your FlightAPI.io API key:");
+    if (k) localStorage.setItem("flightapi_key", k);
+  }
+  return k;
+}
+
+// Store selected flight + context and open details page
+function openFlightDetailsWithStorage(flight, context) {
+  const key = `flight_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  sessionStorage.setItem(key, JSON.stringify({ flight, context }));
+  window.location.href = `flight-details.html?key=${encodeURIComponent(key)}`;
+}
+
+
+
 // Function to get city name from airport code
 function getCityName(airportCode) {
     return airportCodeToCityName[airportCode] || airportCode; // Return the city name or fallback to the code
@@ -67,7 +86,7 @@ function displayDepartures(departures) {
     departures.forEach(flight => {
         let row = departureTable.insertRow();
         row.innerHTML = `
-            <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
+            <td><button class="btn ghost" onclick=\'openFlightDetailsWithStorage(flight, {mode:"departures", airport:"BRS", day:1})'>${(flight.flight && flight.flight.iataNumber) ? flight.flight.iataNumber : (flight.flight_iata || flight.flightNumber || "N/A")}</button></td>
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getCityName(flight.arrival.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.departure.scheduledTime) || 'N/A'}</td>
@@ -82,7 +101,7 @@ function displayArrivals(arrivals) {
     arrivals.forEach(flight => {
         let row = arrivalTable.insertRow();
         row.innerHTML = `
-            <td><a href="flight-details.html?flight=${flight.flight.iataNumber}" class="flight-link">${flight.flight.iataNumber || 'N/A'}</a></td>
+            <td><button class="btn ghost" onclick=\'openFlightDetailsWithStorage(flight, {mode:"arrivals", airport:"BRS", day:1})'>${(flight.flight && flight.flight.iataNumber) ? flight.flight.iataNumber : (flight.flight_iata || flight.flightNumber || "N/A")}</button></td>
             <td>${getAirlineLogo(flight.airline.iataCode, flight.airline.name)}</td>
             <td>${getCityName(flight.departure.iataCode) || 'N/A'}</td> <!-- Show city name instead of airport code -->
             <td>${convertToLondonTime(flight.arrival.scheduledTime) || 'N/A'}</td>
