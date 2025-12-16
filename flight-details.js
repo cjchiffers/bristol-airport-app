@@ -1,4 +1,6 @@
-(function () {
+
+
+  (function () {
   const els = {
     headline: document.getElementById("headline"),
     subhead: document.getElementById("subhead"),
@@ -25,7 +27,7 @@
     aircraftImageCredit: document.getElementById("aircraftImageCredit"),
 
     mapHint: document.getElementById("mapHint"),
-    mapEl: document.getElementById("map"),
+    mapEl: document.getElementById("routeSvg"),
 
     notifyBtn: document.getElementById("notifyBtn"),
     shareBtn: document.getElementById("shareBtn"),
@@ -43,11 +45,45 @@
     groupCountdown: document.getElementById("groupCountdown"),
     groupNext: document.getElementById("groupNext"),
     groupPills: document.getElementById("groupPills"),
-    nudges: document.getElementById("nudges"),
     weatherBox: document.getElementById("weatherBox"),
     wxHint: document.getElementById("wxHint"),
-    tipsBox: document.getElementById("tipsBox"),
   };
+  // Details overflow menu (mobile)
+  const overflowBtn = document.getElementById("overflowDetailsBtn");
+  const menu = document.getElementById("detailsMenu");
+  const closeMenu = () => {
+    if (!menu || !overflowBtn) return;
+    menu.classList.remove("open");
+    overflowBtn.setAttribute("aria-expanded", "false");
+  };
+  const openMenu = () => {
+    if (!menu || !overflowBtn) return;
+    menu.classList.add("open");
+    overflowBtn.setAttribute("aria-expanded", "true");
+  };
+  const toggleMenu = (ev) => {
+    if (!menu || !overflowBtn) return;
+    ev && ev.stopPropagation();
+    if (menu.classList.contains("open")) closeMenu();
+    else openMenu();
+  };
+
+  if (overflowBtn && menu) {
+    overflowBtn.addEventListener("click", toggleMenu);
+    document.addEventListener("click", (e) => {
+      if (!menu.classList.contains("open")) return;
+      if (menu.contains(e.target) || overflowBtn.contains(e.target)) return;
+      closeMenu();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeMenu();
+    });
+    menu.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (btn) closeMenu();
+    });
+  }
+
 
   const state = {
     storageKey: null,
@@ -79,6 +115,223 @@
     } catch {
       return false;
     }
+
+  // Airport coordinates fallback (IATA -> lat/lng). Used when API payload omits positions.
+  var AIRPORT_COORDS = {
+  "BRS": [
+    51.3827,
+    -2.7191
+  ],
+  "LGW": [
+    51.1537,
+    -0.1821
+  ],
+  "LHR": [
+    51.47,
+    -0.4543
+  ],
+  "STN": [
+    51.885,
+    0.235
+  ],
+  "MAN": [
+    53.365,
+    -2.272
+  ],
+  "BHX": [
+    52.4539,
+    -1.748
+  ],
+  "EDI": [
+    55.95,
+    -3.3725
+  ],
+  "GLA": [
+    55.8719,
+    -4.4331
+  ],
+  "DUB": [
+    53.4213,
+    -6.2701
+  ],
+  "AMS": [
+    52.3086,
+    4.7639
+  ],
+  "CDG": [
+    49.0097,
+    2.5479
+  ],
+  "ORY": [
+    48.7262,
+    2.3652
+  ],
+  "BCN": [
+    41.2974,
+    2.0833
+  ],
+  "MAD": [
+    40.4983,
+    -3.5676
+  ],
+  "LIS": [
+    38.7742,
+    -9.1342
+  ],
+  "OPO": [
+    41.2481,
+    -8.6814
+  ],
+  "AGP": [
+    36.6749,
+    -4.4991
+  ],
+  "ALC": [
+    38.2822,
+    -0.5582
+  ],
+  "PMI": [
+    39.5517,
+    2.7388
+  ],
+  "FAO": [
+    37.0144,
+    -7.9659
+  ],
+  "TFS": [
+    28.0445,
+    -16.5725
+  ],
+  "ACE": [
+    28.9455,
+    -13.6052
+  ],
+  "FUE": [
+    28.4527,
+    -13.8638
+  ],
+  "IBZ": [
+    38.8729,
+    1.3731
+  ],
+  "NCE": [
+    43.6653,
+    7.215
+  ],
+  "GVA": [
+    46.2381,
+    6.1089
+  ],
+  "ZRH": [
+    47.4581,
+    8.5555
+  ],
+  "VIE": [
+    48.1103,
+    16.5697
+  ],
+  "PRG": [
+    50.1008,
+    14.2632
+  ],
+  "BUD": [
+    47.439,
+    19.261
+  ],
+  "WAW": [
+    52.1657,
+    20.9671
+  ],
+  "KRK": [
+    50.0777,
+    19.7848
+  ],
+  "FCO": [
+    41.8003,
+    12.2389
+  ],
+  "NAP": [
+    40.886,
+    14.2908
+  ],
+  "VCE": [
+    45.5053,
+    12.3519
+  ],
+  "MXP": [
+    45.6306,
+    8.7281
+  ],
+  "BGY": [
+    45.6699,
+    9.7042
+  ],
+  "BER": [
+    52.3667,
+    13.5033
+  ],
+  "FRA": [
+    50.0379,
+    8.5622
+  ],
+  "MUC": [
+    48.3538,
+    11.7861
+  ],
+  "HAM": [
+    53.6304,
+    9.9882
+  ],
+  "DUS": [
+    51.2895,
+    6.7668
+  ],
+  "CPH": [
+    55.618,
+    12.6508
+  ],
+  "ARN": [
+    59.6519,
+    17.9186
+  ],
+  "OSL": [
+    60.1976,
+    11.1004
+  ],
+  "KEF": [
+    63.985,
+    -22.6056
+  ],
+  "JER": [
+    49.2079,
+    -2.1955
+  ],
+  "GCI": [
+    49.435,
+    -2.6019
+  ]
+};
+
+  function getAirportCoords(iata){
+    const code = String(iata || "").toUpperCase().trim();
+    if (!code) return null;
+
+    // Allow user overrides (local)
+    try{
+      const raw = safeGetLocal("brs_airport_coords_overrides");
+      if (raw){
+        const map = JSON.parse(raw);
+        if (map && map[code] && Array.isArray(map[code]) && map[code].length === 2){
+          return { lat: Number(map[code][0]), lng: Number(map[code][1]) };
+        }
+      }
+    } catch {}
+
+    const v = AIRPORT_COORDS && AIRPORT_COORDS[code];
+    if (!v) return null;
+    return { lat: Number(v[0]), lng: Number(v[1]) };
+  }
+
   }
   function safeGetSession(key) {
     try {
@@ -463,11 +716,20 @@ const list =
 
     if (els.mapHint) els.mapHint.textContent = `${originCode} → ${destCode}`;
 
-    renderMap(oLat, oLng, dLat, dLng, originCode, destCode);
+    if ((oLat == null || oLng == null) && originCode) {
+      const c = getAirportCoords(originCode);
+      if (c) { oLat = c.lat; oLng = c.lng; }
+    }
+    if ((dLat == null || dLng == null) && destCode) {
+      const c = getAirportCoords(destCode);
+      if (c) { dLat = c.lat; dLng = c.lng; }
+    }
+
+    renderMap(oLat, oLng, dLat, dLng, originCode ? String(originCode).toUpperCase() : originCode, destCode ? String(destCode).toUpperCase() : destCode);
 
     renderLeaveIndicator(flat);
     renderInboundLink(flat);
-    renderNudges(flat);
+    renderWeather(flat);
 
     // Raw JSON
     if (els.rawJson) els.rawJson.textContent = JSON.stringify(flight, null, 2);
@@ -597,59 +859,84 @@ const list =
     return null;
   }
 
-  function renderMap(oLat, oLng, dLat, dLng, originCode, destCode) {
-    if (!els.mapEl) return;
+  
+  function haversineKm(lat1, lon1, lat2, lon2){
+    const R = 6371;
+    const toRad = (d)=> (d*Math.PI)/180;
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.min(1, Math.sqrt(a)));
+  }
 
-    // Leaflet not loaded or blocked
-    if (typeof L === "undefined") {
-      els.mapEl.innerHTML = `<div class="small" style="padding:12px">Map unavailable (Leaflet blocked).</div>`;
+function renderMap(oLat, oLng, dLat, dLng, originCode, destCode) {
+    // Draw a simple SVG route map (equirectangular projection).
+    const svg = els.mapEl;
+    if (!svg) return;
+
+    const w = 1000, h = 420; // viewBox units
+
+    // Clear
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    // SVG helper
+    const make = (name, attrs = {}) => {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", name);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+      return el;
+    };
+
+    // Background
+    svg.appendChild(make("rect", { x: 0, y: 0, width: w, height: h, fill: "rgba(15,26,46,0.35)" }));
+
+    // Grid
+    for (let i = 1; i < 6; i++) {
+      svg.appendChild(make("line", { x1: (w / 6) * i, y1: 0, x2: (w / 6) * i, y2: h, stroke: "rgba(157,176,208,0.08)", "stroke-width": 1 }));
+    }
+    for (let i = 1; i < 4; i++) {
+      svg.appendChild(make("line", { x1: 0, y1: (h / 4) * i, x2: w, y2: (h / 4) * i, stroke: "rgba(157,176,208,0.08)", "stroke-width": 1 }));
+    }
+
+    const isNum = (n) => typeof n === "number" && isFinite(n);
+    if (!isNum(oLat) || !isNum(oLng) || !isNum(dLat) || !isNum(dLng)) {
+      const t = make("text", { x: w / 2, y: h / 2, "text-anchor": "middle", "dominant-baseline": "middle", fill: "rgba(157,176,208,0.9)", "font-size": 20, "font-weight": 900 });
+      t.textContent = `${originCode || "—"} → ${destCode || "—"}`;
+      svg.appendChild(t);
       return;
     }
 
-    if (oLat === null || oLng === null || dLat === null || dLng === null) {
-      els.mapEl.innerHTML = `<div class="small" style="padding:12px">Map unavailable (missing coordinates in API response).</div>`;
-      return;
+    const proj = (lat, lng) => {
+      const x = ((lng + 180) / 360) * w;
+      const y = ((90 - lat) / 180) * h;
+      return { x, y };
+    };
+
+    const a = proj(oLat, oLng);
+    const b = proj(dLat, dLng);
+
+    // Line
+    svg.appendChild(make("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: "rgba(78,161,255,0.95)", "stroke-width": 4, "stroke-linecap": "round" }));
+
+    // Endpoints
+    const endpoint = (pt, label, side) => {
+      svg.appendChild(make("circle", { cx: pt.x, cy: pt.y, r: 12, fill: "rgba(78,161,255,0.20)" }));
+      svg.appendChild(make("circle", { cx: pt.x, cy: pt.y, r: 7, fill: "rgba(255,255,255,0.95)" }));
+      const dx = side === "left" ? -14 : 14;
+      const anchor = side === "left" ? "end" : "start";
+      const t = make("text", { x: pt.x + dx, y: pt.y - 12, "text-anchor": anchor, fill: "rgba(235,245,255,0.95)", "font-size": 16, "font-weight": 950 });
+      t.textContent = label || "—";
+      svg.appendChild(t);
+    };
+
+    endpoint(a, originCode, "right");
+    endpoint(b, destCode, "left");
+
+    const km = haversineKm(oLat, oLng, dLat, dLng);
+    if (Number.isFinite(km)) {
+      const t2 = make("text", { x: w / 2, y: h - 16, "text-anchor": "middle", fill: "rgba(157,176,208,0.85)", "font-size": 13, "font-weight": 800 });
+      t2.textContent = `${Math.round(km).toLocaleString()} km (great-circle)`;
+      svg.appendChild(t2);
     }
-
-    if (!state.map) {
-      state.map = L.map(els.mapEl, {
-        zoomControl: true,
-        attributionControl: true,
-      });
-
-      state.mapLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 18,
-        attribution: "&copy; OpenStreetMap contributors",
-      }).addTo(state.map);
-
-      state.markers = {
-        origin: L.marker([oLat, oLng]).addTo(state.map),
-        dest: L.marker([dLat, dLng]).addTo(state.map),
-        line: L.polyline(
-          [
-            [oLat, oLng],
-            [dLat, dLng],
-          ],
-          { weight: 3, opacity: 0.85 }
-        ).addTo(state.map),
-      };
-    } else {
-      state.markers.origin.setLatLng([oLat, oLng]);
-      state.markers.dest.setLatLng([dLat, dLng]);
-      state.markers.line.setLatLngs([
-        [oLat, oLng],
-        [dLat, dLng],
-      ]);
-    }
-
-    state.markers.origin.bindPopup(`<b>${escapeHtml(originCode)}</b>`);
-    state.markers.dest.bindPopup(`<b>${escapeHtml(destCode)}</b>`);
-
-    const bounds = L.latLngBounds([
-      [oLat, oLng],
-      [dLat, dLng],
-    ]);
-    state.map.fitBounds(bounds.pad(0.25));
   }
 
   // ---------- Identity & matching ----------
@@ -685,7 +972,6 @@ const list =
   function normalize(x) {
     return String(x).trim().toUpperCase();
   }
-
   function timeDistanceMinutes(t1, t2) {
     const a = toDate(t1);
     const b = toDate(t2);
@@ -990,59 +1276,15 @@ function renderLeaveIndicator(flat){
     } catch { return null; }
   }
 
-  function renderNudges(flat){
-    if (!els.nudges) return;
-    const rawStatus =
-      pickAny(flat, ["status", "flight_status", "arrival.status", "departure.status", "flight.status", "info.status"]) || "Unknown";
-
-    const friendlyStatus = (() => {
-      const st = String(rawStatus).toLowerCase();
-      if (st.includes("cancel")) return "Cancelled";
-      if (st.includes("delay")) return "Delayed";
-      if (st.includes("boarding")) return "Boarding";
-      if (st.includes("depart")) return "Departed";
-      if (st.includes("land")) return "Landed";
-      if (st.includes("scheduled") || st.includes("on time")) return "On time";
-      return rawStatus;
-    })();
-
-    const status = friendlyStatus;
-
-    // original status value (kept via rawStatus)
-    // const status = (pickAny(flat, ["status","flight_status","arrival.status","departure.status"]) || "Unknown").toLowerCase();
-    const gate = pickAny(flat, ["departure.gate","depGate","gate","departure_gate"]) || "";
-    const depSched = toDate(pickAny(flat, ["departure.scheduledTime","departure.scheduled","scheduled_departure","departure_time","scheduledDeparture"]));
-    const depEst = toDate(pickAny(flat, ["departure.estimatedTime","departure.estimated","estimated_departure","estimatedDeparture"])) || depSched;
-    const minsToDep = depEst ? (depEst.getTime() - Date.now())/60000 : null;
-    const lastCallMins = depEst ? minsToDep - 15 : null;
-
-    let title = "Today’s checklist";
-    let lines = [
-      "Passport / ID ready",
-      "Liquids: under 100ml in a clear bag",
-      "Terminal: Bristol is Terminal 1"
-    ];
-    if (gate) lines.unshift(`Gate: ${gate} (walk ~${estimateGateWalkMinutes(gate) || "—"} min)`);
-
-    let vibe = "Calm";
-    if (status.includes("cancel")) { vibe = "Stop"; title="Update"; lines = ["This flight is cancelled."]; }
-    else if (status.includes("boarding")) { vibe = "Go"; title="Boarding"; lines = [gate ? `Head to Gate ${gate} now.` : "Boarding now — head airside."]; }
-    else if (lastCallMins !== null && lastCallMins <= 15 && lastCallMins > 0) { vibe="Soon"; title="Last call approaching"; lines.unshift("Finish up and head airside."); }
-    else if (lastCallMins !== null && lastCallMins <= 0) { vibe="Now"; title="Last call"; lines = ["Time to go — last call is due."]; }
-    else if (status.includes("delay")) { vibe="Easy"; title="Delayed"; lines.unshift("You’ve got extra time — keep an eye on updates."); }
-
-    const emojis = { Calm:"✅", Easy:"🟢", Soon:"🟡", Now:"🟠", Go:"🔔", Stop:"⛔" };
-    els.nudges.innerHTML = `
-      <div class="big">${escapeHtml(emojis[vibe] || "✅")} ${escapeHtml(title)}</div>
-      <div class="small" style="margin-top:6px">${lines.map(l => `• ${escapeHtml(l)}`).join("<br/>")}</div>
-    `;
-  }
-
   async function renderWeather(flat){
     if (!els.weatherBox) return;
 
     const mode = (state.context && state.context.mode) ? state.context.mode : "departures";
-    const brs = (state.context && state.context.airportPos) ? state.context.airportPos : null;
+    let brs = (state.context && state.context.airportPos) ? state.context.airportPos : null;
+    if (!brs || brs.lat == null || brs.lng == null) {
+      const c = getAirportCoords("BRS");
+      if (c) brs = c;
+    }
 
     const otherLat = pickNumber(flat, [
       mode === "departures" ? "flight.airport.destination.position.latitude" : "flight.airport.origin.position.latitude",
@@ -1071,7 +1313,14 @@ function renderLeaveIndicator(flat){
 
     if (els.wxHint) els.wxHint.textContent = `Bristol (BRS) • ${otherCode}`;
 
-    if ((!brs || brs.lat == null || brs.lng == null) && (otherLat === null || otherLng === null)) {
+    let otherLat2 = otherLat;
+    let otherLng2 = otherLng;
+    if ((otherLat2 === null || otherLng2 === null) && otherCode) {
+      const c = getAirportCoords(otherCode);
+      if (c) { otherLat2 = c.lat; otherLng2 = c.lng; }
+    }
+
+    if ((!brs || brs.lat == null || brs.lng == null) && (otherLat2 === null || otherLng2 === null)) {
       els.weatherBox.innerHTML = `<div class="small">Weather unavailable (missing coordinates).</div>`;
       return;
     }
@@ -1138,9 +1387,9 @@ function renderLeaveIndicator(flat){
         brsData = getCached(brs.lat, brs.lng) || await fetchWx(brs.lat, brs.lng);
         setCached(brs.lat, brs.lng, brsData);
       }
-      if (otherLat !== null && otherLng !== null){
-        otherData = getCached(otherLat, otherLng) || await fetchWx(otherLat, otherLng);
-        setCached(otherLat, otherLng, otherData);
+      if (otherLat2 !== null && otherLng2 !== null){
+        otherData = getCached(otherLat2, otherLng2) || await fetchWx(otherLat2, otherLng2);
+        setCached(otherLat2, otherLng2, otherData);
       }
 
       const parts = [];
@@ -1151,103 +1400,6 @@ function renderLeaveIndicator(flat){
     } catch (e){
       els.weatherBox.innerHTML = `<div class="small">Weather unavailable right now.</div>`;
     }
-  }
-
-    // Cache for 15 minutes
-    const cacheKey = `wx_${destLat.toFixed(2)}_${destLng.toFixed(2)}`;
-    try{
-      const raw = safeGetLocal(cacheKey);
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (Date.now() - cached.t < 15*60*1000) {
-          els.weatherBox.innerHTML = cached.html;
-          return;
-        }
-      }
-    } catch {}
-
-    els.weatherBox.innerHTML = `<div class="small">Loading weather…</div>`;
-
-    try{
-      const url = new URL("https://api.open-meteo.com/v1/forecast");
-      url.searchParams.set("latitude", String(destLat));
-      url.searchParams.set("longitude", String(destLng));
-      url.searchParams.set("current_weather", "true");
-      url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,precipitation_probability_max");
-      url.searchParams.set("timezone", "auto");
-
-      const res = await fetch(url.toString(), { cache:"no-store" });
-      if (!res.ok) throw new Error("weather");
-      const data = await res.json();
-
-      const cur = data.current_weather;
-      const daily = data.daily;
-      const todayMax = daily?.temperature_2m_max?.[0];
-      const todayMin = daily?.temperature_2m_min?.[0];
-      const rain = daily?.precipitation_probability_max?.[0];
-
-      const html = `
-        <div class="panel-grid">
-          <div class="kpi">
-            <div class="label">Now</div>
-            <div class="value mono">${cur ? `${Math.round(cur.temperature)}°C` : "—"}</div>
-            <div class="small">${cur ? `Wind ${Math.round(cur.windspeed)} km/h` : ""}</div>
-          </div>
-          <div class="kpi">
-            <div class="label">Today</div>
-            <div class="value mono">${(todayMin!==undefined && todayMax!==undefined) ? `${Math.round(todayMin)}–${Math.round(todayMax)}°C` : "—"}</div>
-            <div class="small">${rain !== undefined ? `Rain chance ${Math.round(rain)}%` : ""}</div>
-          </div>
-        </div>
-        <div class="small" style="margin-top:10px;">Powered by Open‑Meteo (best effort).</div>
-      `;
-      els.weatherBox.innerHTML = html;
-      try { safeSetLocal(cacheKey, JSON.stringify({ t: Date.now(), html })); } catch {}
-    } catch (e){
-      els.weatherBox.innerHTML = `<div class="small">Weather unavailable right now.</div>`;
-    }
-  }
-
-  function renderTips(flat){
-    if (!els.tipsBox) return;
-    const now = new Date();
-    const hour = now.getHours();
-
-    // Very lightweight, static Bristol guidance (keeps app fast + reliable)
-    const food = [
-      { name: "Coffee", note: "Plenty of options airside; queues peak early morning." },
-      { name: "Breakfast", note: "Allow extra time on Friday mornings." },
-      { name: "Wetherspoons", note: "A dependable early option for groups." }
-    ];
-
-    const openNow = (h) => (h >= 4 && h <= 22); // conservative airport-window
-
-    const parking = [
-      "Drop & Go: remember to pay (charges apply).",
-      "If parking: add shuttle/walk time (often 10–15 mins).",
-      "Meet-ups: set a clear rendezvous point landside."
-    ];
-
-    const security = [
-      "Liquids under 100ml in a clear bag.",
-      "Keep laptops/tablets accessible.",
-      "Families: prep bags before you join the queue."
-    ];
-
-    els.tipsBox.innerHTML = `
-      <div class="panel-grid">
-        <div>
-          <div class="hero-title">What’s open</div>
-          <div class="small">${openNow(hour) ? "Most outlets should be open around now." : "Some outlets may be closed right now."}</div>
-          <div class="small" style="margin-top:8px">${food.map(x => `• <b>${escapeHtml(x.name)}</b>: ${escapeHtml(x.note)}`).join("<br/>")}</div>
-        </div>
-        <div>
-          <div class="hero-title">Parking & security</div>
-          <div class="small" style="margin-top:6px">${parking.concat(security).map(x => `• ${escapeHtml(x)}`).join("<br/>")}</div>
-        </div>
-      </div>
-      <div class="small" style="margin-top:10px">Tip: for groups, use “Group mode” to keep everyone on the same countdown.</div>
-    `;
   }
 
   function openGroupMode(){

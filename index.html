@@ -1,84 +1,102 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <title>Bristol Airport - Live Departures & Arrivals</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Bristol Airport — Flights</title>
   <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
-   <header class="app-header">
-  <div class="brand">
-    <img class="brand-logo" src="assets/bristol-logo.png" alt="Bristol Airport">
-    <div class="brand-title">
-      Bristol Airport
-      <span>Live Departures & Arrivals</span>
-    </div>
-  </div>
-</header>
-
-    <div class="container">
-        
-<section class="card pad">
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="departures" type="button">Departures</button>
-    <button class="tab-btn" data-tab="arrivals" type="button">Arrivals</button>
-  </div>
-
-  <div class="tab-panels">
-    <div class="tab-panel active" id="tab-departures">
-      <section id="departures">
-            <h2>Departures</h2>
-            <table class="table" id="departureTable">
-                <thead>
-                    <tr>
-                        <th>Flight</th>
-                        <th></th><th>Airline</th>
-                        <th>Destination</th>
-                        <th>Time</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Dynamic data will be inserted here -->
-                </tbody>
-            </table>
-        </section>
-    </div>
-    <div class="tab-panel" id="tab-arrivals">
-      <section id="arrivals">
-            <h2>Arrivals</h2>
-            <table class="table" id="arrivalTable">
-                <thead>
-                    <tr>
-                        <th>Flight</th>
-                        <th></th><th>Airline</th>
-                        <th>Origin</th>
-                        <th>Time</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Dynamic data will be inserted here -->
-                </tbody>
-            </table>
-        </section>
-    </div>
-  </div>
-</section>
-
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="assets/bristol-logo.png" alt="Bristol Airport" />
+      <div class="brand-text">
+        <div class="brand-name">Bristol Airport</div>
+        <div class="brand-sub">Live flights</div>
+      </div>
     </div>
 
-    <script src="script.js"></script>
+    <button class="icon-btn" id="overflowBtn" aria-haspopup="menu" aria-expanded="false" aria-label="More">
+      ⋯
+    </button>
 
-<script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(console.warn);
-  }
-</script>
+    <div class="menu" id="overflowMenu" role="menu" aria-label="More menu">
+      <button class="menu-item" id="savedBtn" role="menuitem">Saved flights</button>
+      <button class="menu-item" id="securityBtn" role="menuitem">Security wait</button>
+      <button class="menu-item" id="installBtn" role="menuitem" style="display:none;">Install app</button>
+      <button class="menu-item" id="refreshBtn" role="menuitem">Refresh</button>
+    </div>
+  </header>
+
+  <main class="app">
+    <section class="search">
+      <div class="segmented" role="tablist" aria-label="Departures and arrivals">
+        <button class="seg-btn active" data-tab="departures" type="button" role="tab" aria-selected="true">Departures</button>
+        <button class="seg-btn" data-tab="arrivals" type="button" role="tab" aria-selected="false">Arrivals</button>
+      </div>
+
+      <label class="searchbox" aria-label="Search flights">
+        <span class="searchicon">⌕</span>
+        <input id="searchInput" type="search" inputmode="search"
+               placeholder="Search flight, city, airline, status…" autocomplete="off" />
+        <button class="clear-btn" id="clearSearchBtn" type="button" aria-label="Clear search">×</button>
+      </label>
+
+      <div class="chips-row" id="quickFilters" aria-label="Quick filters">
+        <button class="chip-btn active" data-filter="all" type="button">All</button>
+        <button class="chip-btn" data-filter="next" type="button">Next 4h</button>
+        <button class="chip-btn" data-filter="delayed" type="button">Delayed</button>
+        <button class="chip-btn" data-filter="gate" type="button">Gate</button>
+      </div>
+
+      <div class="meta-row">
+        <div class="meta" id="searchMeta"></div>
+        <div class="meta" id="lastRefreshed"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="savedDrawer" style="display:none;">
+      <div class="panel-head">
+        <div class="panel-title">Saved flights</div>
+        <button class="icon-btn" id="savedCloseBtn" aria-label="Close saved">×</button>
+      </div>
+      <div class="savedBar" id="savedBar"></div>
+      <div class="panel-hint">Tip: tap a saved flight to open details. Stored on this device.</div>
+    </section>
+
+    <section class="panel" id="securityPanel" style="display:none;"></section>
+
+    <section class="list-wrap">
+      <div class="tab-panel active" id="tab-departures">
+        <div class="list-head">
+          <h2>Departures</h2>
+          <div class="small">Tap a flight for details</div>
+        </div>
+        <div class="flight-list" id="departureList" aria-live="polite"></div>
+        <div class="empty" id="depEmpty" style="display:none;">No departures match your filters.</div>
+      </div>
+
+      <div class="tab-panel" id="tab-arrivals">
+        <div class="list-head">
+          <h2>Arrivals</h2>
+          <div class="small">Tap a flight for details</div>
+        </div>
+        <div class="flight-list" id="arrivalList" aria-live="polite"></div>
+        <div class="empty" id="arrEmpty" style="display:none;">No arrivals match your filters.</div>
+      </div>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  </main>
+
+  <script src="script.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(console.warn);
+  </script>
 </body>
 </html>
