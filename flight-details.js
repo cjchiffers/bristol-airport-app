@@ -672,26 +672,56 @@ const list =
 
     const otherLat = pickNumber(flat, [
       "flight.airport.destination.position.latitude",
+      "flight.airport.destination.position.lat",
+      "flight.airport.destination.positionLatitude",
       "airport.destination.position.latitude",
+      "airport.destination.position.lat",
       "destination.position.latitude",
-      "flight.airport.origin.position.latitude",
-      "airport.origin.position.latitude",
-      "origin.position.latitude",
+      "destination.position.lat",
       "arrival.position.latitude",
-      "departure.position.latitude"
-    ]);
-    const otherLng = pickNumber(flat, [
-      "flight.airport.destination.position.longitude",
-      "airport.destination.position.longitude",
-      "destination.position.longitude",
-      "flight.airport.origin.position.longitude",
-      "airport.origin.position.longitude",
-      "origin.position.longitude",
-      "arrival.position.longitude",
-      "departure.position.longitude"
+      "arrival.position.lat",
+      "departure.position.latitude",
+      "departure.position.lat",
+
+      "flight.airport.origin.position.latitude",
+      "flight.airport.origin.position.lat",
+      "flight.airport.origin.positionLatitude",
+      "airport.origin.position.latitude",
+      "airport.origin.position.lat",
+      "origin.position.latitude",
+      "origin.position.lat"
     ]);
 
-    let oLat = null, oLng = null, dLat = null, dLng = null;
+    const otherLng = pickNumber(flat, [
+      "flight.airport.destination.position.longitude",
+      "flight.airport.destination.position.lng",
+      "flight.airport.destination.position.lon",
+      "flight.airport.destination.positionLongitude",
+      "airport.destination.position.longitude",
+      "airport.destination.position.lng",
+      "airport.destination.position.lon",
+      "destination.position.longitude",
+      "destination.position.lng",
+      "destination.position.lon",
+      "arrival.position.longitude",
+      "arrival.position.lng",
+      "arrival.position.lon",
+      "departure.position.longitude",
+      "departure.position.lng",
+      "departure.position.lon",
+
+      "flight.airport.origin.position.longitude",
+      "flight.airport.origin.position.lng",
+      "flight.airport.origin.position.lon",
+      "flight.airport.origin.positionLongitude",
+      "airport.origin.position.longitude",
+      "airport.origin.position.lng",
+      "airport.origin.position.lon",
+      "origin.position.longitude",
+      "origin.position.lng",
+      "origin.position.lon"
+    ]);
+let oLat = null, oLng = null, dLat = null, dLng = null;
 
     if (mode === "departures") {
       oLat = ctxPos ? ctxPos.lat : null;
@@ -714,7 +744,6 @@ const list =
       (mode === "arrivals" ? (state.context?.airport || "BRS") : "—") ||
       "—";
 
-    if (els.mapHint) els.mapHint.textContent = `${originCode} → ${destCode}`;
 
     if ((oLat == null || oLng == null) && originCode) {
       const c = getAirportCoords(originCode);
@@ -725,6 +754,11 @@ const list =
       if (c) { dLat = c.lat; dLng = c.lng; }
     }
 
+    const hasOrigin = Number.isFinite(oLat) && Number.isFinite(oLng);
+    const hasDest = Number.isFinite(dLat) && Number.isFinite(dLng);
+    if (els.mapHint) {
+      els.mapHint.textContent = (hasOrigin && hasDest) ? `${originCode} → ${destCode}` : `${originCode} → ${destCode} (map unavailable)`;
+    }
     renderMap(oLat, oLng, dLat, dLng, originCode ? String(originCode).toUpperCase() : originCode, destCode ? String(destCode).toUpperCase() : destCode);
 
     renderLeaveIndicator(flat);
@@ -869,7 +903,12 @@ const list =
     return 2*R*Math.asin(Math.min(1, Math.sqrt(a)));
   }
 
-function renderMap(oLat, oLng, dLat, dLng, originCode, destCode) {
+    const hasOrigin = Number.isFinite(oLat) && Number.isFinite(oLng);
+    const hasDest = Number.isFinite(dLat) && Number.isFinite(dLng);
+    if (els.mapHint) {
+      els.mapHint.textContent = (hasOrigin && hasDest) ? `${originCode} → ${destCode}` : `${originCode} → ${destCode} (map unavailable)`;
+    }
+    renderMap(oLat, oLng, dLat, dLng, originCode ? String(originCode).toUpperCase() : originCode, destCode ? String(destCode).toUpperCase() : destCode);
     // Draw a simple SVG route map (equirectangular projection).
     const svg = els.mapEl;
     if (!svg) return;
