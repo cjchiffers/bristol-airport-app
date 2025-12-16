@@ -903,12 +903,7 @@ let oLat = null, oLng = null, dLat = null, dLng = null;
     return 2*R*Math.asin(Math.min(1, Math.sqrt(a)));
   }
 
-    const hasOrigin = Number.isFinite(oLat) && Number.isFinite(oLng);
-    const hasDest = Number.isFinite(dLat) && Number.isFinite(dLng);
-    if (els.mapHint) {
-      els.mapHint.textContent = (hasOrigin && hasDest) ? `${originCode} → ${destCode}` : `${originCode} → ${destCode} (map unavailable)`;
-    }
-    renderMap(oLat, oLng, dLat, dLng, originCode ? String(originCode).toUpperCase() : originCode, destCode ? String(destCode).toUpperCase() : destCode);
+function renderMap(oLat, oLng, dLat, dLng, originCode, destCode) {
     // Draw a simple SVG route map (equirectangular projection).
     const svg = els.mapEl;
     if (!svg) return;
