@@ -9,6 +9,55 @@
 (() => {
   "use strict";
 
+  const airportCodeToCityName = {
+  "ABZ": "Aberdeen",
+  "AGP": "Malaga",
+  "ADA": "Izmir",
+  "ALC": "Alicante",
+  "AMS": "Amsterdam",
+  "ATA": "Antalya",
+  "AYT": "Dalaman",
+  "BCN": "Barcelona",
+  "BLQ": "Bologna",
+  "BHD": "Belfast City",
+  "BFS": "Belfast International",
+  "CDG": "Paris Charles de Gaulle",
+  "CFU": "Corfu",
+  "CUN": "Cancun",
+  "DAA": "Sharm el Sheikh",
+  "DLM": "Dalaman",
+  "EDI": "Edinburgh",
+  "FAO": "Faro",
+  "FCO": "Rome",
+  "FNC": "Madeira",
+  "GLA": "Glasgow",
+  "HRG": "Hurghada",
+  "INV": "Inverness",
+  "IOM": "Isle of Man",
+  "JER": "Jersey",
+  "KRK": "Krakow",
+  "LIN": "Milan",
+  "LIS": "Lisbon",
+  "LPA": "Gran Canaria",
+  "MAN": "Manchester",
+  "MME": "Teesside",
+  "MUC": "Munich",
+  "NAP": "Naples",
+  "NCL": "Newcastle",
+  "OLB": "Olbia",
+  "ORY": "Paris Orly",
+  "PMI": "Palma de Mallorca",
+  "PSA": "Pisa",
+  "RHO": "Rhodes",
+  "SKG": "Thessaloniki",
+  "SSH": "Sharm el Sheikh",
+  "TFS": "Tenerife South",
+  "VIE": "Vienna",
+  "ZRH": "Zurich",
+  };
+
+    function getCityName(code){ return airportCodeToCityName[code] || code || ""; }
+
   // ---------- DOM ----------
   const els = {
     headline: document.getElementById("headline"),
@@ -511,25 +560,53 @@
   }
 
   function cityFromFlight(flat) {
-    const candidates = [
-      "flight.airport.destination.city",
-      "flight.airport.destination.cityName",
-      "flight.destination.city",
-      "destination.city",
-      "arrival.city",
-      "arrival.cityName",
-      "arrival.airport.city",
-      "toCity",
-      "destinationCity",
-    ];
-    const city = pickAny(flat, candidates);
-    return city ? String(city).trim() : "";
-  }
+  // Prefer an explicit destination city name if the API provides one.
+  const cityCandidates = [
+    "flight.airport.destination.city",
+    "flight.airport.destination.cityName",
+    "flight.destination.city",
+    "destination.city",
+    "arrival.city",
+    "arrival.cityName",
+    "arrival.airport.city",
+    "toCity",
+    "destinationCity",
+  ];
+  const explicitCity = pickAny(flat, cityCandidates);
+  if (explicitCity) return String(explicitCity).trim();
+
+  // Fallback: many flight feeds only provide an airport/IATA code for destination.
+  const codeCandidates = [
+    "flight.airport.destination.code",
+    "flight.airport.destination.iata",
+    "flight.airport.destination.iataCode",
+    "flight.destination.iata",
+    "flight.destination.iataCode",
+    "destination.iata",
+    "destination.iataCode",
+    "arrival.airport.iata",
+    "arrival.airport.iataCode",
+    "arrival.iata",
+    "arrival.iataCode",
+    "to",
+    "toCode",
+    "destinationAirport",
+    "destinationAirportCode",
+    "arrivalAirport",
+    "arrivalAirportCode",
+  ];
+  const codeRaw = pickAny(flat, codeCandidates);
+  const code = codeRaw ? String(codeRaw).trim().toUpperCase() : "";
+  if (code) return getCityName(code).trim();
+
+  return "";
+}
 
   async function renderWeatherByCityName(flat) {
     if (!els.weatherBox) return;
 
     const city = cityFromFlight(flat);
+    console.log("Extracted city: ", city);  // Add this line to see the city being extracted
     if (!city) {
       if (els.wxHint) els.wxHint.textContent = "Weather";
       els.weatherBox.innerHTML = `<div class="small">Weather unavailable (no destination city in flight data).</div>`;
