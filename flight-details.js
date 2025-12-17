@@ -559,7 +559,7 @@
     return res.json();
   }
 
-  function cityFromFlight(flat) {
+  function cityFromFlight(flat, flightObj) {
   // Prefer an explicit destination city name if the API provides one.
   const cityCandidates = [
     "flight.airport.destination.city",
@@ -575,38 +575,50 @@
   const explicitCity = pickAny(flat, cityCandidates);
   if (explicitCity) return String(explicitCity).trim();
 
-  // Fallback: many flight feeds only provide an airport/IATA code for destination.
+  // Fallback: many feeds only provide an airport/IATA code for destination.
   const codeCandidates = [
+    "arrival.iataCode",
+    "arrival.iata_code",
+    "arrival.iata",
+    "arrival.airport.iataCode",
+    "arrival.airport.iata_code",
+    "arrival.airport.iata",
+    "arrival.airport.code",
+    "arrivalAirportIata",
+    "arrivalAirportCode",
+    "destination.iata",
+    "destination.iataCode",
+    "destination.iata_code",
+    "destinationAirport",
+    "destinationAirportCode",
+    "to",
+    "toCode",
     "flight.airport.destination.code",
     "flight.airport.destination.iata",
     "flight.airport.destination.iataCode",
     "flight.destination.iata",
     "flight.destination.iataCode",
-    "destination.iata",
-    "destination.iataCode",
-    "arrival.airport.iata",
-    "arrival.airport.iataCode",
-    "arrival.iata",
-    "arrival.iataCode",
-    "to",
-    "toCode",
-    "destinationAirport",
-    "destinationAirportCode",
-    "arrivalAirport",
-    "arrivalAirportCode",
   ];
   const codeRaw = pickAny(flat, codeCandidates);
-  const code = codeRaw ? String(codeRaw).trim().toUpperCase() : "";
-  if (code) return getCityName(code).trim();
+  let code = codeRaw ? String(codeRaw).trim().toUpperCase() : "";
 
+  // Extra fallback: use the same identity derivation the page already uses for the header.
+  if (!code && flightObj) {
+    try {
+      const id = deriveIdentity(flightObj);
+      if (id && id.arr) code = String(id.arr).trim().toUpperCase();
+    } catch {}
+  }
+
+  if (code) return getCityName(code).trim();
   return "";
 }
 
   async function renderWeatherByCityName(flat) {
     if (!els.weatherBox) return;
 
-    const city = cityFromFlight(flat);
-    console.log("Extracted city: ", city);  // Add this line to see the city being extracted
+    const city = cityFromFlight(flat, state.current);
+    console.log("Extracted city:", city, "| arrival.iataCode=", flat["arrival.iataCode"], "| arrival.iata=", flat["arrival.iata"], "| destination.iataCode=", flat["destination.iataCode"]);  // Add this line to see the city being extracted
     if (!city) {
       if (els.wxHint) els.wxHint.textContent = "Weather";
       els.weatherBox.innerHTML = `<div class="small">Weather unavailable (no destination city in flight data).</div>`;
