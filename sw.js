@@ -1,4 +1,4 @@
-const CACHE_NAME = "brs-flights-v4";
+const CACHE_NAME = "brs-flights-v1";
 const APP_SHELL = [
   "./",
   "./index.html",

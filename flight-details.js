@@ -1,43 +1,67 @@
+// ---------- Refresh (optional / best-effort) ----------
+async function refreshNow(forceFeedback) {
+  if (!state.context || !state.current) return;
 
-(() => {
-  "use strict";
+  const apiKey = getFlightApiKey();
+  if (!apiKey) return;
 
-  // Nominatim Geocoding API - gets latitude and longitude for a city
-  async function geocodeCity(cityName) {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=1`;
-    try {
-      const response = await fetch(url);
-      const data = await response.json();
-      if (data && data.length > 0) {
-        const lat = data[0].lat;
-        const lon = data[0].lon;
-        return { latitude: parseFloat(lat), longitude: parseFloat(lon) };
-      } else {
-        console.error("City not found:", cityName);
-        return null;
-      }
-    } catch (error) {
-      console.error("Geocoding error:", error);
-      return null;
+  try {
+    // Fetching the flight details from Cloudflare Worker
+    const updated = await fetchBestEffortUpdate(state.context, state.current);
+    if (!updated) return;
+
+    const prev = state.current;
+    state.current = updated;
+
+    if (state.storageKey) {
+      safeSetSession(state.storageKey, JSON.stringify({ flight: state.current, context: state.context }));
+    }
+
+    render(state.current, prev);
+    if (forceFeedback) flashStatus("good", "Updated");
+  } catch (e) {
+    console.error(e);
+    if (forceFeedback) flashStatus("bad", "Refresh failed");
+  }
+}
+
+async function fetchBestEffortUpdate(context, current) {
+  const mode = context.mode || "departures";
+  const airport = context.airport || "BRS";
+  const day = context.day || 1;
+
+  // Fetch flight data from Cloudflare Worker (this is the Worker URL you set)
+  const url = new URL(`https://proud-bonus-5b54.cjchiffers.workers.dev/api/timetable`);
+  url.searchParams.set("iataCode", airport);
+  url.searchParams.set("type", mode);
+  url.searchParams.set("day", String(day));
+
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  if (!res.ok) return null;
+
+  const data = await res.json();
+
+  // Process and return the data here (same as before)
+  const list =
+    (Array.isArray(data) && data) ||
+    (data && Array.isArray(data.data) && data.data) ||
+    (data && Array.isArray(data.result) && data.result) ||
+    null;
+
+  if (!list) return null;
+
+  const curId = deriveIdentity(current);
+
+  let best = null;
+  let bestScore = -1;
+  for (const f of list) {
+    const candId = deriveIdentity(f);
+    const score = scoreMatch(curId, candId);
+    if (score > bestScore) {
+      bestScore = score;
+      best = f;
     }
   }
-  
-  async function geocodeCached(cityName) {
-    const key = `geo_city_${String(cityName).toLowerCase()}`;
-    const cachedRaw = safeGetLocal(key);
-    if (cachedRaw) {
-      try {
-        const cached = JSON.parse(cachedRaw);
-        if (cached && typeof cached.lat === "number" && typeof cached.lon === "number") return cached;
-      } catch {}
-    }
-    const result = await geocodeCity(cityName);
-    if (result) {
-      safeSetLocal(key, JSON.stringify(result));  // Cache the result for next time
-    }
-    return result;
-  }
-  
-  // Other functions for rendering, flight updates, etc. remain here...
-  
-})();
+  if (bestScore < 3) return null;
+  return best;
+}
