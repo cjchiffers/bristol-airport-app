@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -147,30 +146,3 @@
 
 </body>
 </html>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-
-async function fetchWeather(lat, lon) {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=Europe/London`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    let forecastHtml = '';
-    data.daily.time.forEach((date, i) => {
-        forecastHtml += `
-            <p>${date}: 🌡️ Max: ${data.daily.temperature_2m_max[i]}°C, Min: ${data.daily.temperature_2m_min[i]}°C</p>
-        `;
-    });
-
-    const forecastElement = document.getElementById('forecast');
-    if (forecastElement) {
-        forecastElement.innerHTML = forecastHtml;
-    }
-}
-
-// Example: Fetch weather for London (coordinates 51.5074, -0.1278)
-fetchWeather(51.5074, -0.1278);  // Change this to the destination's coordinates
-
-});
-</script>
