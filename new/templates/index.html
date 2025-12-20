@@ -1,0 +1,37 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bristol Airport Flights</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.3/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body class="bg-gray-100">
+
+    <!-- Navigation Tabs -->
+    <div class="flex justify-around p-4 bg-blue-500">
+        <button id="arrivalsTab" class="text-white py-2 px-4 hover:bg-blue-700">Arrivals</button>
+        <button id="departuresTab" class="text-white py-2 px-4 hover:bg-blue-700">Departures</button>
+    </div>
+
+    <!-- Flight Information Display -->
+    <div id="flightInfo" class="p-4">
+        <!-- Content will be dynamically populated by JavaScript -->
+    </div>
+
+    <!-- Flight Details Modal -->
+    <div id="flightDetailsModal" class="fixed inset-0 bg-gray-800 bg-opacity-50 hidden">
+        <div class="flex justify-center items-center h-full">
+            <div class="bg-white p-6 rounded-lg w-1/2">
+                <h3 class="text-2xl font-bold mb-4" id="flightTitle">Flight Details</h3>
+                <div id="flightDetailsContent"></div>
+                <button id="closeModal" class="mt-4 bg-red-500 text-white py-2 px-4 rounded">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/js/app.js"></script>
+</body>
+</html>

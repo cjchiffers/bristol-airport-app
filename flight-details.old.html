@@ -11,7 +11,6 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="flight-details.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 
 <body class="details-page">
@@ -105,8 +104,7 @@
         <div class="h-sub small">Tap to zoom — pinch gestures supported in most browsers</div>
       </div>
       <div class="route-wrap">
-        <div id="routeMap" class="route-map" aria-label="Route map"></div>
-        <svg id="routeSvg" class="route-svg-fallback" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="Route map (fallback)"></svg>
+        <svg id="routeSvg" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-label="Route map"></svg>
       </div>
     </section>
 
@@ -145,8 +143,34 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="flight-details.js"></script>
 
 </body>
 </html>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+async function fetchWeather(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=Europe/London`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    let forecastHtml = '';
+    data.daily.time.forEach((date, i) => {
+        forecastHtml += `
+            <p>${date}: 🌡️ Max: ${data.daily.temperature_2m_max[i]}°C, Min: ${data.daily.temperature_2m_min[i]}°C</p>
+        `;
+    });
+
+    const forecastElement = document.getElementById('forecast');
+    if (forecastElement) {
+        forecastElement.innerHTML = forecastHtml;
+    }
+}
+
+// Example: Fetch weather for London (coordinates 51.5074, -0.1278)
+fetchWeather(51.5074, -0.1278);  // Change this to the destination's coordinates
+
+});
+</script>
