@@ -1,323 +1,164 @@
+console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
 /* flight-details.js
-   Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open-Meteo)
+   Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
    Notes:
    - Uses Leaflet tiles (no API key) when available; falls back to your SVG route if Leaflet isn't loaded.
-   - Weather remains Open-Meteo (free) via geocoding -> forecast.
+   - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
 (() => {
   "use strict";
 
-// --- Bristol (BRS) non-stop destinations (city/place names for geocoding)
-const airportCodeToCityName = {
-  // UK / near
-  "BRS": "Bristol",
-  "ABZ": "Aberdeen",
-  "EDI": "Edinburgh",
-  "GLA": "Glasgow",
-  "NCL": "Newcastle",
-  "INV": "Inverness",
-  "EXT": "Exeter",
-  "BHD": "Belfast",
-  "BFS": "Belfast",
-  "JER": "Jersey",
-  "GCI": "Guernsey",
-  "IOM": "Isle of Man",
+  // --- Airport code -> city name (for geocoding). Add as needed.
+  const airportCodeToCityName = {
+    "ABZ": "Aberdeen",
+    "AGP": "Malaga",
+    "ADA": "Izmir",
+    "ALC": "Alicante",
+    "AMS": "Amsterdam",
+    "ATA": "Antalya",
+    "AYT": "Dalaman",
+    "BCN": "Barcelona",
+    "BLQ": "Bologna",
+    "BHD": "Belfast City",
+    "BFS": "Belfast International",
+    "BRS": "Bristol",
+    "CDG": "Paris Charles de Gaulle",
+    "CFU": "Corfu",
+    "CUN": "Cancun",
+    "DAA": "Sharm el Sheikh",
+    "DLM": "Dalaman",
+    "EDI": "Edinburgh",
+    "FAO": "Faro",
+    "FCO": "Rome",
+    "FNC": "Madeira",
+    "FUE": "Fuerteventura",
+    "GLA": "Glasgow",
+    "HRG": "Hurghada",
+    "INV": "Inverness",
+    "IOM": "Isle of Man",
+    "JER": "Jersey",
+    "KRK": "Krakow",
+    "LIN": "Milan",
+    "LIS": "Lisbon",
+    "LPA": "Gran Canaria",
+    "MAN": "Manchester",
+    "MME": "Teesside",
+    "MUC": "Munich",
+    "NAP": "Naples",
+    "NCL": "Newcastle",
+    "OLB": "Olbia",
+    "ORY": "Paris Orly",
+    "PMI": "Palma de Mallorca",
+    "PSA": "Pisa",
+    "RHO": "Rhodes",
+    "SKG": "Thessaloniki",
+    "SSH": "Sharm el Sheikh",
+    "TFS": "Tenerife South",
+    "VIE": "Vienna",
+    "ZRH": "Zurich",
+  };
 
-  // Ireland
-  "DUB": "Dublin",
-  "ORK": "Cork",
-  "NOC": "Knock",
+  // Optional: airport coordinates lookup (IATA -> {lat, lon}).
+  // If you have a full table, you can set window.airportCoords = {...} before this script.
+  const airportCoords = (typeof window !== "undefined" && window.airportCoords && typeof window.airportCoords === "object")
+    ? window.airportCoords
+    : {};
 
-  // Netherlands / Belgium / Switzerland / Austria / Germany
-  "AMS": "Amsterdam",
-  "BSL": "Basel",
-  "ZRH": "Zurich",
-  "GVA": "Geneva",
-  "VIE": "Vienna",
-  "SZG": "Salzburg",
-  "INN": "Innsbruck",
-  "BER": "Berlin",
-  "MUC": "Munich",
+  // ---------- Airport geocoding (robust pin placement) ----------
+  // We prefer an explicit lat/lon table when available (window.airportCoords),
+  // otherwise we geocode using Open‑Meteo and *prefer airport features* (feature_code=AIRP).
+  // Results are cached in localStorage for fast repeat loads.
+  const AIRPORT_GEO_CACHE_KEY = "brs_airport_geo_cache_v1";
+  const AIRPORT_GEO_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
-  // France
-  "CDG": "Paris",
-  "BOD": "Bordeaux",
-  "TLS": "Toulouse",
-  "LYS": "Lyon",
-  "GNB": "Grenoble",
-  "CMF": "Chambery",
-  "BZR": "Beziers",
-  "LRH": "La Rochelle",
-  "LIG": "Limoges",
-  "NCE": "Nice",
-  "MRS": "Marseille",
+  function loadAirportGeoCache() {
+    try {
+      const raw = localStorage.getItem(AIRPORT_GEO_CACHE_KEY);
+      if (!raw) return { ts: 0, data: {} };
+      const parsed = JSON.parse(raw);
+      const ts = Number(parsed && parsed.ts) || 0;
+      const data = (parsed && parsed.data && typeof parsed.data === "object") ? parsed.data : {};
+      return { ts, data };
+    } catch {
+      return { ts: 0, data: {} };
+    }
+  }
+  function saveAirportGeoCache(cache) {
+    try { localStorage.setItem(AIRPORT_GEO_CACHE_KEY, JSON.stringify(cache)); } catch {}
+  }
 
-  // Spain (mainland)
-  "ALC": "Alicante",
-  "AGP": "Malaga",
-  "FAO": "Faro",          // (Portugal but often grouped by users; keeping exact below too)
-  "MAD": "Madrid",
-  "BIO": "Bilbao",
-  "LEI": "Almeria",
-  "SVQ": "Seville",
-  "VLC": "Valencia",
-  "REU": "Reus",
-  "RMU": "Murcia",
-  "GRO": "Girona",
+  function isValidLatLon(lat, lon) {
+    return Number.isFinite(lat) && Number.isFinite(lon) &&
+      Math.abs(lat) <= 90 && Math.abs(lon) <= 180 &&
+      !(Math.abs(lat) < 0.001 && Math.abs(lon) < 0.001);
+  }
 
-  // Portugal (keep separate + correct)
-  "LIS": "Lisbon",
-  "OPO": "Porto",
-  "FAO": "Faro",
-  "FNC": "Funchal",
+  function airportQueryFromIata(iata) {
+    const code = normIata(iata);
+    if (!code) return "";
+    const mapped = getCityName(code);
+    // If mapping already looks like an airport name, keep it; otherwise bias to airports.
+    if (/airport/i.test(mapped)) return mapped;
+    // Some mappings are "Paris Charles de Gaulle" etc; appending "Airport" helps Open‑Meteo pick AIRP.
+    return mapped ? `${mapped} Airport` : `${code} Airport`;
+  }
 
-  // Canary Islands / Balearics / Atlantic
-  "TFS": "Tenerife",
-  "LPA": "Gran Canaria",
-  "ACE": "Lanzarote",
-  "FUE": "Fuerteventura",
-  "PMI": "Palma de Mallorca",
-  "IBZ": "Ibiza",
-  "MAH": "Menorca",
-  "SID": "Sal",
+  async function geocodeAirportOpenMeteo(query) {
+    const q = String(query || "").trim();
+    if (!q) return null;
+    const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
+    url.searchParams.set("name", q);
+    url.searchParams.set("count", "5");
+    url.searchParams.set("language", "en");
+    url.searchParams.set("format", "json");
 
-  // Italy
-  "FCO": "Rome",
-  "NAP": "Naples",
-  "PSA": "Pisa",
-  "CTA": "Catania",
-  "PMO": "Palermo",
-  "VCE": "Venice",
-  "TRN": "Turin",
-  "VRN": "Verona",
-  "BGY": "Milan",
-  "MXP": "Milan",
-  "OLB": "Olbia",
-  "BRI": "Bari",
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const results = (data && Array.isArray(data.results)) ? data.results : [];
+    if (!results.length) return null;
 
-  // Poland / Czech / Hungary / Romania / Bulgaria / Lithuania
-  "KRK": "Krakow",
-  "GDN": "Gdansk",
-  "WRO": "Wroclaw",
-  "POZ": "Poznan",
-  "RZE": "Rzeszow",
-  "BZG": "Bydgoszcz",
-  "PRG": "Prague",
-  "BUD": "Budapest",
-  "OTP": "Bucharest",
-  "SOF": "Sofia",
-  "KUN": "Kaunas",
+    // Prefer airports explicitly.
+    const best = results.find(r => String(r.feature_code || "").toUpperCase() === "AIRP") || results[0];
+    const lat = Number(best.latitude);
+    const lon = Number(best.longitude);
+    if (!isValidLatLon(lat, lon)) return null;
 
-  // Greece / Cyprus / Balkans
-  "ATH": "Athens",
-  "SKG": "Thessaloniki",
-  "CFU": "Corfu",
-  "CHQ": "Chania",
-  "HER": "Heraklion",
-  "RHO": "Rhodes",
-  "KGS": "Kos",
-  "ZTH": "Zakynthos",
-  "PVK": "Preveza",
-  "JTR": "Santorini",
-  "JSI": "Skiathos",
-  "EFL": "Kefalonia",
-  "LCA": "Larnaca",
-  "DBV": "Dubrovnik",
-  "SPU": "Split",
-  "TIV": "Tivat",
-  "PUY": "Pula",
-  "KLX": "Kalamata",
+    return { lat, lon, name: best.name || q };
+  }
 
-  // Turkey
-  "AYT": "Antalya",
-  "DLM": "Dalaman",
-  "ADB": "Izmir",
-  "BJV": "Bodrum",
-  "IST": "Istanbul",
-  "SAW": "Istanbul",
+  async function geocodeCachedQuery(queryOrIata) {
+    // Accept either a free-text query (for SVG fallback) or an IATA-ish string.
+    const raw = String(queryOrIata || "").trim();
+    if (!raw) return null;
 
-  // North Africa / Middle East
-  "AGA": "Agadir",
-  "RAK": "Marrakech",
-  "NBE": "Enfidha",
-  "HRG": "Hurghada",
-  "SSH": "Sharm el Sheikh",
-  "PFO": "Paphos",
+    // If it's a 3-letter code, treat as IATA.
+    const isIata = /^[A-Za-z]{3}$/.test(raw);
+    const key = isIata ? normIata(raw) : raw.toLowerCase();
 
-  // Iceland / Norway
-  "KEF": "Reykjavik",
-  "TOS": "Tromso",
-  "BGO": "Bergen",
+    const now = Date.now();
+    const cache = loadAirportGeoCache();
+    const fresh = (now - (cache.ts || 0)) < AIRPORT_GEO_TTL_MS;
+    if (fresh && cache.data && cache.data[key]) return cache.data[key];
 
-  // Gibraltar / Malta
-  "GIB": "Gibraltar",
-  "MLA": "Malta",
+    const query = isIata ? airportQueryFromIata(key) : raw;
+    const geo = await geocodeAirportOpenMeteo(query);
+    if (!geo) return null;
 
-  // Spain (city airports already included)
-  "BCN": "Barcelona",
-};
+    const entry = { lat: geo.lat, lon: geo.lon, name: geo.name, q: query, t: now };
+    // Update cache (keep old entries too)
+    cache.ts = now;
+    cache.data = cache.data || {};
+    cache.data[key] = entry;
+    saveAirportGeoCache(cache);
 
-
-  // --- Airport code -> coordinates (accurate markers).
-  // Add airports you care about; this can stay small.
-  // (These are standard published airport coordinates; tweak/extend as needed.)
-  // Accurate airport coordinates (lat/lon).
-// Add/remove as needed. These are used to place markers correctly on the Leaflet map.
-// --- Airport coordinates (lat/lon) for Bristol destinations
-// --- Airport coordinates (lat/lon) for your BRS destination list
-// Format matches OurAirports columns latitude_deg / longitude_deg.
-const airportCoords = {
-  // UK / near
-  BRS: { lat: 51.382669, lon: -2.719089 }, // Bristol
-  ABZ: { lat: 57.201944, lon: -2.197778 }, // Aberdeen
-  EDI: { lat: 55.950000, lon: -3.372500 }, // Edinburgh
-  GLA: { lat: 55.871944, lon: -4.433056 }, // Glasgow
-  NCL: { lat: 55.037500, lon: -1.691667 }, // Newcastle
-  INV: { lat: 57.542500, lon: -4.047500 }, // Inverness
-  EXT: { lat: 50.734444, lon: -3.413889 }, // Exeter
-  BHD: { lat: 54.618056, lon: -5.872500 }, // Belfast City
-  BFS: { lat: 54.657500, lon: -6.215833 }, // Belfast Intl
-  JER: { lat: 49.207944, lon: -2.195500 }, // Jersey
-  GCI: { lat: 49.434956, lon: -2.601969 }, // Guernsey
-  IOM: { lat: 54.083333, lon: -4.623889 }, // Isle of Man
-
-  // Ireland
-  DUB: { lat: 53.421333, lon: -6.270075 }, // Dublin
-  ORK: { lat: 51.841269, lon: -8.491111 }, // Cork
-  NOC: { lat: 53.910297, lon: -8.818492 }, // Knock (Ireland West)
-
-  // Netherlands / Switzerland / Austria / Germany
-  AMS: { lat: 52.310539, lon: 4.768274 }, // Amsterdam Schiphol
-  BSL: { lat: 47.589583, lon: 7.529914 }, // Basel (EuroAirport)
-  ZRH: { lat: 47.464722, lon: 8.549167 }, // Zurich
-  GVA: { lat: 46.238056, lon: 6.108056 }, // Geneva
-  VIE: { lat: 48.110278, lon: 16.569722 }, // Vienna
-  SZG: { lat: 47.793056, lon: 13.004444 }, // Salzburg
-  INN: { lat: 47.260278, lon: 11.343889 }, // Innsbruck
-  BER: { lat: 52.366667, lon: 13.503333 }, // Berlin Brandenburg
-  MUC: { lat: 48.353783, lon: 11.786086 }, // Munich
-
-  // France
-  CDG: { lat: 49.009722, lon: 2.547778 }, // Paris CDG
-  BOD: { lat: 44.828333, lon: -0.715556 }, // Bordeaux
-  TLS: { lat: 43.629444, lon: 1.363889 }, // Toulouse
-  LYS: { lat: 45.725556, lon: 5.081111 }, // Lyon
-  GNB: { lat: 45.362944, lon: 5.329375 }, // Grenoble
-  CMF: { lat: 45.638056, lon: 5.880556 }, // Chambery
-  BZR: { lat: 43.323611, lon: 3.353889 }, // Beziers
-  LRH: { lat: 46.179167, lon: -1.195278 }, // La Rochelle
-  LIG: { lat: 45.862778, lon: 1.179444 }, // Limoges
-  NCE: { lat: 43.658411, lon: 7.215872 }, // Nice
-  MRS: { lat: 43.436667, lon: 5.215000 }, // Marseille
-
-  // Spain (mainland)
-  ALC: { lat: 38.282222, lon: -0.558056 }, // Alicante
-  AGP: { lat: 36.674900, lon: -4.499106 }, // Malaga
-  MAD: { lat: 40.471926, lon: -3.562640 }, // Madrid
-  BIO: { lat: 43.301111, lon: -2.910556 }, // Bilbao
-  LEI: { lat: 36.843889, lon: -2.370000 }, // Almeria
-  SVQ: { lat: 37.418000, lon: -5.893106 }, // Seville
-  VLC: { lat: 39.489314, lon: -0.481625 }, // Valencia
-  REU: { lat: 41.147392, lon: 1.167172 }, // Reus
-  RMU: { lat: 37.803000, lon: -1.125000 }, // Murcia (RMU approx)
-  GRO: { lat: 41.901000, lon: 2.760000 }, // Girona
-
-  // Portugal / Madeira
-  LIS: { lat: 38.774167, lon: -9.134167 }, // Lisbon
-  OPO: { lat: 41.248055, lon: -8.681389 }, // Porto
-  FAO: { lat: 37.014425, lon: -7.965911 }, // Faro
-  FNC: { lat: 32.697889, lon: -16.774453 }, // Funchal
-
-  // Canary / Balearics / Cape Verde
-  TFS: { lat: 28.044475, lon: -16.572489 }, // Tenerife South
-  LPA: { lat: 27.931886, lon: -15.386586 }, // Gran Canaria
-  ACE: { lat: 28.945464, lon: -13.605225 }, // Lanzarote
-  FUE: { lat: 28.452717, lon: -13.863761 }, // Fuerteventura
-  PMI: { lat: 39.551741, lon: 2.738810 }, // Palma de Mallorca
-  IBZ: { lat: 38.872858, lon: 1.373117 }, // Ibiza
-  MAH: { lat: 39.862598, lon: 4.218647 }, // Menorca
-  SID: { lat: 16.741389, lon: -22.949444 }, // Sal, Cape Verde
-
-  // Italy
-  FCO: { lat: 41.800278, lon: 12.238889 }, // Rome Fiumicino
-  NAP: { lat: 40.886033, lon: 14.290781 }, // Naples
-  PSA: { lat: 43.683917, lon: 10.392750 }, // Pisa
-  CTA: { lat: 37.466781, lon: 15.066400 }, // Catania
-  PMO: { lat: 38.175958, lon: 13.091019 }, // Palermo
-  VCE: { lat: 45.505278, lon: 12.351944 }, // Venice
-  TRN: { lat: 45.200761, lon: 7.649631 }, // Turin
-  VRN: { lat: 45.395706, lon: 10.888533 }, // Verona
-  BGY: { lat: 45.673889, lon: 9.704167 }, // Milan Bergamo
-  MXP: { lat: 45.630000, lon: 8.723056 }, // Milan Malpensa
-  OLB: { lat: 40.898611, lon: 9.517222 }, // Olbia
-  BRI: { lat: 41.138889, lon: 16.760556 }, // Bari
-
-  // Poland / Central & Eastern Europe
-  KRK: { lat: 50.077731, lon: 19.784836 }, // Krakow
-  GDN: { lat: 54.377569, lon: 18.466222 }, // Gdansk
-  WRO: { lat: 51.102683, lon: 16.885836 }, // Wroclaw
-  POZ: { lat: 52.421031, lon: 16.826325 }, // Poznan
-  RZE: { lat: 50.110000, lon: 22.019000 }, // Rzeszow approx
-  BZG: { lat: 53.096667, lon: 17.977778 }, // Bydgoszcz
-  PRG: { lat: 50.100833, lon: 14.260000 }, // Prague
-  BUD: { lat: 47.436933, lon: 19.255592 }, // Budapest
-  OTP: { lat: 44.571111, lon: 26.085000 }, // Bucharest Otopeni
-  SOF: { lat: 42.696693, lon: 23.411436 }, // Sofia
-  KUN: { lat: 54.963919, lon: 24.084778 }, // Kaunas
-
-  // Greece / Cyprus / Balkans
-  ATH: { lat: 37.936358, lon: 23.947472 }, // Athens
-  SKG: { lat: 40.519725, lon: 22.970950 }, // Thessaloniki
-  CFU: { lat: 39.601944, lon: 19.911667 }, // Corfu
-  CHQ: { lat: 35.531747, lon: 24.149656 }, // Chania
-  HER: { lat: 35.339722, lon: 25.180278 }, // Heraklion
-  RHO: { lat: 36.405419, lon: 28.086192 }, // Rhodes
-  KGS: { lat: 36.793335, lon: 27.091667 }, // Kos
-  ZTH: { lat: 37.750853, lon: 20.884251 }, // Zakynthos
-  PVK: { lat: 38.925467, lon: 20.765311 }, // Preveza (Aktio)
-  JTR: { lat: 36.399169, lon: 25.479333 }, // Santorini
-  JSI: { lat: 39.177100, lon: 23.503700 }, // Skiathos
-  EFL: { lat: 38.120000, lon: 20.500000 }, // Kefalonia approx
-  LCA: { lat: 34.875117, lon: 33.624850 }, // Larnaca
-  DBV: { lat: 42.561353, lon: 18.268244 }, // Dubrovnik
-  SPU: { lat: 43.538944, lon: 16.297964 }, // Split
-  TIV: { lat: 42.404944, lon: 18.723333 }, // Tivat
-  PUY: { lat: 44.893533, lon: 13.922192 }, // Pula
-  KLX: { lat: 37.068319, lon: 22.025526 }, // Kalamata
-
-  // Turkey
-  AYT: { lat: 36.898731, lon: 30.800461 }, // Antalya
-  DLM: { lat: 36.713100, lon: 28.792500 }, // Dalaman
-  ADB: { lat: 38.292392, lon: 27.156953 }, // Izmir
-  BJV: { lat: 37.250556, lon: 27.664167 }, // Bodrum
-  IST: { lat: 41.275278, lon: 28.751944 }, // Istanbul
-  SAW: { lat: 40.898553, lon: 29.309219 }, // Istanbul Sabiha
-
-  // North Africa / Middle East
-  AGA: { lat: 30.325000, lon: -9.413056 }, // Agadir
-  RAK: { lat: 31.606886, lon: -8.036300 }, // Marrakech
-  NBE: { lat: 36.075833, lon: 10.438611 }, // Enfidha
-  HRG: { lat: 27.178317, lon: 33.799436 }, // Hurghada
-  SSH: { lat: 27.977222, lon: 34.395000 }, // Sharm el Sheikh
-  PFO: { lat: 34.718040, lon: 32.485731 }, // Paphos
-
-  // Iceland / Norway
-  KEF: { lat: 63.985000, lon: -22.605556 }, // Keflavik
-  TOS: { lat: 69.681389, lon: 18.918919 }, // Tromso
-  BGO: { lat: 60.293386, lon: 5.218140 }, // Bergen
-
-  // Gibraltar / Malta
-  GIB: { lat: 36.151111, lon: -5.349444 }, // Gibraltar
-  MLA: { lat: 35.857497, lon: 14.477497 }, // Malta
-
-  // Spain city airport
-  BCN: { lat: 41.297078, lon: 2.078464 }, // Barcelona
-};
+    return entry;
+  }
 
 
   function getCityName(code) {
-    const c = normIata(code);
+    const c = (code || "").toUpperCase().trim();
     return airportCodeToCityName[c] || (code || "");
   }
 
@@ -364,33 +205,33 @@ const airportCoords = {
     storageKey: null,
     context: null,
     current: null,
-
     auto: true,
     intervalMs: 30000,
     timer: null,
 
-    // Leaflet
+    // Leaflet map
     map: null,
-    mapTheme: "light",
     tileLight: null,
     tileDark: null,
+    mapTheme: null,
+    themeOverridden: false,
     routeGroup: null,
     routeLine: null,
-    planeMarker: null,
     depMarker: null,
     arrMarker: null,
+    planeMarker: null,
     animRaf: null,
-    lastRouteKey: "",
+    lastRouteKey: null,
+    prefersDark: window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null,
   };
 
-  // ---------- Utilities ----------
+  // ---------- Storage helpers ----------
   function safeGetLocal(key) { try { return localStorage.getItem(key); } catch { return null; } }
   function safeSetLocal(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
   function safeGetSession(key) { try { return sessionStorage.getItem(key); } catch { return null; } }
   function safeSetSession(key, value) { try { sessionStorage.setItem(key, value); return true; } catch { return false; } }
 
-  function normIata(code) { return String(code || "").trim().toUpperCase(); }
-
+  // ---------- Utilities ----------
   function escapeHtml(s) {
     return String(s)
       .replaceAll("&", "&amp;")
@@ -440,35 +281,42 @@ const airportCoords = {
     return "";
   }
 
+  function setText(el, text) { if (el) el.textContent = text; }
+
   function deriveIdentity(f) {
     const flat = flattenObject(f || {});
     const flightNo =
       pickAny(flat, [
-        "flight.iataNumber", "flight_iata", "flightNumber", "number", "flight_no", "flight.iata"
+        "flight.iataNumber", "flight_iata", "flightNumber", "number", "flight_no", "flight.iata",
+        "flight.iata_number",
       ]) || null;
 
     const dep =
-      pickAny(flat, ["departure.iataCode", "departure.iata", "dep_iata", "origin", "from", "flight.airport.origin.code.iata"]) || null;
+      pickAny(flat, [
+        "departure.iataCode", "departure.iata", "dep_iata", "origin", "from", "flight.departure.iataCode",
+        "flight.departure.iata_code", "flight.origin.iataCode", "flight.airport.origin.code.iata",
+      ]) || null;
 
     const arr =
-      pickAny(flat, ["arrival.iataCode", "arrival.iata", "arr_iata", "destination", "to", "flight.airport.destination.code.iata"]) || null;
+      pickAny(flat, [
+        "arrival.iataCode", "arrival.iata", "arr_iata", "destination", "to", "flight.arrival.iataCode",
+        "flight.arrival.iata_code", "flight.destination.iataCode", "flight.airport.destination.code.iata",
+      ]) || null;
 
     const schedDep =
       pickAny(flat, [
         "departure.scheduledTime", "departure.scheduled", "departure_time", "scheduled_departure", "scheduledDeparture",
-        "flight.time.scheduled.departure"
+        "flight.time.scheduled.departure",
       ]) || null;
 
     const schedArr =
       pickAny(flat, [
         "arrival.scheduledTime", "arrival.scheduled", "arrival_time", "scheduled_arrival", "scheduledArrival",
-        "flight.time.scheduled.arrival"
+        "flight.time.scheduled.arrival",
       ]) || null;
 
     return { flightNo, dep, arr, schedDep, schedArr };
   }
-
-  function setText(el, text) { if (el) el.textContent = text; }
 
   // ---------- Menu ----------
   function closeMenu() {
@@ -549,7 +397,7 @@ const airportCoords = {
   function stopAuto() { if (state.timer) clearInterval(state.timer); state.timer = null; }
 
   // ---------- Refresh (best-effort) ----------
-  const apiKey = "YOUR_API_KEY_HERE"; // Aviation Edge key
+  const apiKey = "26071f-14ef94"; // Aviation Edge key
 
   async function refreshNow(forceFeedback) {
     if (!state.context || !state.current) return;
@@ -601,7 +449,16 @@ const airportCoords = {
   }
 
   async function fetchBestEffortUpdate(apiKey_, context, current) {
-    const mode = context.mode || "departure";
+    // UI uses plural ("departures"/"arrivals"), but Aviation Edge timetable expects singular ("departure"/"arrival").
+    const normalizeMode = (m) => {
+      const x = String(m || "").trim().toLowerCase();
+      if (x === "departures") return "departure";
+      if (x === "arrivals") return "arrival";
+      if (x === "departure" || x === "arrival") return x;
+      return "departure";
+    };
+
+    const mode = normalizeMode(context.mode);
     const airport = context.airport || "BRS";
 
     const curId = deriveIdentity(current);
@@ -613,6 +470,7 @@ const airportCoords = {
     if (flightNo) url.searchParams.set("flight_Iata", flightNo);
     url.searchParams.set("iataCode", airport);
 
+    console.log("[BRS Flights] timetable request", { mode, url: url.toString(), contextMode: context && context.mode });
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) return null;
 
@@ -733,14 +591,64 @@ const airportCoords = {
       } else els.aircraftImageWrap.style.display = "none";
     }
 
-    // Basic panels
-    if (els.depKv) els.depKv.innerHTML = `<div class="small">Scheduled: ${escapeHtml(depTime || "—")}</div>`;
-    if (els.arrKv) els.arrKv.innerHTML = `<div class="small">Scheduled: ${escapeHtml(arrTime || "—")}</div>`;
+    // Basic panels (more details)
+const depInfo = {
+  sched: fmtTime(pickAny(flat, ["flight.time.scheduled.departure","departure.scheduledTime","departure.scheduled","scheduled_departure","departure_time","scheduledDeparture"])),
+  est: fmtTime(pickAny(flat, ["departure.estimatedTime","departure.estimated","estimated_departure","departure_estimated","flight.time.estimated.departure"])),
+  act: fmtTime(pickAny(flat, ["departure.actualTime","departure.actual","actual_departure","departure_actual","flight.time.actual.departure"])),
+  term: pickAny(flat, ["departure.terminal","flight.departure.terminal","departureTerminal"]) || "",
+  gate: pickAny(flat, ["departure.gate","flight.departure.gate","departureGate"]) || "",
+  stand: pickAny(flat, ["departure.stand","flight.departure.stand","departureStand"]) || "",
+};
+
+const arrInfo = {
+  sched: fmtTime(pickAny(flat, ["flight.time.scheduled.arrival","arrival.scheduledTime","arrival.scheduled","scheduled_arrival","arrival_time","scheduledArrival"])),
+  est: fmtTime(pickAny(flat, ["arrival.estimatedTime","arrival.estimated","estimated_arrival","arrival_estimated","flight.time.estimated.arrival"])),
+  act: fmtTime(pickAny(flat, ["arrival.actualTime","arrival.actual","actual_arrival","arrival_actual","flight.time.actual.arrival"])),
+  term: pickAny(flat, ["arrival.terminal","flight.arrival.terminal","arrivalTerminal"]) || "",
+  gate: pickAny(flat, ["arrival.gate","flight.arrival.gate","arrivalGate"]) || "",
+  belt: pickAny(flat, ["arrival.baggage","arrival.belt","flight.arrival.baggage","baggage"]) || "",
+};
+
+function kvLine(label, val) {
+  if (!val) return "";
+  return `<div class="kv-line"><span class="kv-k">${escapeHtml(label)}</span><span class="kv-v">${escapeHtml(val)}</span></div>`;
+}
+
+if (els.depKv) {
+  els.depKv.innerHTML = `
+    <div class="kv-stack">
+      ${kvLine("Scheduled", depInfo.sched || "—")}
+      ${kvLine("Estimated", depInfo.est)}
+      ${kvLine("Actual", depInfo.act)}
+      ${kvLine("Terminal", depInfo.term)}
+      ${kvLine("Gate", depInfo.gate)}
+      ${kvLine("Stand", depInfo.stand)}
+    </div>
+  `;
+}
+
+if (els.arrKv) {
+  els.arrKv.innerHTML = `
+    <div class="kv-stack">
+      ${kvLine("Scheduled", arrInfo.sched || "—")}
+      ${kvLine("Estimated", arrInfo.est)}
+      ${kvLine("Actual", arrInfo.act)}
+      ${kvLine("Terminal", arrInfo.term)}
+      ${kvLine("Gate", arrInfo.gate)}
+      ${kvLine("Belt", arrInfo.belt)}
+    </div>
+  `;
+}
+
 
     // Raw JSON
     if (els.rawJson) els.rawJson.textContent = JSON.stringify(flight, null, 2);
 
-    // Weather
+    
+    // KPIs (duration, distance, carbon, delay trend)
+    renderKpis(flat, id);
+// Weather
     renderWeatherByCityName(flat).catch((e) => console.warn("Weather render failed:", e));
   }
 
@@ -766,104 +674,452 @@ const airportCoords = {
     els.statusBadge.textContent = label;
   }
 
-  // ---------- Weather (Open-Meteo) ----------
-  async function geocodeCity(name) {
+  
+  // ---------- Flight metrics (duration, distance, carbon) + delay trend ----------
+  function minutesBetween(a, b) {
+    const d1 = toDate(a);
+    const d2 = toDate(b);
+    if (!d1 || !d2) return null;
+    let mins = Math.round((d2.getTime() - d1.getTime()) / 60000);
+    // handle overnight (e.g., dep 23:10, arr 01:05 next day but API may omit date)
+    if (mins < -720) mins += 1440;
+    if (mins > 2880) return null; // sanity
+    return mins;
+  }
+
+  function fmtDuration(mins) {
+    if (!Number.isFinite(mins)) return "—";
+    const h = Math.floor(mins / 60);
+    const m = Math.abs(mins % 60);
+    return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+  }
+
+  function fmtKm(km) {
+    if (!Number.isFinite(km)) return "—";
+    if (km < 10) return `${km.toFixed(1)} km`;
+    return `${Math.round(km)} km`;
+  }
+
+  function estimateCarbonKg(distanceKm) {
+    // Very rough economy-class short-haul factor. Keep it simple + clearly labelled as an estimate.
+    // Source varies widely by aircraft/load/route; treat as indicative only.
+    const FACTOR_KG_PER_PAX_KM = 0.115;
+    if (!Number.isFinite(distanceKm)) return null;
+    return distanceKm * FACTOR_KG_PER_PAX_KM;
+  }
+
+  function fmtKg(kg) {
+    if (!Number.isFinite(kg)) return "—";
+    if (kg >= 1000) return `${(kg / 1000).toFixed(2)} t`;
+    return `${Math.round(kg)} kg`;
+  }
+
+  function getTimeValue(flat, paths) {
+    const v = pickAny(flat, paths);
+    return v || null;
+  }
+
+  function getDelays(flat) {
+    // Best-effort: use actual or estimated if available, else null.
+    const schedDep = getTimeValue(flat, [
+      "flight.time.scheduled.departure",
+      "departure.scheduledTime",
+      "departure.scheduled",
+      "scheduled_departure",
+      "departure_time",
+      "scheduledDeparture",
+    ]);
+    const schedArr = getTimeValue(flat, [
+      "flight.time.scheduled.arrival",
+      "arrival.scheduledTime",
+      "arrival.scheduled",
+      "scheduled_arrival",
+      "arrival_time",
+      "scheduledArrival",
+    ]);
+
+    const actualDep = getTimeValue(flat, [
+      "flight.time.actual.departure",
+      "departure.actualTime",
+      "departure.actual",
+      "actual_departure",
+      "actualDeparture",
+      "departure.actualTimeLocal",
+      "departure.actual_time",
+      "departure.estimatedTime",
+      "departure.estimated",
+      "estimated_departure",
+      "estimatedDeparture",
+    ]);
+
+    const actualArr = getTimeValue(flat, [
+      "flight.time.actual.arrival",
+      "arrival.actualTime",
+      "arrival.actual",
+      "actual_arrival",
+      "actualArrival",
+      "arrival.actualTimeLocal",
+      "arrival.actual_time",
+      "arrival.estimatedTime",
+      "arrival.estimated",
+      "estimated_arrival",
+      "estimatedArrival",
+    ]);
+
+    const depDelay = minutesBetween(schedDep, actualDep);
+    const arrDelay = minutesBetween(schedArr, actualArr);
+
+    return {
+      depDelay: Number.isFinite(depDelay) ? depDelay : null,
+      arrDelay: Number.isFinite(arrDelay) ? arrDelay : null,
+      schedDep,
+      schedArr,
+      actualDep,
+      actualArr,
+    };
+  }
+
+  function delayTrendKey(id) {
+    const fn = String(id?.flightNo || "").trim().toUpperCase();
+    const dep = String(id?.dep || "").trim().toUpperCase();
+    const arr = String(id?.arr || "").trim().toUpperCase();
+    return `delay_hist_${fn || `${dep}_${arr}` || "unknown"}`;
+  }
+
+  function recordDelaySample(id, delays) {
+    const key = delayTrendKey(id);
+    const now = Date.now();
+
+    // De-dupe: only record if it changes or at least every 10 minutes.
+    const lastKey = `${key}_last`;
+    const lastRaw = safeGetSession(lastKey);
+    const last = lastRaw ? safeParseJson(lastRaw) : null;
+    const hash = `${delays.depDelay ?? "n"}|${delays.arrDelay ?? "n"}`;
+    if (last && last.hash === hash && (now - (last.t || 0)) < 10 * 60 * 1000) return;
+
+    safeSetSession(lastKey, JSON.stringify({ t: now, hash }));
+
+    const raw = safeGetLocal(key);
+    const arr = raw ? safeParseJson(raw) : null;
+    const list = Array.isArray(arr) ? arr : [];
+    list.push({ t: now, dep: delays.depDelay, arr: delays.arrDelay });
+    while (list.length > 30) list.shift();
+    safeSetLocal(key, JSON.stringify(list));
+  }
+
+  function computeDelayTrend(id) {
+    const key = delayTrendKey(id);
+    const raw = safeGetLocal(key);
+    const list = raw ? safeParseJson(raw) : null;
+    if (!Array.isArray(list) || list.length < 6) return null;
+
+    const recent = list.slice(-5);
+    const prev = list.slice(-10, -5);
+
+    const avg = (xs, field) => {
+      const vals = xs.map((x) => Number(x?.[field])).filter((n) => Number.isFinite(n));
+      if (!vals.length) return null;
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    };
+
+    const r = avg(recent, "dep");
+    const p = avg(prev, "dep");
+    if (!Number.isFinite(r)) return null;
+
+    let arrow = "→";
+    let delta = null;
+    if (Number.isFinite(p)) {
+      delta = r - p;
+      if (delta > 2) arrow = "↑";
+      else if (delta < -2) arrow = "↓";
+    }
+
+    return { avgDep: r, delta, arrow };
+  }
+
+  function renderKpis(flat, id) {
+    if (!els.kpis) return;
+
+    const delays = getDelays(flat);
+    // record trend best-effort (won't store if all null)
+    if (delays.depDelay !== null || delays.arrDelay !== null) recordDelaySample(id, delays);
+
+    // Duration: scheduled (fallback to actual/estimated when needed)
+    const dur = minutesBetween(delays.schedDep || delays.actualDep, delays.schedArr || delays.actualArr);
+
+    // Distance: use airportCoords first; else use cached endpoints from state (if Leaflet already resolved)
+    const depCode = normIata(id?.dep);
+    const arrCode = normIata(id?.arr);
+    let km = null;
+
+    const depC = depCode && airportCoords && airportCoords[depCode] ? airportCoords[depCode] : null;
+    const arrC = arrCode && airportCoords && airportCoords[arrCode] ? airportCoords[arrCode] : null;
+
+    if (depC && arrC) {
+      km = haversineKm(depC.lat, depC.lon, arrC.lat, arrC.lon);
+    } else if (state.lastRouteMeta && state.lastRouteMeta.distanceKm) {
+      km = state.lastRouteMeta.distanceKm;
+    }
+
+    const co2 = estimateCarbonKg(km);
+
+    const trend = computeDelayTrend(id);
+
+    const delayLabel = delays.depDelay === null ? "—" : `${delays.depDelay >= 0 ? "+" : ""}${Math.round(delays.depDelay)}m`;
+    const trendLabel = trend ? `${trend.arrow} ${Math.round(trend.avgDep)}m avg` : "—";
+
+    els.kpis.innerHTML = `
+      <div class="kpi-chip"><span class="kpi-k">Duration</span><span class="kpi-v">${escapeHtml(fmtDuration(dur))}</span></div>
+      <div class="kpi-chip"><span class="kpi-k">Distance</span><span class="kpi-v">${escapeHtml(fmtKm(km))}</span></div>
+      <div class="kpi-chip"><span class="kpi-k">CO₂e</span><span class="kpi-v" title="Rough estimate per passenger">${escapeHtml(fmtKg(co2))}</span></div>
+      <div class="kpi-chip"><span class="kpi-k">Dep delay</span><span class="kpi-v">${escapeHtml(delayLabel)}</span></div>
+      <div class="kpi-chip"><span class="kpi-k">Delay trend</span><span class="kpi-v" title="Rolling average of recent samples">${escapeHtml(trendLabel)}</span></div>
+    `;
+  }
+
+// ---------- Weather (5-day one-card + icons + local time + extras) ----------
+  const WX_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+  function wxCacheKey(iata, fallbackName) {
+    const k = String(iata || "").trim().toUpperCase();
+    if (k) return `wx_${k}`;
+    return `wx_${String(fallbackName || "dest").toLowerCase().replace(/\s+/g, "_")}`;
+  }
+
+  function safeParseJson(s) { try { return JSON.parse(s); } catch { return null; } }
+
+  function weatherCodeToIconAndLabel(code) {
+    const c = Number(code);
+    if (!Number.isFinite(c)) return { icon: "❓", label: "Unknown" };
+    if (c === 0) return { icon: "☀️", label: "Clear" };
+    if (c === 1) return { icon: "🌤️", label: "Mainly clear" };
+    if (c === 2) return { icon: "⛅", label: "Partly cloudy" };
+    if (c === 3) return { icon: "☁️", label: "Overcast" };
+    if (c === 45 || c === 48) return { icon: "🌫️", label: "Fog" };
+    if ([51,53,55].includes(c)) return { icon: "🌦️", label: "Drizzle" };
+    if ([56,57].includes(c)) return { icon: "🌧️", label: "Freezing drizzle" };
+    if ([61,63,65].includes(c)) return { icon: "🌧️", label: "Rain" };
+    if ([66,67].includes(c)) return { icon: "🌧️", label: "Freezing rain" };
+    if ([71,73,75,77].includes(c)) return { icon: "❄️", label: "Snow" };
+    if ([80,81,82].includes(c)) return { icon: "🌧️", label: "Showers" };
+    if ([85,86].includes(c)) return { icon: "🌨️", label: "Snow showers" };
+    if ([95,96,99].includes(c)) return { icon: "⛈️", label: "Thunderstorm" };
+    return { icon: "🌥️", label: "Weather" };
+  }
+
+  function formatLocalTimeNow(timezone) {
+    try {
+      return new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: timezone || "UTC" });
+    } catch {
+      return new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  function formatWxDay(dateStr, timezone) {
+    try {
+      const d = new Date(`${dateStr}T12:00:00`);
+      return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short", timeZone: timezone || "UTC" }).format(d);
+    } catch {
+      return dateStr;
+    }
+  }
+
+  function fmtSun(timeStr, timezone) {
+    // Open-Meteo returns ISO time in local tz when timezone=auto; still safe to format.
+    const d = toDate(timeStr);
+    if (!d) return "—";
+    try {
+      return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: timezone || "UTC" });
+    } catch {
+      return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  async function geocodeCityOpenMeteo(name) {
+    const q = String(name || "").trim();
+    if (!q) return null;
     const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
-    url.searchParams.set("name", name);
+    url.searchParams.set("name", q);
     url.searchParams.set("count", "1");
     url.searchParams.set("language", "en");
     url.searchParams.set("format", "json");
+
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) return null;
     const data = await res.json();
-    const r = data?.results?.[0];
-    if (!r) return null;
-    return { lat: r.latitude, lon: r.longitude, name: r.name || name };
+    const r = data && Array.isArray(data.results) ? data.results[0] : null;
+    if (!r || typeof r.latitude !== "number" || typeof r.longitude !== "number") return null;
+    return { lat: r.latitude, lon: r.longitude, name: r.name || q };
   }
 
-  async function geocodeCachedQuery(query) {
-    const key = `geo_q_${String(query).toLowerCase()}`;
-    const cachedRaw = safeGetLocal(key);
-    if (cachedRaw) {
-      try {
-        const cached = JSON.parse(cachedRaw);
-        if (cached && typeof cached.lat === "number" && typeof cached.lon === "number") return cached;
-      } catch {}
-    }
-    const r = await geocodeCity(query);
-    if (r && typeof r.lat === "number" && typeof r.lon === "number") {
-      safeSetLocal(key, JSON.stringify(r));
-      return r;
-    }
-    return null;
-  }
-
-  async function fetchWeather(lat, lon) {
+  async function fetchOpenMeteoDaily(lat, lon) {
     const url = new URL("https://api.open-meteo.com/v1/forecast");
     url.searchParams.set("latitude", String(lat));
     url.searchParams.set("longitude", String(lon));
-    url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,weathercode");
-    url.searchParams.set("timezone", "Europe/London");
+    url.searchParams.set("timezone", "auto");
+    url.searchParams.set("daily",
+      [
+        "weathercode",
+        "temperature_2m_max",
+        "temperature_2m_min",
+        "apparent_temperature_max",
+        "apparent_temperature_min",
+        "precipitation_sum",
+        "precipitation_probability_max",
+        "windspeed_10m_max",
+        "uv_index_max",
+        "sunrise",
+        "sunset",
+      ].join(",")
+    );
+
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) throw new Error(`Weather HTTP ${res.status}`);
-    const data = await res.json();
-    return data?.daily || null;
+    return await res.json();
   }
 
   async function renderWeatherByCityName(flat) {
     if (!els.weatherBox) return;
 
-    const destinationAirportCode = normIata(
-      pickAny(flat, [
-        "arrival.iataCode",
-        "flight.arrival.iataCode",
-        "flight.destination.iataCode",
-        "arrival.iata",
-        "arr_iata",
-        "destination",
-        "to",
-      ]) || ""
-    );
+    const destCode = String(pickAny(flat, [
+      "flight.arrival.iataCode",
+      "flight.arrival.iata",
+      "flight.destination.iataCode",
+      "flight.destination.iata",
+      "arrival.iataCode",
+      "arrival.iata",
+      "arr_iata",
+      "arr",
+      "destination",
+      "to",
+      "flight.airport.destination.code.iata",
+    ]) || "").trim().toUpperCase();
 
-    const cityName = getCityName(destinationAirportCode);
-    if (!cityName) {
+    const placeLabel = airportCodeToCityName[destCode] || destCode || "";
+    const cacheKey = wxCacheKey(destCode, placeLabel);
+
+    // cache hit
+    const cachedRaw = safeGetLocal(cacheKey);
+    const cached = cachedRaw ? safeParseJson(cachedRaw) : null;
+    if (cached && cached.fetchedAt && (Date.now() - cached.fetchedAt) < WX_CACHE_TTL_MS && cached.payload) {
+      paintWeather(cached.payload, placeLabel);
+      return;
+    }
+
+    if (!destCode && !placeLabel) {
       if (els.wxHint) els.wxHint.textContent = "Destination not found.";
+      els.weatherBox.innerHTML = "";
+      return;
+    }
+
+    // Coords: airportCoords first, else geocode by name
+    let lat = null, lon = null;
+    if (destCode && typeof airportCoords === "object" && airportCoords && airportCoords[destCode]) {
+      lat = airportCoords[destCode].lat;
+      lon = airportCoords[destCode].lon;
+    } else if (placeLabel) {
+      const geo = await geocodeCityOpenMeteo(placeLabel);
+      if (geo) { lat = geo.lat; lon = geo.lon; }
+    }
+
+    if (!(Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) {
+      if (els.wxHint) els.wxHint.textContent = "Weather: destination coordinates unavailable.";
+      els.weatherBox.innerHTML = "";
       return;
     }
 
     try {
-      if (els.wxHint) els.wxHint.textContent = `Weather: ${cityName} (next 3 days)`;
-
-      const geo = await geocodeCachedQuery(cityName);
-      if (!geo) {
-        if (els.wxHint) els.wxHint.textContent = "Weather data unavailable.";
-        return;
-      }
-
-      const daily = await fetchWeather(geo.lat, geo.lon);
-      if (!daily?.time?.length) {
-        if (els.wxHint) els.wxHint.textContent = "No forecast returned.";
-        return;
-      }
-
-      const days = Math.min(3, daily.time.length);
-      let html = "";
-      for (let i = 0; i < days; i++) {
-        html += `
-          <div class="wx-card">
-            <div class="wx-title">${escapeHtml(daily.time[i])}</div>
-            <div class="wx-sub">Max ${escapeHtml(daily.temperature_2m_max[i])}°C • Min ${escapeHtml(daily.temperature_2m_min[i])}°C</div>
-          </div>
-        `;
-      }
-      els.weatherBox.innerHTML = html;
+      if (els.wxHint) els.wxHint.textContent = "Loading weather…";
+      const payload = await fetchOpenMeteoDaily(lat, lon);
+      safeSetLocal(cacheKey, JSON.stringify({ fetchedAt: Date.now(), payload }));
+      paintWeather(payload, placeLabel);
     } catch (e) {
-      console.error("Weather fetch error:", e);
-      if (els.wxHint) els.wxHint.textContent = "Error fetching weather data.";
+      console.warn("Weather fetch error:", e);
+      if (els.wxHint) els.wxHint.textContent = "Weather unavailable.";
+      els.weatherBox.innerHTML = "";
     }
   }
 
-  // ---------- Route map: Leaflet basemap + animation, with SVG fallback ----------
+  function tempClass(tMax) {
+    const t = Number(tMax);
+    if (!Number.isFinite(t)) return "";
+    if (t >= 25) return "wx-hot";
+    if (t <= 5) return "wx-cold";
+    return "";
+  }
+
+  function paintWeather(payload, placeLabel) {
+    if (!payload || !payload.daily) {
+      if (els.wxHint) els.wxHint.textContent = "Weather unavailable.";
+      els.weatherBox.innerHTML = "";
+      return;
+    }
+
+    const tz = payload.timezone || "UTC";
+    const localNow = formatLocalTimeNow(tz);
+    if (els.wxHint) els.wxHint.textContent = `Local time in ${placeLabel || "destination"}: ${localNow}`;
+
+    const d = payload.daily;
+    const times = Array.isArray(d.time) ? d.time : [];
+    const tmax = Array.isArray(d.temperature_2m_max) ? d.temperature_2m_max : [];
+    const tmin = Array.isArray(d.temperature_2m_min) ? d.temperature_2m_min : [];
+    const feelsMax = Array.isArray(d.apparent_temperature_max) ? d.apparent_temperature_max : [];
+    const feelsMin = Array.isArray(d.apparent_temperature_min) ? d.apparent_temperature_min : [];
+    const wcode = Array.isArray(d.weathercode) ? d.weathercode : [];
+    const precipSum = Array.isArray(d.precipitation_sum) ? d.precipitation_sum : [];
+    const precipProb = Array.isArray(d.precipitation_probability_max) ? d.precipitation_probability_max : [];
+    const windMax = Array.isArray(d.windspeed_10m_max) ? d.windspeed_10m_max : [];
+    const uvMax = Array.isArray(d.uv_index_max) ? d.uv_index_max : [];
+    const sunrise = Array.isArray(d.sunrise) ? d.sunrise : [];
+    const sunset = Array.isArray(d.sunset) ? d.sunset : [];
+
+    const n = Math.min(5, times.length, tmax.length, tmin.length, wcode.length);
+    if (n <= 0) { els.weatherBox.innerHTML = ""; return; }
+
+    // One card containing 5-day rows
+    let rows = "";
+    for (let i = 0; i < n; i++) {
+      const meta = weatherCodeToIconAndLabel(wcode[i]);
+      const dayLabel = formatWxDay(times[i], tz);
+      const tHi = Number.isFinite(Number(tmax[i])) ? `${Number(tmax[i]).toFixed(0)}°` : "—";
+      const tLo = Number.isFinite(Number(tmin[i])) ? `${Number(tmin[i]).toFixed(0)}°` : "—";
+      const fHi = Number.isFinite(Number(feelsMax[i])) ? `${Number(feelsMax[i]).toFixed(0)}°` : "—";
+      const fLo = Number.isFinite(Number(feelsMin[i])) ? `${Number(feelsMin[i]).toFixed(0)}°` : "—";
+      const pSum = Number.isFinite(Number(precipSum[i])) ? `${Number(precipSum[i]).toFixed(1)} mm` : "—";
+      const pProb = Number.isFinite(Number(precipProb[i])) ? `${Number(precipProb[i]).toFixed(0)}%` : "—";
+      const w = Number.isFinite(Number(windMax[i])) ? `${Number(windMax[i]).toFixed(0)} km/h` : "—";
+      const uv = Number.isFinite(Number(uvMax[i])) ? `${Number(uvMax[i]).toFixed(0)}` : "—";
+      const sr = sunrise[i] ? fmtSun(sunrise[i], tz) : "—";
+      const ss = sunset[i] ? fmtSun(sunset[i], tz) : "—";
+
+      rows += `
+        <div class="wx-row ${tempClass(tmax[i])}">
+          <div class="wx-day">
+            <div class="wx-day-top"><span class="wx-ico" aria-hidden="true">${meta.icon}</span><span>${escapeHtml(dayLabel)}</span></div>
+            <div class="wx-desc">${escapeHtml(meta.label)}</div>
+          </div>
+          <div class="wx-metric"><div class="wx-k">Temp</div><div class="wx-v">${escapeHtml(tHi)} / ${escapeHtml(tLo)}</div></div>
+          <div class="wx-metric"><div class="wx-k">Feels</div><div class="wx-v">${escapeHtml(fHi)} / ${escapeHtml(fLo)}</div></div>
+          <div class="wx-metric"><div class="wx-k">Rain</div><div class="wx-v">${escapeHtml(pProb)} • ${escapeHtml(pSum)}</div></div>
+          <div class="wx-metric"><div class="wx-k">Wind</div><div class="wx-v">${escapeHtml(w)}</div></div>
+          <div class="wx-metric"><div class="wx-k">UV</div><div class="wx-v">${escapeHtml(uv)}</div></div>
+          <div class="wx-metric"><div class="wx-k">Sun</div><div class="wx-v">${escapeHtml(sr)}–${escapeHtml(ss)}</div></div>
+        </div>
+      `;
+    }
+
+    els.weatherBox.innerHTML = `
+      <div class="wx-onecard">
+        <div class="wx-onecard-hdr">
+          <div class="wx-place">${escapeHtml(placeLabel || "Destination")}</div>
+          <div class="wx-note">5-day forecast</div>
+        </div>
+        <div class="wx-rows">${rows}</div>
+      </div>
+    `;
+  }
+
+// ---------- Route map: Leaflet basemap + animation, with SVG fallback ----------
   const ROUTE_SVG_W = 1000;
   const ROUTE_SVG_H = 420;
 
@@ -880,36 +1136,33 @@ const airportCoords = {
     return el;
   }
 
+  function normIata(code) { return String(code || "").trim().toUpperCase(); }
+
   function resolvePlaceQuery(flat, kind, iata) {
-    const i = normIata(iata);
-    if (i && airportCoords[i]) return null; // coords provided; don't geocode
+    const paths = (kind === "dep")
+      ? [
+          "departure.city", "departure.cityName", "departure.city_name",
+          "departure.airport.name", "departure.airportName", "departure.airport",
+          "flight.departure.city", "flight.origin.city", "flight.airport.origin.name",
+        ]
+      : [
+          "arrival.city", "arrival.cityName", "arrival.city_name",
+          "arrival.airport.name", "arrival.airportName", "arrival.airport",
+          "flight.arrival.city", "flight.destination.city", "flight.airport.destination.name",
+        ];
 
-    const directCodeName = getCityName(i);
-    if (directCodeName) return directCodeName;
+    const fromPayload = pickAny(flat, paths);
+    if (fromPayload) return String(fromPayload);
 
-    const city = (kind === "dep")
-      ? pickAny(flat, ["departure.city", "departure.cityName", "departure.airport.city", "flight.departure.city"])
-      : pickAny(flat, ["arrival.city", "arrival.cityName", "arrival.airport.city", "flight.arrival.city"]);
-    if (city) return city;
+    const mapped = getCityName(iata);
+    if (mapped) return mapped;
 
-    const airport = (kind === "dep")
-      ? pickAny(flat, ["departure.airport", "departure.name", "flight.departure.airport", "flight.departure.name"])
-      : pickAny(flat, ["arrival.airport", "arrival.name", "flight.arrival.airport", "flight.arrival.name"]);
-    if (airport) return airport;
-
-    return directCodeName || i || "";
+    const c = normIata(iata);
+    return c ? `${c} airport` : "";
   }
 
   async function resolveEndpoint(flat, kind, iata) {
-    const code = normIata(iata);
-
-    // 1) Prefer our hard-coded airport coords if present (most accurate and stable)
-    if (code && airportCoords[code]) {
-      const c = airportCoords[code];
-      return { lat: c.lat, lon: c.lon, label: code };
-    }
-
-    // 2) Try coords from payload (if API provides)
+    // Try to use coords if present in the payload (best accuracy).
     const latPaths = (kind === "dep")
       ? ["departure.latitude", "departure.lat", "flight.departure.latitude", "flight.departure.lat", "departure.geo.lat"]
       : ["arrival.latitude", "arrival.lat", "flight.arrival.latitude", "flight.arrival.lat", "arrival.geo.lat"];
@@ -920,17 +1173,20 @@ const airportCoords = {
     const lat = Number(pickAny(flat, latPaths));
     const lon = Number(pickAny(flat, lonPaths));
     if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-      return { lat, lon, label: code || "—" };
+      return { lat, lon, label: normIata(iata) || "—" };
     }
 
-    // 3) Geocode a place query
-    const query = resolvePlaceQuery(flat, kind, code);
+    // Otherwise geocode a place query (city/airport name).
+    let query = resolvePlaceQuery(flat, kind, iata);
+    // Bias to airport features (avoids pins landing on city centres)
+    if (iata && query && !/airport/i.test(query)) query = airportQueryFromIata(iata);
     const geo = query ? await geocodeCachedQuery(query) : null;
     if (!geo) return null;
-    return { lat: geo.lat, lon: geo.lon, label: code || "—" };
+    return { lat: geo.lat, lon: geo.lon, label: normIata(iata) || "—" };
   }
 
   function greatCirclePoints(lat1, lon1, lat2, lon2, steps = 72) {
+    // Spherical linear interpolation between two coords.
     const toRad = (d) => (d * Math.PI) / 180;
     const toDeg = (r) => (r * 180) / Math.PI;
 
@@ -989,36 +1245,11 @@ const airportCoords = {
 
   function makeAirportIcon(code) {
     if (!window.L) return null;
-
-    // Inline-styled HTML so marker placement can't be thrown off by external CSS transforms.
-    // The "tip" circle is the true anchor point.
-    const safe = escapeHtml(code || "—");
     return L.divIcon({
       className: "",
-      html: `
-        <div style="
-          width:46px;height:56px;position:relative;
-          display:flex;align-items:flex-start;justify-content:center;
-          ">
-          <div style="
-            width:46px;height:46px;border-radius:16px;
-            border:1px solid rgba(255,255,255,.18);
-            background:rgba(16,20,34,.85);
-            backdrop-filter:blur(10px);
-            box-shadow: 0 8px 22px rgba(0,0,0,.32);
-            display:flex;align-items:center;justify-content:center;
-            font-weight:950;letter-spacing:.3px;font-size:12px;color:#fff;
-          ">${safe}</div>
-          <div style="
-            position:absolute;left:50%;bottom:2px;
-            width:10px;height:10px;border-radius:999px;
-            background:#fff;transform:translateX(-50%);
-            box-shadow:0 6px 14px rgba(0,0,0,.35);
-          "></div>
-        </div>
-      `,
-      iconSize: [46, 56],
-      iconAnchor: [23, 54], // anchor near the center of the tip circle
+      html: `<div class="airport-pin"><div class="code">${escapeHtml(code || "—")}</div></div>`,
+      iconSize: [46, 46],
+      iconAnchor: [23, 42],
     });
   }
 
@@ -1044,6 +1275,7 @@ const airportCoords = {
     const want = theme === "dark" ? "dark" : "light";
     if (state.mapTheme === want) return;
 
+    // swap tile layers
     if (state.mapTheme === "dark" && state.tileDark) state.map.removeLayer(state.tileDark);
     if (state.mapTheme === "light" && state.tileLight) state.map.removeLayer(state.tileLight);
 
@@ -1057,6 +1289,7 @@ const airportCoords = {
     if (!els.routeMap || !window.L) return false;
     if (state.map) return true;
 
+    // enable Leaflet view, hide SVG fallback
     document.body.classList.add("leaflet-on");
 
     const L = window.L;
@@ -1086,6 +1319,7 @@ const airportCoords = {
       className: "tiles-dark",
     });
 
+    // Fallback if CARTO tiles are blocked: use OSM tiles with a dark filter.
     const tileDarkFallback = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       subdomains: "abc",
       maxZoom: 19,
@@ -1093,40 +1327,55 @@ const airportCoords = {
       className: "tiles-dark-fallback",
     });
 
-    state.tileLight.addTo(state.map);
-    state.mapTheme = "light";
+    // If tiles fail to load (common on some networks), switch to a fallback layer.
+    state.tileLight.on("tileerror", () => {
+      // OSM is already state.tileLight, so nothing to do here.
+    });
 
+    state.tileDark.on("tileerror", () => {
+      // Swap dark layer to the fallback once, then re-apply the current theme.
+      if (state.tileDark === tileDarkFallback) return;
+      try {
+        if (state.mapTheme === "dark") state.map.removeLayer(state.tileDark);
+      } catch {}
+      state.tileDark = tileDarkFallback;
+      applyTheme("dark");
+    });
+
+    // initial theme
+    const initial = state.prefersDark && state.prefersDark.matches ? "dark" : "light";
+    state.mapTheme = null;
+    applyTheme(initial);
+
+    // auto-switch with OS theme unless user overrides
+    if (state.prefersDark && state.prefersDark.addEventListener) {
+      state.prefersDark.addEventListener("change", (e) => {
+        if (state.themeOverridden) return;
+        applyTheme(e.matches ? "dark" : "light");
+      });
+    }
+
+    // Theme toggle control
     const Toggle = L.Control.extend({
       options: { position: "topright" },
-      onAdd: function () {
+      onAdd: () => {
         const btn = L.DomUtil.create("button", "map-toggle-btn");
         btn.type = "button";
-        btn.title = "Toggle map theme";
-        btn.textContent = "Theme";
+        btn.textContent = "Map: Auto";
         L.DomEvent.disableClickPropagation(btn);
-        L.DomEvent.on(btn, "click", () => {
-          const next = state.mapTheme === "light" ? "dark" : "light";
-          if (next === "dark") {
-            try {
-              state.tileDark.addTo(state.map);
-              state.map.removeLayer(state.tileLight);
-              state.mapTheme = "dark";
-            } catch {
-              tileDarkFallback.addTo(state.map);
-              state.map.removeLayer(state.tileLight);
-              state.mapTheme = "dark";
-            }
-          } else {
-            try { state.map.removeLayer(state.tileDark); } catch {}
-            try { state.map.removeLayer(tileDarkFallback); } catch {}
-            state.tileLight.addTo(state.map);
-            state.mapTheme = "light";
-          }
+        btn.addEventListener("click", () => {
+          state.themeOverridden = true;
+          const next = state.mapTheme === "dark" ? "light" : "dark";
+          applyTheme(next);
+          btn.textContent = `Map: ${next === "dark" ? "Dark" : "Light"}`;
         });
         return btn;
       }
     });
     state.map.addControl(new Toggle());
+
+    // size fix when container is visible
+    setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 50);
 
     return true;
   }
@@ -1140,8 +1389,11 @@ const airportCoords = {
     const routeKey = `${depCode}|${arrCode}`;
     const useLeaflet = ensureLeafletMap();
 
+    // Prefer Leaflet if available; else SVG fallback.
     if (useLeaflet) {
+      // Avoid re-animating if same route and map already rendered.
       if (routeKey && routeKey === state.lastRouteKey && state.routeLine) {
+        // still make sure bounds are sane on resize
         setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 0);
         return;
       }
@@ -1150,6 +1402,7 @@ const airportCoords = {
       return;
     }
 
+    // --- SVG fallback (your original behaviour) ---
     if (!els.routeSvg) return;
     els.routeSvg.replaceChildren();
 
@@ -1175,7 +1428,10 @@ const airportCoords = {
       return;
     }
 
-    const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
+    
+    // Cache route meta for KPIs
+    try { state.lastRouteMeta = { dep: { lat: depGeo.lat, lon: depGeo.lon }, arr: { lat: arrGeo.lat, lon: arrGeo.lon }, distanceKm: haversineKm(depGeo.lat, depGeo.lon, arrGeo.lat, arrGeo.lon) }; } catch {}
+const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
     const p2 = projectLonLatToSvg(arrGeo.lon, arrGeo.lat);
 
     const mx = (p1.x + p2.x) / 2;
@@ -1190,6 +1446,7 @@ const airportCoords = {
     const cx = mx + nx * arc;
     const cy = my + ny * arc;
 
+    // faint background
     els.routeSvg.append(svgEl("rect", { x:0, y:0, width:ROUTE_SVG_W, height:ROUTE_SVG_H, fill:"currentColor", opacity:"0.03" }));
 
     const grid = svgEl("g", { opacity: "0.35" });
@@ -1216,8 +1473,10 @@ const airportCoords = {
     const L = window.L;
     if (!state.map || !L) return;
 
+    // Cancel any in-flight animation
     if (state.animRaf) { cancelAnimationFrame(state.animRaf); state.animRaf = null; }
 
+    // Resolve endpoints
     const [dep, arr] = await Promise.all([
       resolveEndpoint(flat, "dep", depCode),
       resolveEndpoint(flat, "arr", arrCode),
@@ -1228,25 +1487,45 @@ const airportCoords = {
     const points = greatCirclePoints(dep.lat, dep.lon, arr.lat, arr.lon, 84);
     const bounds = L.latLngBounds(points.map((p) => L.latLng(p[0], p[1])));
 
+    // Clear previous layers
     if (state.routeGroup) state.routeGroup.remove();
     state.routeGroup = L.layerGroup().addTo(state.map);
 
-    state.depMarker = L.marker([dep.lat, dep.lon], { icon: makeAirportIcon(depCode), interactive: false }).addTo(state.routeGroup);
-    state.arrMarker = L.marker([arr.lat, arr.lon], { icon: makeAirportIcon(arrCode), interactive: false }).addTo(state.routeGroup);
+    // Markers
+    state.depMarker = L.marker([dep.lat, dep.lon], { icon: makeAirportIcon(depCode), interactive: true }).addTo(state.routeGroup);
+    state.arrMarker = L.marker([arr.lat, arr.lon], { icon: makeAirportIcon(arrCode), interactive: true }).addTo(state.routeGroup);
 
+    // Tooltips / popups (mobile friendly)
+    try {
+      const depTitle = `${depCode}${dep.name ? ` — ${dep.name}` : ""}`;
+      const arrTitle = `${arrCode}${arr.name ? ` — ${arr.name}` : ""}`;
+      state.depMarker.bindTooltip(depTitle, { direction: "top", offset: [0, -8] });
+      state.arrMarker.bindTooltip(arrTitle, { direction: "top", offset: [0, -8] });
+      state.depMarker.bindPopup(`<strong>${depTitle}</strong>`);
+      state.arrMarker.bindPopup(`<strong>${arrTitle}</strong>`);
+    } catch {}
+
+
+    // Route polyline (animated draw)
     state.routeLine = L.polyline([], { weight: 4, opacity: 0.95, className: "route-line" }).addTo(state.routeGroup);
 
+    // Plane marker
     const firstBearing = bearingDeg(points[0][0], points[0][1], points[1][0], points[1][1]);
     state.planeMarker = L.marker(points[0], { icon: makePlaneIcon(firstBearing), interactive: false }).addTo(state.routeGroup);
 
-    // ✅ slightly closer than before
-    state.map.fitBounds(bounds, { padding: [28, 28], maxZoom: 10 });
+    // Fit bounds nicely
+    state.map.fitBounds(bounds, { padding: [28, 28], maxZoom: 8 });
 
+    // If endpoints are very close (geocode sometimes returns same city centre), zoom in a bit.
     const dKm = haversineKm(dep.lat, dep.lon, arr.lat, arr.lon);
+    // Cache route meta for KPIs (distance etc.)
+    state.lastRouteMeta = { dep, arr, distanceKm: dKm };
+
     if (Number.isFinite(dKm) && dKm < 80) {
       state.map.setView([(dep.lat + arr.lat) / 2, (dep.lon + arr.lon) / 2], 8, { animate: false });
     }
 
+    // Animate the path + plane
     const durationMs = 1300;
     const total = points.length;
 
@@ -1258,19 +1537,18 @@ const airportCoords = {
       state.routeLine.setLatLngs(points.slice(0, idx + 1));
 
       const cur = points[idx];
+      const next = points[Math.min(idx + 1, total - 1)];
+      const brg = bearingDeg(cur[0], cur[1], next[0], next[1]);
       state.planeMarker.setLatLng(cur);
-
-      if (idx + 1 < total) {
-        const next = points[Math.min(total - 1, idx + 1)];
-        const brg = bearingDeg(cur[0], cur[1], next[0], next[1]);
-        state.planeMarker.setIcon(makePlaneIcon(brg));
-      }
+      state.planeMarker.setIcon(makePlaneIcon(brg));
 
       if (t < 1) state.animRaf = requestAnimationFrame(step);
       else state.animRaf = null;
     };
+
     state.animRaf = requestAnimationFrame(step);
 
+    // Ensure Leaflet sizes correctly after animation + layout settles
     setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 120);
   }
 

@@ -502,3 +502,58 @@ body.leaflet-on #routeSvg{ display:none; }
 .leaflet-tile.tiles-dark-fallback{
   filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.05);
 }
+
+
+/* ---- Weather one-card (5 day) ---- */
+.wx-onecard{
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255,255,255,.55);
+  backdrop-filter: blur(8px);
+}
+.wx-onecard-hdr{
+  display:flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.wx-place{ font-weight: 700; }
+.wx-note{ opacity: .75; font-size: 12px; }
+.wx-rows{ display:flex; flex-direction: column; }
+.wx-row{
+  display: grid;
+  grid-template-columns: 1.4fr repeat(5, 1fr);
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  align-items: center;
+}
+.wx-row:last-child{ border-bottom: none; }
+.wx-day-top{ display:flex; gap:8px; align-items: center; font-weight: 650; }
+.wx-ico{ font-size: 18px; }
+.wx-desc{ opacity: .75; font-size: 12px; margin-left: 26px; margin-top: 2px; }
+.wx-metric .wx-k{ opacity: .65; font-size: 11px; }
+.wx-metric .wx-v{ font-weight: 600; font-size: 13px; margin-top: 2px; }
+
+/* Hot/cold tint */
+.wx-row.wx-hot{ background: rgba(255, 159, 67, .12); }
+.wx-row.wx-cold{ background: rgba(84, 160, 255, .12); }
+
+/* Make weather readable on small screens */
+@media (max-width: 720px){
+  .wx-row{
+    grid-template-columns: 1.6fr 1fr 1fr;
+    grid-auto-rows: auto;
+    grid-auto-flow: row;
+  }
+  .wx-row .wx-metric:nth-child(n+4){ display:none; } /* hide Rain/Wind/UV/Sun on very narrow; tap details page if needed */
+}
+
+/* ---- Key/Value stacks in Dep/Arr cards ---- */
+.kv-stack{ display:flex; flex-direction: column; gap: 6px; }
+.kv-line{ display:flex; justify-content: space-between; gap: 10px; }
+.kv-k{ opacity:.7; font-size: 12px; }
+.kv-v{ font-weight: 650; font-size: 12px; }
+

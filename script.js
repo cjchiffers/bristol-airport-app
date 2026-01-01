@@ -1,131 +1,286 @@
-// Bristol Airport — redesigned mobile UI (uses existing data sources)
-// Keeps your existing flight-details flow + saved flights + security samples.
+// Bristol Airport — redesigned mobile UI (stable build)
+// - Aviation Edge timetable (departures/arrivals)
+// - Saved (starred) flights stored in localStorage
+// - Install button (optional) + security wait samples
+"use strict";
 
-// Stores current airport coordinates from the last schedule response (FlightAPI schedule wrapper)
-window.__brsAirportPos = window.__brsAirportPos || null;
-function extractAirportPosFromScheduleResponse(data){
+// =======================
+// Configuration
+// =======================
+// Override key via ?key=YOUR_KEY or localStorage.setItem('aviationEdgeApiKey','YOUR_KEY')
+const apiKey =
+  (new URLSearchParams(location.search).get("key")) ||
+  (safeGetLocal("aviationEdgeApiKey")) ||
+  "26071f-14ef94"; 
+
+// ---------- Airport coordinate prefetch (for accurate map pins on details page) ----------
+const AIRPORT_GEO_CACHE_KEY = "brs_airport_geo_cache_v1";
+const AIRPORT_GEO_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
+function normIata(code){ return String(code||"").trim().toUpperCase(); }
+
+function loadAirportGeoCache(){
   try{
-    const pos = data?.airport?.pluginData?.details?.position;
-    if (pos && typeof pos.latitude === "number" && typeof pos.longitude === "number") {
-      return { lat: pos.latitude, lng: pos.longitude };
-    }
-  } catch {}
-  return null;
+    const raw = localStorage.getItem(AIRPORT_GEO_CACHE_KEY);
+    if(!raw) return { ts:0, data:{} };
+    const parsed = JSON.parse(raw);
+    const ts = Number(parsed && parsed.ts) || 0;
+    const data = (parsed && parsed.data && typeof parsed.data==="object") ? parsed.data : {};
+    return { ts, data };
+  }catch{ return { ts:0, data:{} }; }
+}
+function saveAirportGeoCache(cache){
+  try{ localStorage.setItem(AIRPORT_GEO_CACHE_KEY, JSON.stringify(cache)); }catch{}
+}
+function isValidLatLon(lat, lon){
+  return Number.isFinite(lat) && Number.isFinite(lon) &&
+    Math.abs(lat) <= 90 && Math.abs(lon) <= 180 &&
+    !(Math.abs(lat) < 0.001 && Math.abs(lon) < 0.001);
 }
 
-// Mapping of airport codes to city names (fallback to code)
-const airportCodeToCityName = {
-"ABZ": "Aberdeen",
-"AGP": "Malaga",
-"ADA": "Izmir",
-"ALC": "Alicante",
-"AMS": "Amsterdam",
-"ATA": "Antalya",
-"AYT": "Dalaman",
-"BCN": "Barcelona",
-"BLQ": "Bologna",
-"BHD": "Belfast City",
-"BFS": "Belfast International",
-"CDG": "Paris Charles de Gaulle",
-"CFU": "Corfu",
-"CUN": "Cancun",
-"DAA": "Sharm el Sheikh",
-"DLM": "Dalaman",
-"EDI": "Edinburgh",
-"FAO": "Faro",
-"FCO": "Rome",
-"FNC": "Madeira",
-"GLA": "Glasgow",
-"HRG": "Hurghada",
-"INV": "Inverness",
-"IOM": "Isle of Man",
-"JER": "Jersey",
-"KRK": "Krakow",
-"LIN": "Milan",
-"LIS": "Lisbon",
-"LPA": "Gran Canaria",
-"MAN": "Manchester",
-"MME": "Teesside",
-"MUC": "Munich",
-"NAP": "Naples",
-"NCL": "Newcastle",
-"OLB": "Olbia",
-"ORY": "Paris Orly",
-"PMI": "Palma de Mallorca",
-"PSA": "Pisa",
-"RHO": "Rhodes",
-"SKG": "Thessaloniki",
-"SSH": "Sharm el Sheikh",
-"TFS": "Tenerife South",
-"VIE": "Vienna",
-"ZRH": "Zurich",
-};
+async function geocodeAirportOpenMeteo(query){
+  const q = String(query||"").trim();
+  if(!q) return null;
+  const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
+  url.searchParams.set("name", q);
+  url.searchParams.set("count", "5");
+  url.searchParams.set("language", "en");
+  url.searchParams.set("format", "json");
 
-function getCityName(code){ return airportCodeToCityName[code] || code || "—"; }
+  const res = await fetch(url.toString(), { cache:"no-store" });
+  if(!res.ok) return null;
+  const data = await res.json();
+  const results = (data && Array.isArray(data.results)) ? data.results : [];
+  if(!results.length) return null;
 
+  const best = results.find(r => String(r.feature_code||"").toUpperCase()==="AIRP") || results[0];
+  const lat = Number(best.latitude);
+  const lon = Number(best.longitude);
+  if(!isValidLatLon(lat, lon)) return null;
+  return { lat, lon, name: best.name || q };
+}
+
+function airportQueryFromParts(iata, name){
+  const n = String(name||"").trim();
+  if(n){
+    return /airport/i.test(n) ? n : `${n} Airport`;
+  }
+  const c = normIata(iata);
+  return c ? `${c} Airport` : "";
+}
+
+async function ensureAirportCached(iata, name){
+  const code = normIata(iata);
+  if(!code) return;
+  const now = Date.now();
+  const cache = loadAirportGeoCache();
+  const fresh = (now - (cache.ts||0)) < AIRPORT_GEO_TTL_MS;
+  if(fresh && cache.data && cache.data[code]) return;
+
+  const query = airportQueryFromParts(code, name);
+  const geo = await geocodeAirportOpenMeteo(query);
+  if(!geo) return;
+
+  const entry = { lat: geo.lat, lon: geo.lon, name: geo.name, q: query, t: now };
+  cache.ts = now;
+  cache.data = cache.data || {};
+  cache.data[code] = entry;
+  saveAirportGeoCache(cache);
+}
+
+function pickAny(obj, paths){
+  for(const p of paths){
+    const parts = p.split(".");
+    let v = obj;
+    for(const k of parts){
+      if(!v || typeof v !== "object") { v = undefined; break; }
+      v = v[k];
+    }
+    if(v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return undefined;
+}
+
+async function prefetchAirportsFromFlights(depList, arrList){
+  const flights = [...(depList||[]), ...(arrList||[])];
+  const seen = new Set();
+  const jobs = [];
+  for(const f of flights){
+    const depIata = pickAny(f, ["departure.iataCode","departure.iata","departure.airport.iataCode","departure.airport.iata","depIata","dep.iataCode"]);
+    const depName = pickAny(f, ["departure.airport.name","departure.airportName","departure.airport","departure.name","departure.city","departure.cityName"]);
+    const arrIata = pickAny(f, ["arrival.iataCode","arrival.iata","arrival.airport.iataCode","arrival.airport.iata","arrIata","arr.iataCode"]);
+    const arrName = pickAny(f, ["arrival.airport.name","arrival.airportName","arrival.airport","arrival.name","arrival.city","arrival.cityName"]);
+
+    const pairs = [[depIata, depName],[arrIata, arrName]];
+    for(const [iata, name] of pairs){
+      const code = normIata(iata);
+      if(!code || seen.has(code)) continue;
+      seen.add(code);
+      jobs.push(()=>ensureAirportCached(code, name));
+    }
+  }
+
+  // Concurrency limit (gentle to free API)
+  const limit = 3;
+  let i = 0;
+  const workers = new Array(limit).fill(0).map(async ()=>{
+    while(i < jobs.length){
+      const j = jobs[i++];
+      try{ await j(); }catch{}
+    }
+  });
+  await Promise.all(workers);
+}
+// replace with your own key
+
+// Airport IATA code (Bristol Airport = BRS)
+const airportIata = "BRS";
+
+// Stores current airport coordinates (for details page map fallback)
+window.__brsAirportPos = window.__brsAirportPos || null;
+
+// =======================
+// Small utilities
+// =======================
 function safeSetSession(key, value){ try { sessionStorage.setItem(key, value); return true; } catch { return false; } }
 function safeGetLocal(key){ try { return localStorage.getItem(key);} catch { return null; } }
 function safeSetLocal(key, value){ try { localStorage.setItem(key,value); return true;} catch { return false; } }
 function escapeHtml(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
-function openFlightDetailsWithStorage(flight, context) {
-  const key = `flight_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  safeSetSession(key, JSON.stringify({ flight, context }));
-  window.location.href = `flight-details.html?key=${encodeURIComponent(key)}`;
+function pickAny(obj, keys){
+  for (const k of (keys || [])){
+    if (!k) continue;
+    const v = obj?.[k];
+    if (v !== undefined && v !== null && v !== "") return v;
+  }
+  return null;
 }
 
-// ---- time helpers ----
-function convertToLondonTime(utcTime) {
-  const options = { timeZone: "Europe/London", hour12: false, hour: "2-digit", minute: "2-digit" };
-  return utcTime ? new Date(utcTime).toLocaleString('en-GB', options) : "—";
+/** Flatten nested objects into dot-key map (safe for API heterogeneity). */
+function flattenObject(obj, prefix = ""){
+  const out = {};
+  if (!obj || typeof obj !== "object") return out;
+  for (const [k,v] of Object.entries(obj)){
+    const nk = prefix ? `${prefix}.${k}` : k;
+    if (v && typeof v === "object" && !Array.isArray(v)){
+      Object.assign(out, flattenObject(v, nk));
+    } else {
+      out[nk] = v;
+    }
+  }
+  return out;
 }
-function getCurrentTimeMinusOneHour() {
+
+function toDate(value){
+  const d = parseAviationEdgeTime(value);
+  return d;
+}
+
+// =======================
+// City name mapping (fallback to code)
+// =======================
+const airportCodeToCityName = {
+  "ABZ":"Aberdeen","AGP":"Malaga","ADA":"Izmir","ALC":"Alicante","AMS":"Amsterdam","ATA":"Antalya","AYT":"Dalaman",
+  "BCN":"Barcelona","BLQ":"Bologna","BHD":"Belfast City","BFS":"Belfast International","CDG":"Paris Charles de Gaulle",
+  "CFU":"Corfu","CUN":"Cancun","DAA":"Sharm el Sheikh","DLM":"Dalaman","EDI":"Edinburgh","FAO":"Faro","FCO":"Rome",
+  "FNC":"Madeira","GLA":"Glasgow","HRG":"Hurghada","INV":"Inverness","IOM":"Isle of Man","JER":"Jersey","KRK":"Krakow",
+  "LIN":"Milan","LIS":"Lisbon","LPA":"Gran Canaria","MAN":"Manchester","MME":"Teesside","MUC":"Munich","NAP":"Naples",
+  "NCL":"Newcastle","OLB":"Olbia","ORY":"Paris Orly","PMI":"Palma de Mallorca","PSA":"Pisa","RHO":"Rhodes","SKG":"Thessaloniki",
+  "SSH":"Sharm el Sheikh","TFS":"Tenerife South","VIE":"Vienna","ZRH":"Zurich"
+};
+function getCityName(code){ return airportCodeToCityName[code] || code || "—"; }
+
+// =======================
+// Time helpers (London)
+// =======================
+const LONDON_TZ = "Europe/London";
+const LONDON_TIME_FMT = new Intl.DateTimeFormat("en-GB", { timeZone: LONDON_TZ, hour12:false, hour:"2-digit", minute:"2-digit" });
+const LONDON_DATE_KEY_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: LONDON_TZ, year:"numeric", month:"2-digit", day:"2-digit" });
+
+function parseAviationEdgeTime(value){
+  if (!value) return null;
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+  if (typeof value === "number"){
+    const d = new Date(value);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  if (typeof value !== "string") return null;
+  const s = value.trim();
+  if (!s) return null;
+  if (/[zZ]$/.test(s) || /[+-]\d\d:\d\d$/.test(s)){
+    const d = new Date(s);
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$/.test(s)){
+    const d = new Date(s.replace(" ","T") + "Z");
+    return Number.isFinite(d.getTime()) ? d : null;
+  }
+  const d = new Date(s);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+function convertToLondonTime(v){
+  const d = parseAviationEdgeTime(v);
+  return d ? LONDON_TIME_FMT.format(d) : "—";
+}
+
+function scheduledMs(f){
+  const d = parseAviationEdgeTime(f?.departure?.scheduledTime || f?.arrival?.scheduledTime);
+  return d ? d.getTime() : 0;
+}
+
+function getCurrentTimeMinusOneHour(){
   const now = new Date();
   now.setHours(now.getHours() - 1);
   return now.getTime();
 }
-function filterFlightsByTime(flights) {
-  const currentTimeMinusOneHour = getCurrentTimeMinusOneHour();
+
+function filterFlightsByTime(flights){
+  const cutoff = getCurrentTimeMinusOneHour();
   return (flights || []).filter(f => {
-    const t = new Date(f?.departure?.scheduledTime || f?.arrival?.scheduledTime);
-    return Number.isFinite(t.getTime()) && t.getTime() >= currentTimeMinusOneHour;
+    const d = parseAviationEdgeTime(f?.departure?.scheduledTime || f?.arrival?.scheduledTime);
+    // If time missing, keep (don’t hide everything)
+    if (!d) return true;
+    return d.getTime() >= cutoff;
   });
 }
-function scheduledMs(f){ return new Date(f?.departure?.scheduledTime || f?.arrival?.scheduledTime).getTime(); }
 
-// ---- airline logo ----
+// =======================
+// Airline logo + status
+// =======================
 function getAirlineLogoUrl(iataCode){
   if (!iataCode) return null;
   return `https://www.gstatic.com/flights/airline_logos/70px/${iataCode}.png`;
 }
 
-// ---- status ----
-function getFlightStatusString(flightSegment) {
-  if (!flightSegment) return "—";
-  if (flightSegment.cancelled) return "Cancelled";
-  if (flightSegment.boarding) return "Boarding";
-  if (flightSegment.gate) return `Gate ${flightSegment.gate}`;
-  if (flightSegment.delay) return `Delayed ${flightSegment.delay} min`;
-  if (flightSegment.scheduledTime && new Date(flightSegment.scheduledTime) > new Date()) return "On time";
-  return "Active";
+function getFlightStatusString(seg){
+  if (!seg) return "—";
+  if (seg.cancelled) return "Cancelled";
+  if (seg.boarding) return "Boarding";
+  if (seg.gate) return `Gate ${seg.gate}`;
+  if (seg.delay) return `Delayed ${seg.delay} min`;
+  return "—";
 }
 function statusTone(statusText){
-  const s = String(statusText || "").toLowerCase();
+  const s = String(statusText||"").toLowerCase();
   if (s.includes("cancel")) return "bad";
-  if (s.includes("delayed") || s.includes("delay")) return "warn";
-  if (s.includes("boarding") || s.includes("gate")) return "good";
-  if (s.includes("on time")) return "good";
+  if (s.includes("delay")) return "warn";
+  if (s.includes("gate") || s.includes("boarding")) return "good";
   return "neutral";
 }
 
-// ---- UI state ----
+// =======================
+// UI state
+// =======================
 let depFlights = [];
 let arrFlights = [];
 let currentTab = "departures";
 let quickFilter = "all";
 let searchQuery = "";
 
-// ---- toast ----
+// =======================
+// Toast
+// =======================
 let toastT = null;
 function toast(msg){
   const el = document.getElementById("toast");
@@ -136,80 +291,126 @@ function toast(msg){
   toastT = setTimeout(() => el.classList.remove("show"), 1800);
 }
 
-// ---- render ----
-function renderList(mode){
-  const isDep = mode === "departures";
-  const listEl = document.getElementById(isDep ? "departureList" : "arrivalList");
-  const emptyEl = document.getElementById(isDep ? "depEmpty" : "arrEmpty");
-  if (!listEl) return;
+// =======================
+// Saved flights
+// =======================
+const STAR_KEY = "starredFlights_v1";
 
-  const flights = (isDep ? depFlights : arrFlights).slice().sort((a,b)=>scheduledMs(a)-scheduledMs(b));
-  const qn = (searchQuery || "").trim().toLowerCase();
-  const now = Date.now();
-  const fourH = now + 4*60*60*1000;
-
-  const filtered = flights.filter(f => {
-    const seg = isDep ? f?.departure : f?.arrival;
-    const status = getFlightStatusString(seg);
-    const textBlob = `${f?.flight?.iataNumber || f?.flight_iata || f?.flightNumber || ""} ${f?.airline?.name || ""} ${f?.airline?.iataCode || ""} ${getCityName(isDep ? f?.arrival?.iataCode : f?.departure?.iataCode)} ${status}`.toLowerCase();
-
-    if (qn && !textBlob.includes(qn)) return false;
-
-    if (quickFilter === "next"){
-      const ms = scheduledMs(f);
-      if (!Number.isFinite(ms) || ms < now || ms > fourH) return false;
-    }
-    if (quickFilter === "delayed"){
-      const s = status.toLowerCase();
-      if (!(s.includes("delayed") || s.includes("delay"))) return false;
-    }
-    if (quickFilter === "gate"){
-      const s = status.toLowerCase();
-      if (!s.includes("gate")) return false;
-    }
-    return true;
-  });
-
-  listEl.innerHTML = filtered.map((f,i) => flightCardHtml(f, mode, i)).join("");
-  emptyEl.style.display = filtered.length ? "none" : "";
-
-  // Wire up events
-  listEl.querySelectorAll("[data-open]").forEach(card => {
-    card.addEventListener("click", (e) => {
-      // if save button was pressed, ignore
-      if (e.target && (e.target.closest && e.target.closest("[data-save]"))) return;
-      const idx = Number(card.getAttribute("data-idx"));
-      const flight = filtered[idx];
-      if (!flight) return;
-      openFlightDetailsWithStorage(flight, { mode, airport:"BRS", day:1, airportPos: window.__brsAirportPos });
-    });
-  });
-
-  listEl.querySelectorAll("[data-save]").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const idx = Number(btn.getAttribute("data-idx"));
-      const flight = filtered[idx];
-      if (!flight) return;
-      saveFlight(flight, { mode, airport:"BRS", day:1, airportPos: window.__brsAirportPos });
-      btn.classList.add("saved");
-      btn.textContent = "★";
-      toast("Saved");
-    });
-  });
-
-  // meta
-  const meta = document.getElementById("searchMeta");
-  if (meta){
-    const total = flights.length;
-    meta.textContent = (qn || quickFilter !== "all") ? `${filtered.length} of ${total} flights` : "";
-  }
+function getSavedFlights(){
+  const raw = safeGetLocal(STAR_KEY);
+  if (!raw) return [];
+  try { const x = JSON.parse(raw); return Array.isArray(x) ? x : []; } catch { return []; }
+}
+function setSavedFlights(list){
+  safeSetLocal(STAR_KEY, JSON.stringify(Array.isArray(list) ? list : []));
 }
 
+function deriveIdentity(f){
+  const flat = flattenObject(f || {});
+  const flightNo = pickAny(flat, ["flight.iataNumber","flight_iata","flightNumber","flight.iata","flight.number"]) || "";
+  const dep = pickAny(flat, ["departure.iataCode","departure.iata","dep_iata","origin","from"]) || "";
+  const arr = pickAny(flat, ["arrival.iataCode","arrival.iata","arr_iata","destination","to"]) || "";
+  const schedDep = pickAny(flat, ["departure.scheduledTime","departure.scheduled","scheduled_departure","departure_time"]) || "";
+  const schedArr = pickAny(flat, ["arrival.scheduledTime","arrival.scheduled","scheduled_arrival","arrival_time"]) || "";
+  return { flightNo, dep, arr, schedDep, schedArr };
+}
+
+function isFlightSaved(flight){
+  const id = deriveIdentity(flight);
+  const list = getSavedFlights();
+  return list.some(it => {
+    const fid = it?.id;
+    if (!fid) return false;
+    return String(fid.flightNo||"").toUpperCase() === String(id.flightNo||"").toUpperCase()
+      && String(fid.dep||"").toUpperCase() === String(id.dep||"").toUpperCase()
+      && String(fid.arr||"").toUpperCase() === String(id.arr||"").toUpperCase()
+      && String(fid.schedDep||"") === String(id.schedDep||"");
+  });
+}
+
+function saveFlight(flight, context){
+  const cur = getSavedFlights();
+  const id = deriveIdentity(flight);
+  const idx = cur.findIndex(x =>
+    String(x?.id?.flightNo||"").toUpperCase() === String(id.flightNo||"").toUpperCase() &&
+    String(x?.id?.schedDep||"") === String(id.schedDep||"") &&
+    String(x?.id?.dep||"").toUpperCase() === String(id.dep||"").toUpperCase() &&
+    String(x?.id?.arr||"").toUpperCase() === String(id.arr||"").toUpperCase()
+  );
+
+  if (idx >= 0){
+    cur.splice(idx, 1);
+  } else {
+    const flat = flattenObject(flight || {});
+    cur.unshift({
+      id,
+      updatedAt: Date.now(),
+      context: context || null,
+      airline: pickAny(flat, ["airline.name","airlineName","airline"]) || "",
+      flight
+    });
+    if (cur.length > 200) cur.length = 200;
+  }
+  setSavedFlights(cur);
+  renderSavedDrawer(false);
+}
+
+function renderSavedDrawer(forceOpen){
+  const drawer = document.getElementById("savedDrawer");
+  const bar = document.getElementById("savedBar");
+  if (!drawer || !bar) return;
+
+  const list = getSavedFlights();
+  bar.innerHTML = list.map((item, i) => {
+    const id = item?.id || {};
+    const label = `${escapeHtml(id.flightNo || "Flight")} · ${escapeHtml(id.dep||"")}→${escapeHtml(id.arr||"")}`;
+    return `<div class="chip" data-idx="${i}">
+      <span>${label}</span><span class="x" title="Remove" aria-label="Remove">×</span>
+    </div>`;
+  }).join("");
+
+  bar.querySelectorAll(".chip").forEach(ch => {
+    ch.addEventListener("click", (e) => {
+      const idx = Number(ch.getAttribute("data-idx"));
+      if (Number.isNaN(idx)) return;
+      const list2 = getSavedFlights();
+      const item = list2[idx];
+      if (!item) return;
+
+      if (e.target && e.target.classList && e.target.classList.contains("x")){
+        list2.splice(idx,1);
+        setSavedFlights(list2);
+        renderSavedDrawer(true);
+        return;
+      }
+      openFlightDetailsWithStorage(item.flight, item.context || { mode:"departure", airport: airportIata, day:1, airportPos: window.__brsAirportPos });
+    });
+  });
+
+  drawer.style.display = (forceOpen || list.length) ? "" : "none";
+}
+
+function initSavedUI(){
+  document.getElementById("savedBtn")?.addEventListener("click", () => renderSavedDrawer(true));
+  document.getElementById("savedCloseBtn")?.addEventListener("click", () => {
+    const drawer = document.getElementById("savedDrawer");
+    if (drawer) drawer.style.display = "none";
+  });
+  renderSavedDrawer(false);
+}
+
+function openFlightDetailsWithStorage(flight, context){
+  const key = `flight_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  safeSetSession(key, JSON.stringify({ flight, context }));
+  window.location.href = `flight-details.html?key=${encodeURIComponent(key)}`;
+}
+
+// =======================
+// Rendering
+// =======================
 function flightCardHtml(flight, mode, idx){
   const isDep = mode === "departures";
-  const flightNo = (flight.flight && flight.flight.iataNumber) ? flight.flight.iataNumber : (flight.flight_iata || flight.flightNumber || "—");
+  const flightNo = (flight?.flight?.iataNumber) ? flight.flight.iataNumber : (flight?.flight_iata || flight?.flightNumber || "—");
   const city = getCityName(isDep ? flight?.arrival?.iataCode : flight?.departure?.iataCode);
   const airlineName = flight?.airline?.name || flight?.airline?.iataCode || "—";
   const airlineCode = flight?.airline?.iataCode || "";
@@ -218,10 +419,10 @@ function flightCardHtml(flight, mode, idx){
   const statusText = getFlightStatusString(isDep ? flight?.departure : flight?.arrival);
   const tone = statusTone(statusText);
   const route = isDep ? `Bristol → ${city}` : `${city} → Bristol`;
-
   const saved = isFlightSaved(flight);
+
   return `
-    <article class="flight-card" data-open="1" data-idx="${idx}" role="button" tabindex="0" aria-label="${escapeHtml(flightNo)} ${escapeHtml(route)} ${escapeHtml(time)} ${escapeHtml(statusText)}">
+    <article class="flight-card" data-open="1" data-idx="${idx}" role="button" tabindex="0">
       <div class="fc-top">
         <div class="flight-no">${escapeHtml(flightNo)}</div>
         <div class="time">${escapeHtml(time)}</div>
@@ -241,7 +442,112 @@ function flightCardHtml(flight, mode, idx){
   `.trim();
 }
 
-// ---- Tabs ----
+function renderList(mode){
+  const isDep = mode === "departures";
+  const listEl = document.getElementById(isDep ? "departureList" : "arrivalList");
+  const emptyEl = document.getElementById(isDep ? "depEmpty" : "arrEmpty");
+  if (!listEl || !emptyEl) return;
+
+  const flights = (isDep ? depFlights : arrFlights).slice().sort((a,b)=>scheduledMs(a)-scheduledMs(b));
+  const qn = (searchQuery || "").trim().toLowerCase();
+  const nowMs = Date.now();
+  const fourH = nowMs + 4*60*60*1000;
+
+  const filtered = flights.filter(f => {
+    const seg = isDep ? f?.departure : f?.arrival;
+    const status = getFlightStatusString(seg);
+    const textBlob = `${f?.flight?.iataNumber || f?.flight_iata || f?.flightNumber || ""} ${f?.airline?.name || ""} ${f?.airline?.iataCode || ""} ${getCityName(isDep ? f?.arrival?.iataCode : f?.departure?.iataCode)} ${status}`.toLowerCase();
+    if (qn && !textBlob.includes(qn)) return false;
+
+    if (quickFilter === "next"){
+      const ms = scheduledMs(f);
+      if (ms && (ms < nowMs || ms > fourH)) return false;
+    }
+    if (quickFilter === "delayed"){
+      const s = status.toLowerCase();
+      if (!s.includes("delay")) return false;
+    }
+    if (quickFilter === "gate"){
+      const s = status.toLowerCase();
+      if (!s.includes("gate")) return false;
+    }
+    return true;
+  });
+
+  // Group by London date
+  const groups = new Map();
+  const todayKey = LONDON_DATE_KEY_FMT.format(new Date());
+  const tomorrowKey = LONDON_DATE_KEY_FMT.format(new Date(Date.now() + 24*60*60*1000));
+
+  const dayKeyOf = (f) => {
+    const t = f?.departure?.scheduledTime || f?.arrival?.scheduledTime;
+    const d = toDate(t);
+    if (!d) return "unknown";
+    return LONDON_DATE_KEY_FMT.format(d);
+  };
+
+  filtered.forEach(f => {
+    const k = dayKeyOf(f);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(f);
+  });
+
+  const labelForKey = (k) => {
+    if (k === todayKey) return "Today";
+    if (k === tomorrowKey) return "Tomorrow";
+    if (k === "unknown") return "Other";
+    try {
+      const d = new Date(`${k}T12:00:00Z`);
+      return d.toLocaleDateString("en-GB", { weekday:"long", day:"2-digit", month:"short" });
+    } catch { return k; }
+  };
+
+  const orderedKeys = Array.from(groups.keys()).sort((a,b)=>String(a).localeCompare(String(b)));
+  let html = "";
+  let idx = 0;
+  orderedKeys.forEach(k => {
+    html += `<div class="day-sep">${escapeHtml(labelForKey(k))}</div>`;
+    for (const f of groups.get(k)) html += flightCardHtml(f, mode, idx++);
+  });
+
+  listEl.innerHTML = html;
+  emptyEl.style.display = filtered.length ? "none" : "";
+
+  // Events
+  listEl.querySelectorAll("[data-open]").forEach(card => {
+    card.addEventListener("click", (e) => {
+      if (e.target && e.target.closest && e.target.closest("[data-save]")) return;
+      const i = Number(card.getAttribute("data-idx"));
+      const flight = filtered[i];
+      if (!flight) return;
+      const apiMode = (mode === "departures") ? "departure" : (mode === "arrivals") ? "arrival" : mode;
+      openFlightDetailsWithStorage(flight, { mode: apiMode, airport: airportIata, day:1, airportPos: window.__brsAirportPos });
+});
+  });
+  listEl.querySelectorAll("[data-save]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const i = Number(btn.getAttribute("data-idx"));
+      const flight = filtered[i];
+      if (!flight) return;
+      const apiMode = (mode === "departures") ? "departure" : (mode === "arrivals") ? "arrival" : mode;
+      saveFlight(flight, { mode: apiMode, airport: airportIata, day:1, airportPos: window.__brsAirportPos });
+btn.classList.toggle("saved");
+      btn.textContent = btn.classList.contains("saved") ? "★" : "☆";
+      toast(btn.classList.contains("saved") ? "Saved" : "Removed");
+    });
+  });
+
+  const meta = document.getElementById("searchMeta");
+  if (meta){
+    const total = flights.length;
+    meta.textContent = (qn || quickFilter !== "all") ? `${filtered.length} of ${total} flights` : "";
+  }
+}
+
+// =======================
+// Tabs + filters + search
+// =======================
 function setTab(name){
   currentTab = name;
   document.querySelectorAll(".seg-btn").forEach(b => {
@@ -253,157 +559,178 @@ function setTab(name){
   document.getElementById("tab-arrivals")?.classList.toggle("active", name === "arrivals");
   renderList(name);
 }
-
-// ---- Quick filters ----
 function setQuickFilter(name){
   quickFilter = name;
   document.querySelectorAll(".chip-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === name));
   renderList(currentTab);
 }
-
-// ---- Menu / panels ----
+function initSearch(){
+  const input = document.getElementById("searchInput");
+  const clear = document.getElementById("clearSearchBtn");
+  if (!input) return;
+  input.addEventListener("input", () => { searchQuery = input.value || ""; renderList(currentTab); });
+  clear?.addEventListener("click", () => { input.value=""; searchQuery=""; renderList(currentTab); input.focus(); });
+}
 function initOverflowMenu(){
   const btn = document.getElementById("overflowBtn");
   const menu = document.getElementById("overflowMenu");
   if (!btn || !menu) return;
-
-  function close(){
-    menu.classList.remove("open");
-    btn.setAttribute("aria-expanded","false");
-  }
-
+  function close(){ menu.classList.remove("open"); btn.setAttribute("aria-expanded","false"); }
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     const open = !menu.classList.contains("open");
     menu.classList.toggle("open", open);
     btn.setAttribute("aria-expanded", open ? "true" : "false");
   });
-
   document.addEventListener("click", close);
   window.addEventListener("resize", close);
 }
 
-// ---- Search ----
-function initSearch(){
-  const input = document.getElementById("searchInput");
-  const clear = document.getElementById("clearSearchBtn");
-  if (!input) return;
+// =======================
+// Error banner
+// =======================
+function ensureErrorBanner(){
+  let el = document.getElementById("errorBanner");
+  if (!el){
+    el = document.createElement("div");
+    el.id="errorBanner";
+    el.className="banner";
+    el.hidden=true;
+    el.innerHTML = `<div class="banner__msg" id="errorBannerMsg"></div>
+                    <button class="banner__btn" id="errorBannerRetry" type="button">Retry</button>`;
+    document.body.insertBefore(el, document.body.firstChild);
+  }
+  el.querySelector("#errorBannerRetry")?.addEventListener("click", () => refreshAll({force:true}));
+  return el;
+}
+function showError(message, {retry=true}={}){
+  const el = ensureErrorBanner();
+  const msg = el.querySelector("#errorBannerMsg");
+  const btn = el.querySelector("#errorBannerRetry");
+  if (msg) msg.textContent = message || "Something went wrong.";
+  if (btn) btn.style.display = retry ? "" : "none";
+  el.hidden = false;
+}
+function hideError(){
+  const el = document.getElementById("errorBanner");
+  if (el) el.hidden = true;
+}
 
-  input.addEventListener("input", () => {
-    searchQuery = input.value || "";
+// =======================
+// Cache + fetching
+// =======================
+const CACHE_TTL_MS = 90 * 1000;
+function cacheKey(type){ return `brs_timetable_${type}`; }
+function cacheMetaKey(type){ return `brs_timetable_${type}_meta`; }
+
+function hashFlights(list){
+  const reduced = (list || []).map(f => ({
+    iata: f?.flight?.iataNumber || "",
+    airline: f?.airline?.iataCode || "",
+    dep: f?.departure?.iataCode || "",
+    arr: f?.arrival?.iataCode || "",
+    sched: f?.departure?.scheduledTime || f?.arrival?.scheduledTime || ""
+  }));
+  const s = JSON.stringify(reduced);
+  let h = 5381;
+  for (let i=0;i<s.length;i++) h = ((h<<5)+h) + s.charCodeAt(i);
+  return String(h|0);
+}
+function loadCachedTimetable(type){
+  try{
+    const meta = JSON.parse(sessionStorage.getItem(cacheMetaKey(type)) || "null");
+    const data = JSON.parse(sessionStorage.getItem(cacheKey(type)) || "null");
+    if (!meta || !Array.isArray(data)) return null;
+    const age = Date.now() - (meta.ts || 0);
+    return { data, ts: meta.ts||0, age, fresh: age < CACHE_TTL_MS, hash: meta.hash||"" };
+  } catch { return null; }
+}
+function saveCachedTimetable(type, list){
+  try{
+    const hash = hashFlights(list);
+    sessionStorage.setItem(cacheKey(type), JSON.stringify(list||[]));
+    sessionStorage.setItem(cacheMetaKey(type), JSON.stringify({ ts: Date.now(), hash }));
+    return hash;
+  } catch { return ""; }
+}
+
+async function fetchTimetable(type, dateISO){
+  const url = new URL("https://aviation-edge.com/v2/public/timetable");
+  url.searchParams.set("key", apiKey);
+  url.searchParams.set("iataCode", airportIata);
+  url.searchParams.set("type", type);
+  if (dateISO) url.searchParams.set("date", dateISO);
+
+  const r = await fetch(url.toString(), { cache:"no-store" });
+  if (!r.ok) throw new Error(`Timetable HTTP ${r.status}`);
+  const j = await r.json();
+  return (Array.isArray(j) && j) || (j && Array.isArray(j.data) && j.data) || (j && Array.isArray(j.result) && j.result) || [];
+}
+
+async function refreshAll({force=false} = {}){
+  const lr = document.getElementById("lastRefreshed");
+  const cachedDep = !force ? loadCachedTimetable("departure") : null;
+  const cachedArr = !force ? loadCachedTimetable("arrival") : null;
+
+  let renderedFromCache = false;
+  if (cachedDep?.data && cachedArr?.data){
+    depFlights = filterFlightsByTime(cachedDep.data);
+    arrFlights = filterFlightsByTime(cachedArr.data);
     renderList(currentTab);
-    });
+    renderedFromCache = true;
+    if (lr) lr.textContent = `Updated ${new Date(cachedDep.ts).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})} (cached)`;
+  }
 
-  if (clear){
-    clear.addEventListener("click", () => {
-      input.value = "";
-      searchQuery = "";
+  if (!navigator.onLine){
+    if (!renderedFromCache) showError("You appear to be offline. Connect to the internet to load flights.", {retry:false});
+    return;
+  }
+
+  try{
+    hideError();
+    const [dep, arr] = await Promise.all([fetchTimetable("departure"), fetchTimetable("arrival")]);
+    const depList = Array.isArray(dep) ? dep : [];
+    const arrList = Array.isArray(arr) ? arr : [];
+
+    // Warm the airport geo cache for accurate pins on the details map.
+    prefetchAirportsFromFlights(depList, arrList).catch(()=>{});
+
+    const newDepHash = saveCachedTimetable("departure", depList);
+    const newArrHash = saveCachedTimetable("arrival", arrList);
+
+    const changed =
+      !renderedFromCache ||
+      (cachedDep && cachedDep.hash !== newDepHash) ||
+      (cachedArr && cachedArr.hash !== newArrHash);
+
+    if (changed){
+      depFlights = filterFlightsByTime(depList);
+      arrFlights = filterFlightsByTime(arrList);
       renderList(currentTab);
-          input.focus();
-    });
+    }
+
+    if (lr) lr.textContent = `Updated ${new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
+  } catch (err){
+    console.error(err);
+    showError("Couldn’t refresh flight data. Check your connection / API key, then retry.", {retry:true});
+    if (!renderedFromCache) toast("Couldn’t load flight data");
   }
 }
 
 // =======================
-// Saved flights (localStorage)
-// =======================
-function getSavedFlights(){
-  const raw = safeGetLocal("brs_saved_flights");
-  if (!raw) return [];
-  try { const x = JSON.parse(raw); return Array.isArray(x) ? x : []; } catch { return []; }
-}
-function setSavedFlights(list){ safeSetLocal("brs_saved_flights", JSON.stringify(list.slice(0, 30))); }
-
-function flightIdentity(f){
-  const flightNo = (f?.flight?.iataNumber) ? f.flight.iataNumber : (f?.flight_iata || f?.flightNumber || "");
-  const dep = f?.departure?.iataCode || f?.departure?.iata || "";
-  const arr = f?.arrival?.iataCode || f?.arrival?.iata || "";
-  const t = f?.departure?.scheduledTime || f?.arrival?.scheduledTime || "";
-  return `${flightNo}|${dep}|${arr}|${t}`;
-}
-
-function isFlightSaved(flight){
-  const id = flightIdentity(flight);
-  return getSavedFlights().some(x => x?.identity === id);
-}
-
-function saveFlight(flight, context){
-  const tripLabel = prompt('Trip label (optional) — e.g. “Client meeting” or “Family holiday”') || '';
-  const id = flightIdentity(flight);
-  const flightNo = (flight?.flight?.iataNumber) ? flight.flight.iataNumber : (flight?.flight_iata || flight?.flightNumber || "—");
-  const dep = flight?.departure?.iataCode || flight?.departure?.iata || "—";
-  const arr = flight?.arrival?.iataCode || flight?.arrival?.iata || "—";
-  const label = `${flightNo} • ${dep}→${arr}` + (tripLabel.trim() ? ` • ${tripLabel.trim()}` : '');
-  const key = `saved_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-
-  const list = getSavedFlights();
-  const next = [{ id:key, identity: id, label, tripLabel: tripLabel.trim(), context, flight }, ...list.filter(x => x.identity !== id)];
-  setSavedFlights(next);
-  renderSavedDrawer(true);
-}
-
-function removeSaved(id){
-  setSavedFlights(getSavedFlights().filter(x => x.id !== id));
-  renderSavedDrawer(true);
-}
-
-function renderSavedDrawer(forceOpen){
-  const drawer = document.getElementById("savedDrawer");
-  const bar = document.getElementById("savedBar");
-  if (!drawer || !bar) return;
-
-  const list = getSavedFlights();
-  bar.innerHTML = list.map(item => `
-    <div class="chip" data-id="${escapeHtml(item.id)}">
-      <span>${escapeHtml(item.label)}</span>
-      <span class="x" title="Remove" aria-label="Remove">×</span>
-    </div>
-  `).join("");
-
-  bar.querySelectorAll(".chip").forEach(ch => {
-    ch.addEventListener("click", (e) => {
-      const id = ch.getAttribute("data-id");
-      if (e.target && e.target.classList && e.target.classList.contains("x")) return removeSaved(id);
-      const item = getSavedFlights().find(x => x.id === id);
-      if (item) openFlightDetailsWithStorage(item.flight, item.context || {mode:"departures", airport:"BRS", day:1, airportPos: window.__brsAirportPos});
-    });
-  });
-
-  drawer.style.display = (forceOpen || list.length) ? "" : "none";
-}
-
-function initSavedUI(){
-  document.getElementById("savedBtn")?.addEventListener("click", () => renderSavedDrawer(true));
-  document.getElementById("savedCloseBtn")?.addEventListener("click", () => {
-    const drawer = document.getElementById("savedDrawer");
-    if (drawer) drawer.style.display = "none";
-  });
-  renderSavedDrawer(false);
-}
-
-// =======================
-// Install prompt
+// Install prompt (optional, no console warning)
 // =======================
 function initInstall(){
   const btn = document.getElementById("installBtn");
   if (!btn) return;
-  let deferredPrompt = null;
-  window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    btn.style.display = "";
-  });
-  btn.addEventListener("click", async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    try { await deferredPrompt.userChoice; } catch {}
-    deferredPrompt = null;
-    btn.style.display = "none";
-  });
+
+  // We intentionally do NOT call preventDefault() to avoid Chrome's console warning.
+  // This means the browser controls when/if the native install prompt is shown.
+  btn.style.display = "none";
 }
 
 // =======================
-// Security wait time (local samples)
+// Security wait samples (local-only)
 // =======================
 function getSecuritySamples(){
   const raw = safeGetLocal("brs_security_samples");
@@ -427,7 +754,6 @@ function computeSecurityEstimate(){
 function renderSecurityPanel(forceOpen){
   const panel = document.getElementById("securityPanel");
   if (!panel) return;
-
   const est = computeSecurityEstimate();
   const last = getSecuritySamples()[0];
 
@@ -451,7 +777,8 @@ function renderSecurityPanel(forceOpen){
       <div style="padding:12px; border-radius:16px; border:1px solid var(--stroke); background: var(--surface2);">
         <div class="small">Report your wait</div>
         <div style="display:flex; gap:10px; margin-top:8px;">
-          <input id="secMinutes" type="number" min="0" max="120" placeholder="Minutes" style="flex:1; border-radius:14px; border:1px solid var(--stroke); background: transparent; color: var(--text); padding: 12px; font-size: 15px;" />
+          <input id="secMinutes" type="number" min="0" max="120" placeholder="Minutes"
+            style="flex:1; border-radius:14px; border:1px solid var(--stroke); background: transparent; color: var(--text); padding: 12px; font-size: 15px;" />
           <button class="icon-btn" id="secSubmitBtn" type="button" aria-label="Submit wait">✓</button>
         </div>
         <div class="small" style="margin-top:6px;">Stored on your device only. No account.</div>
@@ -471,34 +798,8 @@ function renderSecurityPanel(forceOpen){
     }
   });
 }
-
 function initSecurityUI(){
   document.getElementById("securityBtn")?.addEventListener("click", () => renderSecurityPanel(true));
-}
-
-// =======================
-// Data fetching
-// =======================
-async function fetchTimetable(type){
-  const url = `https://aviation-edge.com/v2/public/timetable?key=26071f-14ef94&iataCode=BRS&type=${type}`;
-  const r = await fetch(url, { cache: "no-store" });
-  return await r.json();
-}
-
-async function refreshAll(){
-  try{
-    const [dep, arr] = await Promise.all([fetchTimetable("departure"), fetchTimetable("arrival")]);
-    depFlights = Array.isArray(dep) ? filterFlightsByTime(dep) : [];
-    arrFlights = Array.isArray(arr) ? filterFlightsByTime(arr) : [];
-
-    renderList(currentTab);
-  
-    const lr = document.getElementById("lastRefreshed");
-    if (lr) lr.textContent = `Updated ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-  }catch(err){
-    console.error(err);
-    toast("Couldn’t refresh — check connection");
-  }
 }
 
 // =======================
@@ -511,25 +812,17 @@ async function refreshAll(){
   initInstall();
   initSecurityUI();
 
-  document.getElementById("refreshBtn")?.addEventListener("click", refreshAll);
+  window.addEventListener("offline", () => showError("You appear to be offline. Showing cached results if available.", {retry:false}));
+  window.addEventListener("online", () => { hideError(); refreshAll(); });
 
-  document.querySelectorAll(".seg-btn").forEach(b => {
-    b.addEventListener("click", () => setTab(b.dataset.tab));
-  });
+  document.getElementById("refreshBtn")?.addEventListener("click", () => refreshAll({force:true}));
+  document.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  document.querySelectorAll(".chip-btn").forEach(b => b.addEventListener("click", () => setQuickFilter(b.dataset.filter)));
 
-  document.querySelectorAll(".chip-btn").forEach(b => {
-    b.addEventListener("click", () => setQuickFilter(b.dataset.filter));
-  });
-
-  // Keyboard / accessibility: open focused card with Enter/Space
   document.addEventListener("keydown", (e) => {
     const active = document.activeElement;
-    if (!active) return;
-    if (active.classList && active.classList.contains("flight-card")){
-      if (e.key === "Enter" || e.key === " "){
-        e.preventDefault();
-        active.click();
-      }
+    if (active && active.classList && active.classList.contains("flight-card")){
+      if (e.key === "Enter" || e.key === " "){ e.preventDefault(); active.click(); }
     }
   });
 
