@@ -1099,11 +1099,11 @@ if (els.arrKv) {
             <div class="wx-desc">${escapeHtml(meta.label)}</div>
           </div>
           <div class="wx-metric"><div class="wx-k">Temp</div><div class="wx-v">${escapeHtml(tHi)} / ${escapeHtml(tLo)}</div></div>
-          <div class="wx-metric"><div class="wx-k">Feels</div><div class="wx-v">${escapeHtml(fHi)} / ${escapeHtml(fLo)}</div></div>
+          <div class="wx-metric"><div class="wx-k">Feels Like</div><div class="wx-v">${escapeHtml(fHi)} / ${escapeHtml(fLo)}</div></div>
           <div class="wx-metric"><div class="wx-k">Rain</div><div class="wx-v">${escapeHtml(pProb)} • ${escapeHtml(pSum)}</div></div>
           <div class="wx-metric"><div class="wx-k">Wind</div><div class="wx-v">${escapeHtml(w)}</div></div>
           <div class="wx-metric"><div class="wx-k">UV</div><div class="wx-v">${escapeHtml(uv)}</div></div>
-          <div class="wx-metric"><div class="wx-k">Sun</div><div class="wx-v">${escapeHtml(sr)}–${escapeHtml(ss)}</div></div>
+          <div class="wx-metric"><div class="wx-k">Sun Rise & Sun Set</div><div class="wx-v">${escapeHtml(sr)}–${escapeHtml(ss)}</div></div>
         </div>
       `;
     }
@@ -1172,7 +1172,8 @@ if (els.arrKv) {
 
     const lat = Number(pickAny(flat, latPaths));
     const lon = Number(pickAny(flat, lonPaths));
-    if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+    // Some APIs send 0,0 as "unknown" — reject that and fall back to geocoding.
+    if (isValidLatLon(lat, lon)) {
       return { lat, lon, label: normIata(iata) || "—" };
     }
 

@@ -106,10 +106,11 @@ async function prefetchAirportsFromFlights(depList, arrList){
   const seen = new Set();
   const jobs = [];
   for(const f of flights){
-    const depIata = pickAny(f, ["departure.iataCode","departure.iata","departure.airport.iataCode","departure.airport.iata","depIata","dep.iataCode"]);
-    const depName = pickAny(f, ["departure.airport.name","departure.airportName","departure.airport","departure.name","departure.city","departure.cityName"]);
-    const arrIata = pickAny(f, ["arrival.iataCode","arrival.iata","arrival.airport.iataCode","arrival.airport.iata","arrIata","arr.iataCode"]);
-    const arrName = pickAny(f, ["arrival.airport.name","arrival.airportName","arrival.airport","arrival.name","arrival.city","arrival.cityName"]);
+    const flat = flattenObject(f || {});
+    const depIata = pickAny(flat, ["departure.iataCode","departure.iata","departure.airport.iataCode","departure.airport.iata","depIata","dep.iataCode"]);
+    const depName = pickAny(flat, ["departure.airport.name","departure.airportName","departure.airport","departure.name","departure.city","departure.cityName"]);
+    const arrIata = pickAny(flat, ["arrival.iataCode","arrival.iata","arrival.airport.iataCode","arrival.airport.iata","arrIata","arr.iataCode"]);
+    const arrName = pickAny(flat, ["arrival.airport.name","arrival.airportName","arrival.airport","arrival.name","arrival.city","arrival.cityName"]);
 
     const pairs = [[depIata, depName],[arrIata, arrName]];
     for(const [iata, name] of pairs){
