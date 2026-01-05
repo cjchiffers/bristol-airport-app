@@ -7,11 +7,8 @@
 // =======================
 // Configuration
 // =======================
-// Override key via 'aviationEdgeApiKey','YOUR_KEY')
-const apiKey =
-  (new URLSearchParams(location.search).get("key")) ||
-  (safeGetLocal("aviationEdgeApiKey")) ||
-  "26071f-14ef94"; 
+// API base (Cloudflare Worker proxy)
+const API_BASE = "https://flightapp-workers.chiffers.com/api";
 
 // ---------- Airport coordinate prefetch (for accurate map pins on details page) ----------
 const AIRPORT_GEO_CACHE_KEY = "brs_airport_geo_cache_v1";
@@ -86,19 +83,6 @@ async function ensureAirportCached(iata, name){
   cache.data = cache.data || {};
   cache.data[code] = entry;
   saveAirportGeoCache(cache);
-}
-
-function pickAny(obj, paths){
-  for(const p of paths){
-    const parts = p.split(".");
-    let v = obj;
-    for(const k of parts){
-      if(!v || typeof v !== "object") { v = undefined; break; }
-      v = v[k];
-    }
-    if(v !== undefined && v !== null && String(v).trim() !== "") return v;
-  }
-  return undefined;
 }
 
 async function prefetchAirportsFromFlights(depList, arrList){
@@ -403,9 +387,19 @@ function initSavedUI(){
 function openFlightDetailsWithStorage(flight, context){
   const key = `flight_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   safeSetSession(key, JSON.stringify({ flight, context }));
-  window.location.href = `flight-details.html"departures";
+
+  // Pass session key to details page
+  const url = new URL("flight-details.html", window.location.href);
+  url.searchParams.set("k", key);
+  window.location.href = url.toString();
+}
+
+/** Render a flight card for the list (departures/arrivals tabs). */
+function flightCardHtml(flight, mode, idx){
+  const isDep = mode === "departures";
   const flightNo = (flight?.flight?.iataNumber) ? flight.flight.iataNumber : (flight?.flight_iata || flight?.flightNumber || "—");
-  const city = getCityName(isDep ? flight?.arrival?.iataCode : flight?.departure?.iataCode);
+  const otherIata = isDep ? flight?.arrival?.iataCode : flight?.departure?.iataCode;
+  const city = getCityName(otherIata);
   const airlineName = flight?.airline?.name || flight?.airline?.iataCode || "—";
   const airlineCode = flight?.airline?.iataCode || "";
   const logo = getAirlineLogoUrl(airlineCode);
@@ -436,7 +430,8 @@ function openFlightDetailsWithStorage(flight, context){
   `.trim();
 }
 
-function renderList(mode){
+function renderList
+(mode){
   const isDep = mode === "departures";
   const listEl = document.getElementById(isDep ? "departureList" : "arrivalList");
   const emptyEl = document.getElementById(isDep ? "depEmpty" : "arrEmpty");
@@ -649,8 +644,7 @@ function saveCachedTimetable(type, list){
 }
 
 async function fetchTimetable(type, dateISO){
-  const url = new URL("https://flightapp-workers.chiffers.com/api/timetable");
-  url.searchParams.set("key", apiKey);
+  const url = new URL(`${API_BASE}/timetable`);
   url.searchParams.set("iataCode", airportIata);
   url.searchParams.set("type", type);
   if (dateISO) url.searchParams.set("date", dateISO);
