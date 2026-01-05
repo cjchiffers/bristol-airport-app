@@ -29,7 +29,13 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  const url = new URL(req.url);
+  
+  if ((req || request).method !== 'GET') {
+    // Cache API only supports GET; bypass caching for non-GET.
+    event.respondWith(fetch(req || request));
+    return;
+  }
+const url = new URL(req.url);
 
   // Never intercept cross-origin (API) requests — let the browser handle CORS properly.
   if (url.origin !== self.location.origin) return;
