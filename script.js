@@ -1,3 +1,4 @@
+const API_BASE = "${API_BASE}";
 // Bristol Airport — redesigned mobile UI (stable build)
 // - Aviation Edge timetable (departures/arrivals)
 // - Saved (starred) flights stored in localStorage
@@ -7,9 +8,6 @@
 // =======================
 // Configuration
 // =======================
-// API base (Cloudflare Worker proxy)
-const API_BASE = "https://flightapp-workers.chiffers.com/api";
-
 // ---------- Airport coordinate prefetch (for accurate map pins on details page) ----------
 const AIRPORT_GEO_CACHE_KEY = "brs_airport_geo_cache_v1";
 const AIRPORT_GEO_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
@@ -83,6 +81,19 @@ async function ensureAirportCached(iata, name){
   cache.data = cache.data || {};
   cache.data[code] = entry;
   saveAirportGeoCache(cache);
+}
+
+function pickAny(obj, paths){
+  for(const p of paths){
+    const parts = p.split(".");
+    let v = obj;
+    for(const k of parts){
+      if(!v || typeof v !== "object") { v = undefined; break; }
+      v = v[k];
+    }
+    if(v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return undefined;
 }
 
 async function prefetchAirportsFromFlights(depList, arrList){
@@ -388,7 +399,6 @@ function openFlightDetailsWithStorage(flight, context){
   const key = `flight_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   safeSetSession(key, JSON.stringify({ flight, context }));
 
-  // Pass session key to details page
   const url = new URL("flight-details.html", window.location.href);
   url.searchParams.set("k", key);
   window.location.href = url.toString();
@@ -644,8 +654,7 @@ function saveCachedTimetable(type, list){
 }
 
 async function fetchTimetable(type, dateISO){
-  const url = new URL(`${API_BASE}/timetable`);
-  url.searchParams.set("iataCode", airportIata);
+  const url = new URL(`${API_BASE}/timetable`);  url.searchParams.set("iataCode", airportIata);
   url.searchParams.set("type", type);
   if (dateISO) url.searchParams.set("date", dateISO);
 

@@ -731,7 +731,7 @@ init();
     const curId = deriveIdentity(current);
     const flightNo = curId.flightNo || "";
 
-    const url = new URL("https://flightapp-workers.chiffers.com/api/timetable");
+    const url = new URL("https://aviation-edge.com/v2/public/timetable");
     url.searchParams.set("key", apiKey_ || "");
     url.searchParams.set("type", mode);
     if (flightNo) url.searchParams.set("flight_Iata", flightNo);
