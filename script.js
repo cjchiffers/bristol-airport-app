@@ -1,4 +1,4 @@
-const API_BASE = "${API_BASE}";
+const API_BASE = "https://flightapp-workers.chiffers.com/api";
 // Bristol Airport — redesigned mobile UI (stable build)
 // - Aviation Edge timetable (departures/arrivals)
 // - Saved (starred) flights stored in localStorage
@@ -654,7 +654,7 @@ function saveCachedTimetable(type, list){
 }
 
 async function fetchTimetable(type, dateISO){
-  const url = new URL(`${API_BASE}/timetable`);  url.searchParams.set("iataCode", airportIata);
+  const url = new URL(`https://flightapp-workers.chiffers.com/api/timetable`);  url.searchParams.set("iataCode", airportIata);
   url.searchParams.set("type", type);
   if (dateISO) url.searchParams.set("date", dateISO);
 
