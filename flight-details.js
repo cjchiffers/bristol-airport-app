@@ -616,33 +616,13 @@ init();
     }
 
     if (!payload) {
-      const flightParam = params.get("flight");
-      setText(els.headline, flightParam ? `Flight ${flightParam}` : "Flight details");
-      const refreshedTime = new Date().toLocaleTimeString("en-GB",{ timeZone:"Europe/London", hour:"2-digit", minute:"2-digit" });
+  const flightParam = params.get("flight");
+  setText(els.headline, flightParam ? `Flight ${flightParam}` : "Flight details");
+  const refreshedTime = new Date().toLocaleTimeString("en-GB",{ timeZone:"Europe/London", hour:"2-digit", minute:"2-digit" });
     setText(els.subhead, `Updated ${refreshedTime}`);
+  return;
+}
 
-    renderStatusBadge(flat);
-    renderStatusBannerAndOps(flight, flat, id);
-    renderTopStatus(flat, id);
-    renderOpsBar(flat, id);
-    renderCountdownKpi(flat, id);
-
-    // Airline basics
-    const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
-    const airlineIata = pickAny(flat, ["airline.iata", "airline.iataCode", "flight.airline.code.iata", "airline_iata", "airlineCode"]) || "";
-    if (els.airlineName) els.airlineName.textContent = airlineNameVal;
-    if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
-
-    // Logo (best effort)
-    const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
-    if (els.airlineLogo) {
-      if (logoIata) {
-        els.airlineLogo.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(logoIata)}.png`;
-        els.airlineLogo.alt = `${airlineNameVal} logo`;
-        els.airlineLogo.onerror = () => { els.airlineLogo.style.display = "none"; };
-        els.airlineLogo.style.display = "";
-      } else els.airlineLogo.style.display = "none";
-    }
 
     // Aircraft (best effort)
     const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
