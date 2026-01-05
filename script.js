@@ -408,7 +408,7 @@ function openFlightDetailsWithStorage(flight, context){
   safeSetSession(key, JSON.stringify({ flight, context }));
 
   const url = new URL("flight-details.html", window.location.href);
-  url.searchParams.set("k", key);
+  url.searchParams.set("key", key);
   window.location.href = url.toString();
 }
 
