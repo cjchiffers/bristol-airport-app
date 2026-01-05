@@ -52,6 +52,79 @@
 .details-meta .dot{ opacity:.65; }
 .details-meta .spacer{ flex:1; }
 
+/* Network/offline banner */
+.net-banner{
+  border: 1px solid var(--stroke);
+  background: rgba(255, 193, 7, .12);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-weight: 750;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+/* Big status banner */
+.status-banner{
+  border-radius: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--stroke);
+  margin-bottom: 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+}
+.status-banner .sb-left{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.status-banner .sb-title{ font-weight: 950; letter-spacing: .2px; }
+.status-banner .sb-sub{ color: var(--muted); font-size: 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.status-banner.good{ background: rgba(46, 204, 113, .10); }
+.status-banner.warn{ background: rgba(255, 193, 7, .14); }
+.status-banner.bad{ background: rgba(231, 76, 60, .12); }
+.status-banner.neutral{ background: var(--surface); }
+
+/* Gate/terminal/baggage bar */
+.ops-bar{
+  position: sticky;
+  top: 56px; /* below header */
+  z-index: 19;
+  border-radius: 16px;
+  border: 1px solid var(--stroke);
+  background: rgba(0,0,0,.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 10px 12px;
+  display:flex;
+  gap: 10px;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom: 10px;
+}
+.ops-item{ flex:1; min-width:0; }
+.ops-k{ font-size: 11px; color: var(--muted); display:flex; align-items:center; gap:6px; }
+.ops-v{ font-weight: 950; font-size: 14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Refresh spinner */
+.refresh-spin{
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.20);
+  border-top-color: rgba(255,255,255,.75);
+  display:none;
+}
+.refresh-spin.on{
+  display:inline-block;
+  animation: brsSpin .9s linear infinite;
+}
+
+@keyframes brsSpin{ to { transform: rotate(360deg); } }
+.refresh-spin.on{
+  display:inline-block;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin{ to { transform: rotate(360deg);} }
+
 /* Status chip */
 .status-chip{
   padding: 7px 10px;
@@ -557,3 +630,81 @@ body.leaflet-on #routeSvg{ display:none; }
 .kv-k{ opacity:.7; font-size: 12px; }
 .kv-v{ font-weight: 650; font-size: 12px; }
 
+
+
+/* Aircraft photo */
+#aircraftImageWrap { margin-top: 10px; }
+#aircraftImage { width: 100%; height: auto; display: block; border-radius: 12px; }
+#aircraftImageCredit { font-size: 0.78rem; opacity: 0.7; margin-top: 6px; }
+
+/* Status card layout (On time / delayed like airline apps) */
+.status-banner .sb-card{display:flex;flex-direction:column;gap:10px;width:100%;}
+.status-banner .sb-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.status-banner .sb-route{font-weight:800;letter-spacing:.3px;font-size:13px;opacity:.9;}
+.status-banner .sb-pill{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px;white-space:nowrap;}
+.status-banner.good .sb-pill{background:rgba(46,204,113,.20); color: rgb(20,110,60);}
+.status-banner.warn .sb-pill{background:rgba(231,76,60,.18); color: rgb(150,30,24);} /* use red for delay */
+.status-banner.bad .sb-pill{background:rgba(231,76,60,.22); color: rgb(150,30,24);}
+.status-banner .sb-times{display:flex;align-items:flex-end;gap:10px;}
+.status-banner .sb-time{font-size:34px;font-weight:950;letter-spacing:.2px;line-height:1;}
+.status-banner .sb-time-old{font-size:14px;color:var(--muted);text-decoration:line-through;align-self:flex-end;padding-bottom:4px;}
+.status-banner .sb-subline{color:var(--muted);font-size:12px;display:flex;flex-wrap:wrap;gap:10px;}
+.status-banner .sb-subline b{color:var(--text);font-weight:800;}
+
+/* Dual departure/arrival status pills + two-column times (airline-app style) */
+.status-banner .sb-pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.status-banner .sb-pill.good{background:rgba(46,204,113,.20); color: rgb(20,110,60);}
+.status-banner .sb-pill.warn{background:rgba(231,76,60,.18); color: rgb(150,30,24);} /* red for delays */
+.status-banner .sb-pill.bad{background:rgba(231,76,60,.22); color: rgb(150,30,24);}
+.status-banner .sb-two{display:flex;justify-content:space-between;gap:14px;}
+.status-banner .sb-col{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.status-banner .sb-col.right{align-items:flex-end;text-align:right;}
+.status-banner .sb-place{font-size:12px;letter-spacing:.2px;opacity:.85;font-weight:800;}
+.status-banner .sb-timewrap{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;}
+
+
+/* Hide duplicate route label under header */
+.route-subtitle,
+.flight-route-mini,
+.route-inline {
+  display: none !important;
+}
+
+/* Hide detailed departure/arrival breakdown cards */
+.dep-arr-details,
+.departure-details,
+.arrival-details,
+.timeline-card {
+  display: none !important;
+}
+
+
+/* Remove duplicate route text inside the status banner card */
+.sb-route { display: none !important; }
+
+/* Remove the old detailed Departure/Arrival breakdown block */
+.details-hero { display: none !important; }
+
+
+/* Hide legacy meta line (last updated/source/status) */
+#metaLine,.meta-line,.flight-meta,.status-line,.source-line{display:none!important;}
+
+/* Pull-to-refresh indicator */
+.ptr-indicator{
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 10px;
+  z-index: 9999;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(20,20,20,0.75);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.ptr-indicator.show{opacity:1;}
+.ptr-indicator.pull{transform: translateX(-50%) translateY(10px);}

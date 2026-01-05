@@ -7,7 +7,7 @@
 // =======================
 // Configuration
 // =======================
-// Override key via ?key=YOUR_KEY or localStorage.setItem('aviationEdgeApiKey','YOUR_KEY')
+// Override key via 'aviationEdgeApiKey','YOUR_KEY')
 const apiKey =
   (new URLSearchParams(location.search).get("key")) ||
   (safeGetLocal("aviationEdgeApiKey")) ||
@@ -403,14 +403,7 @@ function initSavedUI(){
 function openFlightDetailsWithStorage(flight, context){
   const key = `flight_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   safeSetSession(key, JSON.stringify({ flight, context }));
-  window.location.href = `flight-details.html?key=${encodeURIComponent(key)}`;
-}
-
-// =======================
-// Rendering
-// =======================
-function flightCardHtml(flight, mode, idx){
-  const isDep = mode === "departures";
+  window.location.href = `flight-details.html"departures";
   const flightNo = (flight?.flight?.iataNumber) ? flight.flight.iataNumber : (flight?.flight_iata || flight?.flightNumber || "—");
   const city = getCityName(isDep ? flight?.arrival?.iataCode : flight?.departure?.iataCode);
   const airlineName = flight?.airline?.name || flight?.airline?.iataCode || "—";
@@ -656,7 +649,7 @@ function saveCachedTimetable(type, list){
 }
 
 async function fetchTimetable(type, dateISO){
-  const url = new URL("https://aviation-edge.com/v2/public/timetable");
+  const url = new URL("https://flightapp-workers.chiffers.com/api/timetable");
   url.searchParams.set("key", apiKey);
   url.searchParams.set("iataCode", airportIata);
   url.searchParams.set("type", type);

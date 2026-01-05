@@ -1,7 +1,7 @@
 
 // Set up API key and URLs for the API requests
 const apiKey = '26071f-14ef94';
-const baseApiUrl = 'https://aviation-edge.com/v2/public/flights?key=' + apiKey + '&arrIata=BRS';
+const baseApiUrl = 'https://flightapp-workers.chiffers.com/api/flights?key=' + apiKey + '&arrIata=BRS';
 
 // Select elements
 const arrivalsTab = document.getElementById('arrivalsTab');
@@ -51,7 +51,7 @@ function displayFlights(flights) {
 
 // Show flight details in a modal
 function showFlightDetails(flightId) {
-    fetch(`https://aviation-edge.com/v2/public/flight?key=${apiKey}&flightId=${flightId}`)
+    fetch(`https://flightapp-workers.chiffers.com/api/flight&flightId=${flightId}`)
         .then(response => response.json())
         .then(data => {
             const flight = data[0];

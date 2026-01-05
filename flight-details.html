@@ -15,6 +15,7 @@
 </head>
 
 <body class="details-page">
+  <div id="ptrIndicator" class="ptr-indicator" aria-hidden="true"><span id="ptrText">Pull down to refresh</span></div>
   <header class="topbar details-topbar">
     <button class="icon-btn" id="backBtn" aria-label="Back">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 19.5 8 12l7.5-7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -42,8 +43,13 @@
   </header>
 
   <main class="container details-container">
+    <div id="netBanner" class="net-banner" style="display:none" role="status" aria-live="polite"></div>
+    <div id="statusBanner" class="status-banner" style="display:none" role="status" aria-live="polite"></div>
+    <div id="opsBar" class="ops-bar" style="display:none" aria-label="Gate, terminal and baggage"></div>
+
     <div class="details-meta">
       <span id="lastUpdated">—</span>
+      <span id="refreshSpin" class="refresh-spin" aria-hidden="true" title="Refreshing"></span>
       <span class="dot">•</span>
       <span id="sourceLine">—</span>
       <span class="spacer"></span>
@@ -146,7 +152,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="flight-details.js?v=20260101d"></script>
+  <script src="flight-details.js?v=20260104"></script>
 
 </body>
 </html>

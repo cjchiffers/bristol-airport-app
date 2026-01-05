@@ -1,4 +1,15 @@
-console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
+
+const AIRCRAFT_FRIENDLY = {
+  A20N:"Airbus A320neo family",A21N:"Airbus A321neo",A320:"Airbus A320",A319:"Airbus A319",A321:"Airbus A321",
+  B738:"Boeing 737-800 (Next Generation)",B739:"Boeing 737-900 (Next Generation)",B38M:"Boeing 737 MAX 8",
+  AT7:"ATR 72",AT4:"ATR 42",E190:"Embraer 190",E195:"Embraer 195",DH8D:"Dash 8 Q400"
+};
+function friendlyAircraftType(code){
+  if(!code) return "Unknown aircraft";
+  return AIRCRAFT_FRIENDLY[code]||code;
+}
+
+console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 /* flight-details.js
    Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
    Notes:
@@ -169,10 +180,15 @@ console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
     lastUpdated: document.getElementById("lastUpdated"),
     sourceLine: document.getElementById("sourceLine"),
     statusBadge: document.getElementById("statusBadge"),
+    statusBanner: document.getElementById("statusBanner"),
+    opsBar: document.getElementById("opsBar"),
+    netBanner: document.getElementById("netBanner"),
+    refreshSpin: document.getElementById("refreshSpin"),
 
     depKv: document.getElementById("depKv"),
     arrKv: document.getElementById("arrKv"),
     kpis: document.getElementById("kpis"),
+    leaveCard: document.getElementById("leaveCard"),
     rawJson: document.getElementById("rawJson"),
 
     backBtn: document.getElementById("backBtn"),
@@ -208,6 +224,9 @@ console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
     auto: true,
     intervalMs: 30000,
     timer: null,
+
+    fetching: false,
+    lastFetchOk: true,
 
     // Leaflet map
     map: null,
@@ -279,6 +298,117 @@ console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
       if (v !== undefined && v !== null && String(v).trim() !== "") return v;
     }
     return "";
+  }
+
+  // ---------- Aircraft photo helper (Planespotters public API) ----------
+  // Tries: registration -> icao24 (hex). Caches results in localStorage to keep it fast and polite.
+  const AIRCRAFT_PHOTO_CACHE_KEY = "brs_aircraft_photo_cache_v1";
+  const AIRCRAFT_PHOTO_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
+  function readAircraftPhotoCache() {
+    try { return JSON.parse(localStorage.getItem(AIRCRAFT_PHOTO_CACHE_KEY) || "{}"); }
+    catch { return {}; }
+  }
+  function writeAircraftPhotoCache(cache) {
+    try { localStorage.setItem(AIRCRAFT_PHOTO_CACHE_KEY, JSON.stringify(cache)); } catch {}
+  }
+
+  function normReg(reg) {
+    return String(reg || "").trim().toUpperCase().replace(/\s+/g, "");
+  }
+  function normHex(hex) {
+    return String(hex || "").trim().toLowerCase().replace(/^0x/, "");
+  }
+
+  async function fetchPlanespottersPhotoBy(kind, value) {
+    const v = (kind === "reg") ? normReg(value) : normHex(value);
+    if (!v) return null;
+    const url = `https://api.planespotters.net/pub/photos/${kind}/${encodeURIComponent(v)}`;
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { "Accept": "application/json", "User-Agent": "BRS-Flights/1.0 (public flight board)" },
+    }).catch(() => null);
+    if (!res || !res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const photos = data && Array.isArray(data.photos) ? data.photos : [];
+    if (!photos.length) return null;
+
+    const p = photos[0];
+    const thumb =
+      (p.thumbnail_large && p.thumbnail_large.src) ||
+      (p.thumbnail && p.thumbnail.src) ||
+      (p.thumbnail_large) ||
+      (p.thumbnail) ||
+      (p.image && p.image.src) ||
+      (p.src) || "";
+
+    const full =
+      (p.image && p.image.src) ||
+      (p.original && p.original.src) ||
+      "";
+
+    const link = p.link || p.photo_link || p.url || "";
+    const photographer =
+      (p.photographer && (p.photographer.name || p.photographer)) ||
+      p.author || "";
+
+    const source = "Planespotters.net";
+    const src = thumb || full;
+    if (!src) return null;
+
+    return { src, full: full || "", link, photographer, source };
+  }
+
+  async function resolveAircraftPhoto(reg, icao24) {
+    const key = normReg(reg) || normHex(icao24);
+    if (!key) return null;
+
+    const cache = readAircraftPhotoCache();
+    const cached = cache[key];
+    if (cached && cached.ts && (Date.now() - cached.ts) < AIRCRAFT_PHOTO_TTL_MS && cached.data) {
+      return cached.data;
+    }
+
+    let data = null;
+    if (reg) data = await fetchPlanespottersPhotoBy("reg", reg);
+    if (!data && icao24) data = await fetchPlanespottersPhotoBy("hex", icao24);
+
+    cache[key] = { ts: Date.now(), data };
+    writeAircraftPhotoCache(cache);
+    return data;
+  }
+
+  function applyAircraftPhotoToUi(photo) {
+    if (!els.aircraftImageWrap) return;
+    if (!photo || !photo.src) {
+      els.aircraftImageWrap.style.display = "none";
+      return;
+    }
+    if (els.aircraftImage) {
+      els.aircraftImage.src = photo.src;
+      // If a full-size exists, let users tap to open it in a new tab.
+      if (photo.full) {
+        els.aircraftImage.style.cursor = "pointer";
+        els.aircraftImage.onclick = () => window.open(photo.full, "_blank", "noopener,noreferrer");
+      } else {
+        els.aircraftImage.onclick = null;
+        els.aircraftImage.style.cursor = "";
+      }
+    }
+    els.aircraftImageWrap.style.display = "";
+    if (els.aircraftImageCredit) {
+      const bits = [];
+      if (photo.photographer) bits.push(`© ${photo.photographer}`);
+      bits.push(photo.source || "Planespotters.net");
+      els.aircraftImageCredit.textContent = bits.length ? `Image: ${bits.join(" • ")}` : "Image: Planespotters.net";
+      if (photo.link) {
+        els.aircraftImageCredit.style.cursor = "pointer";
+        els.aircraftImageCredit.onclick = () => window.open(photo.link, "_blank", "noopener,noreferrer");
+      } else {
+        els.aircraftImageCredit.onclick = null;
+        els.aircraftImageCredit.style.cursor = "";
+      }
+    }
   }
 
   function setText(el, text) { if (el) el.textContent = text; }
@@ -360,7 +490,120 @@ console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
   }
 
   // ---------- Init ----------
-  init();
+  
+// enable pull-to-refresh
+setupPullToRefresh(async ()=>{ if (typeof refreshNow==='function') { return refreshNow(true); } if (typeof fetchBestEffortUpdate==='function') { return fetchBestEffortUpdate(); } });
+
+// --- Pull to refresh (mobile-friendly) ---
+function setupPullToRefresh(onRefresh){
+  const ind = document.getElementById("ptrIndicator");
+  const txt = document.getElementById("ptrText");
+  if(!ind || !txt) return;
+
+  let startY = 0;
+  let pulling = false;
+  let armed = false;
+  const THRESH = 65;
+
+  function setState(state, extra){
+    ind.classList.add("show");
+    if(state === "pull"){
+      ind.classList.add("pull");
+      txt.textContent = "Pull down to refresh";
+    } else if(state === "release"){
+      ind.classList.add("pull");
+      txt.textContent = "Release to refresh";
+    } else if(state === "refresh"){
+      ind.classList.add("pull");
+      txt.textContent = "Refreshing…";
+    } else if(state === "done"){
+      ind.classList.remove("pull");
+      txt.textContent = extra || "Updated";
+      setTimeout(()=>ind.classList.remove("show"), 900);
+      return;
+    }
+  }
+
+  function canStart(e){
+    // only when at very top
+    const sc = document.scrollingElement || document.documentElement;
+    if(sc && sc.scrollTop > 0) return false;
+    // ignore if a map is being interacted with etc: allow only if touch starts near top
+    return true;
+  }
+
+  window.addEventListener("touchstart", (e)=>{
+    if(!canStart(e)) return;
+    pulling = true;
+    armed = false;
+    startY = e.touches[0].clientY;
+    setState("pull");
+  }, {passive:true});
+
+  window.addEventListener("touchmove", (e)=>{
+    if(!pulling) return;
+    const y = e.touches[0].clientY;
+    const dy = y - startY;
+    if(dy <= 0){
+      ind.classList.remove("show");
+      return;
+    }
+    if(dy > THRESH){
+      armed = true;
+      setState("release");
+    }else{
+      armed = false;
+      setState("pull");
+    }
+  }, {passive:true});
+
+  window.addEventListener("touchend", async ()=>{
+    if(!pulling) return;
+    pulling = false;
+    if(!armed){
+      ind.classList.remove("show");
+      return;
+    }
+    setState("refresh");
+    try{
+      await onRefresh();
+      const d = new Date();
+      setState("done", "Updated " + d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
+    }catch(e){
+      ind.classList.remove("show");
+    }
+  });
+
+  // desktop testing (mouse)
+  let mDown=false;
+  window.addEventListener("mousedown",(e)=>{
+    if(!canStart(e)) return;
+    mDown=true; pulling=true; armed=false; startY=e.clientY; setState("pull");
+  });
+  window.addEventListener("mousemove",(e)=>{
+    if(!mDown||!pulling) return;
+    const dy=e.clientY-startY;
+    if(dy<=0){ ind.classList.remove("show"); return; }
+    if(dy>THRESH){ armed=true; setState("release"); } else { armed=false; setState("pull"); }
+  });
+  window.addEventListener("mouseup", async ()=>{
+    if(!mDown) return;
+    mDown=false;
+    if(!pulling) return;
+    pulling=false;
+    if(!armed){ ind.classList.remove("show"); return; }
+    setState("refresh");
+    try{
+      await onRefresh();
+      const d=new Date();
+      setState("done","Updated "+d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
+    }catch(e){
+      ind.classList.remove("show");
+    }
+  });
+}
+
+init();
 
   function init() {
     const params = new URLSearchParams(window.location.search);
@@ -401,6 +644,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
 
   async function refreshNow(forceFeedback) {
     if (!state.context || !state.current) return;
+    setFetching(true);
     try {
       const updated = await fetchBestEffortUpdate(apiKey, state.context, state.current);
       if (!updated) return;
@@ -410,11 +654,34 @@ console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
 
       if (state.storageKey) safeSetSession(state.storageKey, JSON.stringify({ flight: state.current, context: state.context }));
       render(state.current, prev);
+      setNetBanner(false);
       if (forceFeedback) flashStatus("good", "Updated");
     } catch (e) {
       console.error(e);
+      setNetBanner(true);
       if (forceFeedback) flashStatus("bad", "Refresh failed");
+    } finally {
+      setFetching(false);
     }
+  }
+
+  function setFetching(isFetching) {
+    state.fetching = !!isFetching;
+    if (els.refreshSpin) {
+      els.refreshSpin.className = `refresh-spin${state.fetching ? " on" : ""}`;
+    }
+  }
+
+  function setNetBanner(isError) {
+    state.lastFetchOk = !isError;
+    if (!els.netBanner) return;
+    if (!isError) {
+      els.netBanner.style.display = "none";
+      els.netBanner.textContent = "";
+      return;
+    }
+    els.netBanner.style.display = "";
+    els.netBanner.textContent = "Connection issue — showing last known data.";
   }
 
   function flashStatus(kind, text) {
@@ -464,7 +731,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
     const curId = deriveIdentity(current);
     const flightNo = curId.flightNo || "";
 
-    const url = new URL("https://aviation-edge.com/v2/public/timetable");
+    const url = new URL("https://flightapp-workers.chiffers.com/api/timetable");
     url.searchParams.set("key", apiKey_ || "");
     url.searchParams.set("type", mode);
     if (flightNo) url.searchParams.set("flight_Iata", flightNo);
@@ -535,6 +802,10 @@ console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
     setText(els.subhead, depTime && arrTime ? `${depTime} → ${arrTime}` : depTime ? `Departs ${depTime}` : "—");
 
     renderStatusBadge(flat);
+    renderStatusBannerAndOps(flight, flat, id);
+    renderTopStatus(flat, id);
+    renderOpsBar(flat, id);
+    renderCountdownKpi(flat, id);
 
     // Airline basics
     const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
@@ -588,7 +859,13 @@ console.log("[BRS Flights] flight-details.js BUILD_20260101_DEBUG1 loaded");
         if (els.aircraftImage) els.aircraftImage.src = imgSrc;
         els.aircraftImageWrap.style.display = "";
         if (els.aircraftImageCredit) els.aircraftImageCredit.textContent = imgCredit ? `Image: ${imgCredit}` : "";
-      } else els.aircraftImageWrap.style.display = "none";
+      } else {
+        // Fallback: fetch a photo via Planespotters public API (registration -> icao24)
+        els.aircraftImageWrap.style.display = "none";
+        const reg2 = reg || "";
+        const hex2 = icao24 || "";
+        resolveAircraftPhoto(reg2, hex2).then(applyAircraftPhotoToUi).catch(() => {});
+      }
     }
 
     // Basic panels (more details)
@@ -652,6 +929,241 @@ if (els.arrKv) {
     renderWeatherByCityName(flat).catch((e) => console.warn("Weather render failed:", e));
   }
 
+  function renderStatusBannerAndOps(flight, flat, id) {
+    renderOpsBar(flight);
+    renderStatusBanner(flight, flat, id);
+  }
+
+  function renderOpsBar(flight) {
+    if (!els.opsBar) return;
+    const t = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase();
+    const isDeparture = t.includes("depart");
+
+    const dep = (flight && flight.departure) || {};
+    const arr = (flight && flight.arrival) || {};
+
+    const gate = (isDeparture ? dep.gate : arr.gate) || null;
+    const terminal = (isDeparture ? dep.terminal : arr.terminal) || null;
+    const baggage = (!isDeparture ? arr.baggage : null) || null;
+
+    // Hide if we have nothing useful.
+    if (!gate && !terminal && !baggage) {
+      els.opsBar.style.display = "none";
+      els.opsBar.innerHTML = "";
+      return;
+    }
+
+    const fmt = (v) => (v === null || v === undefined || String(v).trim() === "" ? "—" : String(v));
+    els.opsBar.style.display = "";
+    els.opsBar.innerHTML = `
+      <div class="ops-item">
+        <div class="ops-k">🚪 Gate</div>
+        <div class="ops-v">${escapeHtml(fmt(gate))}</div>
+      </div>
+      <div class="ops-item">
+        <div class="ops-k">🏢 Terminal</div>
+        <div class="ops-v">${escapeHtml(fmt(terminal))}</div>
+      </div>
+      <div class="ops-item">
+        <div class="ops-k">🧳 Belt</div>
+        <div class="ops-v">${escapeHtml(fmt(baggage))}</div>
+      </div>
+    `;
+  }
+  function renderCountdownKpi(flat, id) {
+    // Renders a big, glanceable countdown card (mobile-friendly).
+    if (!els.leaveCard) return;
+
+    const delays = getDelays(flat);
+    const now = new Date();
+
+    // Determine which segment is primary for countdown.
+    const typeRaw = pickAny(flat, ["type", "flight.type"]) || "";
+    const isDeparture = String(typeRaw).toLowerCase().startsWith("dep");
+
+    const target = isDeparture ? (delays.actualDep || delays.schedDep) : (delays.actualArr || delays.schedArr);
+    const sched = isDeparture ? delays.schedDep : delays.schedArr;
+
+    if (!target) {
+      els.leaveCard.innerHTML = "";
+      return;
+    }
+
+    const mins = minutesBetween(now, target);
+    const when = mins === null ? "—" : (mins >= 0 ? `${fmtRelative(mins)}` : `${fmtRelative(mins)} ago`);
+    const title = isDeparture ? "Departure" : "Arrival";
+    const main = mins === null ? "—" : (mins >= 0 ? `${title} in ${when}` : `${title} was ${when}`);
+
+    // Estimate boarding window for departures: 35 minutes before scheduled/target.
+    let subBits = [];
+    if (isDeparture) {
+      const base = toDate(sched) || toDate(target);
+      if (base) {
+        const boardAt = new Date(base.getTime() - 35 * 60000);
+        const boardMins = minutesBetween(now, boardAt);
+        if (boardMins !== null) {
+          if (boardMins > 0) subBits.push(`Boarding in ${fmtRelative(boardMins)}`);
+          else if (boardMins >= -20 && mins !== null && mins > 0) subBits.push("Boarding likely started");
+        }
+      }
+    }
+
+    // Show scheduled vs estimated (if they differ meaningfully)
+    const tSched = toDate(sched);
+    const tTarget = toDate(target);
+    const schedStr = tSched ? fmtTime(tSched) : null;
+    const targetStr = tTarget ? fmtTime(tTarget) : null;
+    if (schedStr && targetStr && schedStr !== targetStr) subBits.push(`Est ${targetStr} (sched ${schedStr})`);
+    else if (schedStr) subBits.push(`Scheduled ${schedStr}`);
+
+    els.leaveCard.innerHTML = `
+      <div class="title">${escapeHtml(main)}</div>
+      <div class="small">${escapeHtml(subBits.filter(Boolean).join(" • ") || " ")}</div>
+    `;
+  }
+
+
+  function renderStatusBanner(flight, flat, id) {
+  if (!els.statusBanner) return;
+
+  const dep = (flight && flight.departure) || {};
+  const arr = (flight && flight.arrival) || {};
+
+  const depSched = toDate(dep.scheduledTime || null);
+  const depEst   = toDate(dep.estimatedTime || null);
+  const depAct   = toDate(dep.actualTime || null);
+  const depTarget = depAct || depEst || depSched;
+
+  const arrSched = toDate(arr.scheduledTime || null);
+  const arrEst   = toDate(arr.estimatedTime || null);
+  const arrAct   = toDate(arr.actualTime || null);
+  const arrTarget = arrAct || arrEst || arrSched;
+
+  // Delay minutes: prefer explicit delay field, otherwise infer from sched vs est.
+  const inferDelay = (sched, est, rawDelay) => {
+    let d = Number(rawDelay);
+    if (!(Number.isFinite(d) && d >= 0)) {
+      d = (sched && est) ? Math.max(0, Math.round((est.getTime() - sched.getTime()) / 60000)) : 0;
+    }
+    return (Number.isFinite(d) && d > 0) ? d : 0;
+  };
+
+  const depDelayMin = inferDelay(depSched, depEst, dep.delay);
+  const arrDelayMin = inferDelay(arrSched, arrEst, arr.delay);
+
+  const rawStatus = String(pickAny(flat, ["status"]) || "unknown").toLowerCase();
+  const isCancelled = rawStatus.includes("cancel");
+
+  const makePill = (kind, delayMin, actTime, targetTime) => {
+    if (isCancelled) return { text: "Cancelled", cls: "bad" };
+
+    // Prefer "Departed/Landed" when we have actual timestamps.
+    if (actTime) {
+      if (kind === "dep") return { text: "Departed", cls: "good" };
+      return { text: "Arrived", cls: "good" };
+    }
+
+    if (delayMin > 0) return { text: `${delayMin}m delayed`, cls: "warn" };
+    if (rawStatus.includes("board")) return { text: "Boarding", cls: "good" };
+    if (rawStatus.includes("active")) return { text: "Active", cls: "good" };
+    return { text: "On time", cls: "good" };
+  };
+
+  const depPill = makePill("dep", depDelayMin, depAct, depTarget);
+  const arrPill = makePill("arr", arrDelayMin, arrAct, arrTarget);
+
+  // Times display: big "current" time, with scheduled struck-through if changed.
+  const bigDep = depTarget ? fmtTime(depTarget) : "—";
+  const oldDep = (depSched && depTarget && Math.abs(depTarget.getTime() - depSched.getTime()) >= 60_000) ? fmtTime(depSched) : "";
+
+  const bigArr = arrTarget ? fmtTime(arrTarget) : "—";
+  const oldArr = (arrSched && arrTarget && Math.abs(arrTarget.getTime() - arrSched.getTime()) >= 60_000) ? fmtTime(arrSched) : "";
+
+  // Ops hints
+  const gate = dep.gate || "";
+  const terminal = dep.terminal || arr.terminal || "";
+  const baggage = arr.baggage || "";
+
+  const opsBits = [];
+  if (gate) opsBits.push(`Gate <b>${escapeHtml(String(gate))}</b>`);
+  if (terminal) opsBits.push(`Terminal <b>${escapeHtml(String(terminal))}</b>`);
+  if (baggage) opsBits.push(`Belt <b>${escapeHtml(String(baggage))}</b>`);
+
+  // Countdown line uses departure when type=departure, otherwise arrival (existing behaviour)
+  const typeRaw = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase();
+  const isDeparture = typeRaw.includes("depart");
+  const target = isDeparture ? depTarget : arrTarget;
+  const whenWord = isDeparture ? "Departure" : "Arrival";
+
+  const now = Date.now();
+  const minsTo = (target && target.getTime()) ? Math.round((target.getTime() - now) / 60000) : null;
+  const countdown = (typeof minsTo === "number")
+    ? (minsTo >= 0 ? `${whenWord} in ${fmtRelative(minsTo)}` : `${whenWord} ${fmtRelative(minsTo)} ago`)
+    : "";
+
+  const subBits = [];
+  if (countdown) subBits.push(countdown);
+  if (opsBits.length) subBits.push(opsBits.join(" • "));
+  const subLine = subBits.join(" • ") || "—";
+
+  // Neutral banner background; pills carry the colour meaning (matches airline apps better)
+  els.statusBanner.className = `status-banner neutral`;
+  els.statusBanner.style.display = "";
+
+  const routeText = `${(id.dep || "—")} → ${(id.arr || "—")}`;
+
+  els.statusBanner.innerHTML = `
+    <div class="sb-card">
+      <div class="sb-top">
+        <div class="sb-route">${escapeHtml(routeText)}</div>
+        <div class="sb-pills">
+          <span class="sb-pill ${depPill.cls}">Dep: ${escapeHtml(depPill.text)}</span>
+          <span class="sb-pill ${arrPill.cls}">Arr: ${escapeHtml(arrPill.text)}</span>
+        </div>
+      </div>
+
+      <div class="sb-two">
+        <div class="sb-col">
+          <div class="sb-place">${escapeHtml(id.dep || "—")}</div>
+          <div class="sb-timewrap">
+            ${oldDep ? `<span class="sb-time-old">${escapeHtml(oldDep)}</span>` : ``}
+            <span class="sb-time">${escapeHtml(bigDep)}</span>
+          </div>
+        </div>
+
+        <div class="sb-col right">
+          <div class="sb-place">${escapeHtml(id.arr || "—")}</div>
+          <div class="sb-timewrap">
+            ${oldArr ? `<span class="sb-time-old">${escapeHtml(oldArr)}</span>` : ``}
+            <span class="sb-time">${escapeHtml(bigArr)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sb-subline">${subLine}</div>
+    </div>
+  `;
+}
+
+
+
+  function pickPrimaryTimes(flight, isDeparture) {
+    const seg = isDeparture ? (flight && flight.departure) : (flight && flight.arrival);
+    const sched = toDate(seg?.scheduledTime || null);
+    const est = toDate(seg?.estimatedTime || null);
+    const act = toDate(seg?.actualTime || null);
+    const target = act || est || sched;
+    return { sched, est, act, target };
+  }
+
+  function fmtRelative(mins) {
+    const m = Math.abs(Math.round(mins));
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return mm ? `${h}h ${String(mm).padStart(2, "0")}m` : `${h}h`;
+  }
+
   function renderStatusBadge(flat) {
     if (!els.statusBadge) return;
     const rawStatus = pickAny(flat, ["status", "flight_status", "arrival.status", "departure.status", "flight.status", "info.status"]) || "Unknown";
@@ -674,7 +1186,7 @@ if (els.arrKv) {
     els.statusBadge.textContent = label;
   }
 
-  
+
   // ---------- Flight metrics (duration, distance, carbon) + delay trend ----------
   function minutesBetween(a, b) {
     const d1 = toDate(a);
@@ -1048,76 +1560,79 @@ if (els.arrKv) {
     return "";
   }
 
-  function paintWeather(payload, placeLabel) {
-    if (!payload || !payload.daily) {
-      if (els.wxHint) els.wxHint.textContent = "Weather unavailable.";
-      els.weatherBox.innerHTML = "";
-      return;
-    }
+  
+    function paintWeather(payload, placeLabel) {
+  const tz = payload.timezone || "UTC";
+      const localNow = formatLocalTimeNow(tz);
+      if (els.wxHint) els.wxHint.textContent = `Local time in ${placeLabel || "destination"}: ${localNow}`;
 
-    const tz = payload.timezone || "UTC";
-    const localNow = formatLocalTimeNow(tz);
-    if (els.wxHint) els.wxHint.textContent = `Local time in ${placeLabel || "destination"}: ${localNow}`;
+      const d = payload.daily;
+      const times = Array.isArray(d.time) ? d.time : [];
+      const tmax = Array.isArray(d.temperature_2m_max) ? d.temperature_2m_max : [];
+      const tmin = Array.isArray(d.temperature_2m_min) ? d.temperature_2m_min : [];
+      const feelsMax = Array.isArray(d.apparent_temperature_max) ? d.apparent_temperature_max : [];
+      const feelsMin = Array.isArray(d.apparent_temperature_min) ? d.apparent_temperature_min : [];
+      const wcode = Array.isArray(d.weathercode) ? d.weathercode : [];
+      const precipSum = Array.isArray(d.precipitation_sum) ? d.precipitation_sum : [];
+      const precipProb = Array.isArray(d.precipitation_probability_max) ? d.precipitation_probability_max : [];
+      const windMax = Array.isArray(d.windspeed_10m_max) ? d.windspeed_10m_max : [];
+      const uvMax = Array.isArray(d.uv_index_max) ? d.uv_index_max : [];
+      const sunrise = Array.isArray(d.sunrise) ? d.sunrise : [];
+      const sunset = Array.isArray(d.sunset) ? d.sunset : [];
 
-    const d = payload.daily;
-    const times = Array.isArray(d.time) ? d.time : [];
-    const tmax = Array.isArray(d.temperature_2m_max) ? d.temperature_2m_max : [];
-    const tmin = Array.isArray(d.temperature_2m_min) ? d.temperature_2m_min : [];
-    const feelsMax = Array.isArray(d.apparent_temperature_max) ? d.apparent_temperature_max : [];
-    const feelsMin = Array.isArray(d.apparent_temperature_min) ? d.apparent_temperature_min : [];
-    const wcode = Array.isArray(d.weathercode) ? d.weathercode : [];
-    const precipSum = Array.isArray(d.precipitation_sum) ? d.precipitation_sum : [];
-    const precipProb = Array.isArray(d.precipitation_probability_max) ? d.precipitation_probability_max : [];
-    const windMax = Array.isArray(d.windspeed_10m_max) ? d.windspeed_10m_max : [];
-    const uvMax = Array.isArray(d.uv_index_max) ? d.uv_index_max : [];
-    const sunrise = Array.isArray(d.sunrise) ? d.sunrise : [];
-    const sunset = Array.isArray(d.sunset) ? d.sunset : [];
+      const n = Math.min(5, times.length, tmax.length, tmin.length, wcode.length);
+      if (n <= 0) { els.weatherBox.innerHTML = ""; return; }
 
-    const n = Math.min(5, times.length, tmax.length, tmin.length, wcode.length);
-    if (n <= 0) { els.weatherBox.innerHTML = ""; return; }
+      // One card containing 5-day rows
+      let rows = "";
+      for (let i = 0; i < n; i++) {
+        const meta = weatherCodeToIconAndLabel(wcode[i]);
+        const dayLabel = formatWxDay(times[i], tz);
+        const tHi = Number.isFinite(Number(tmax[i])) ? `${Number(tmax[i]).toFixed(0)}°` : "—";
+        const tLo = Number.isFinite(Number(tmin[i])) ? `${Number(tmin[i]).toFixed(0)}°` : "—";
+        const fHi = Number.isFinite(Number(feelsMax[i])) ? `${Number(feelsMax[i]).toFixed(0)}°` : "—";
+        const fLo = Number.isFinite(Number(feelsMin[i])) ? `${Number(feelsMin[i]).toFixed(0)}°` : "—";
+        const pSum = Number.isFinite(Number(precipSum[i])) ? `${Number(precipSum[i]).toFixed(1)} mm` : "—";
+        const pProb = Number.isFinite(Number(precipProb[i])) ? `${Number(precipProb[i]).toFixed(0)}%` : "—";
+        const w = Number.isFinite(Number(windMax[i])) ? `${Number(windMax[i]).toFixed(0)} km/h` : "—";
+        const uv = Number.isFinite(Number(uvMax[i])) ? `${Number(uvMax[i]).toFixed(0)}` : "—";
+        const sr = sunrise[i] ? fmtSun(sunrise[i], tz) : "—";
+        const ss = sunset[i] ? fmtSun(sunset[i], tz) : "—";
 
-    // One card containing 5-day rows
-    let rows = "";
-    for (let i = 0; i < n; i++) {
-      const meta = weatherCodeToIconAndLabel(wcode[i]);
-      const dayLabel = formatWxDay(times[i], tz);
-      const tHi = Number.isFinite(Number(tmax[i])) ? `${Number(tmax[i]).toFixed(0)}°` : "—";
-      const tLo = Number.isFinite(Number(tmin[i])) ? `${Number(tmin[i]).toFixed(0)}°` : "—";
-      const fHi = Number.isFinite(Number(feelsMax[i])) ? `${Number(feelsMax[i]).toFixed(0)}°` : "—";
-      const fLo = Number.isFinite(Number(feelsMin[i])) ? `${Number(feelsMin[i]).toFixed(0)}°` : "—";
-      const pSum = Number.isFinite(Number(precipSum[i])) ? `${Number(precipSum[i]).toFixed(1)} mm` : "—";
-      const pProb = Number.isFinite(Number(precipProb[i])) ? `${Number(precipProb[i]).toFixed(0)}%` : "—";
-      const w = Number.isFinite(Number(windMax[i])) ? `${Number(windMax[i]).toFixed(0)} km/h` : "—";
-      const uv = Number.isFinite(Number(uvMax[i])) ? `${Number(uvMax[i]).toFixed(0)}` : "—";
-      const sr = sunrise[i] ? fmtSun(sunrise[i], tz) : "—";
-      const ss = sunset[i] ? fmtSun(sunset[i], tz) : "—";
-
-      rows += `
-        <div class="wx-row ${tempClass(tmax[i])}">
-          <div class="wx-day">
-            <div class="wx-day-top"><span class="wx-ico" aria-hidden="true">${meta.icon}</span><span>${escapeHtml(dayLabel)}</span></div>
-            <div class="wx-desc">${escapeHtml(meta.label)}</div>
+        rows += `
+          <div class="wx-row ${tempClass(tmax[i])}">
+            <div class="wx-day">
+              <div class="wx-day-top"><span class="wx-ico" aria-hidden="true">${meta.icon}</span><span>${escapeHtml(dayLabel)}</span></div>
+              <div class="wx-desc">${escapeHtml(meta.label)}</div>
+            </div>
+            <div class="wx-metric"><div class="wx-k">Temp</div><div class="wx-v">${escapeHtml(tHi)} / ${escapeHtml(tLo)}</div></div>
+            <div class="wx-metric"><div class="wx-k">Feels</div><div class="wx-v">${escapeHtml(fHi)} / ${escapeHtml(fLo)}</div></div>
+            <div class="wx-metric"><div class="wx-k">Rain</div><div class="wx-v">${escapeHtml(pProb)} • ${escapeHtml(pSum)}</div></div>
+            <div class="wx-metric"><div class="wx-k">Wind</div><div class="wx-v">${escapeHtml(w)}</div></div>
+            <div class="wx-metric"><div class="wx-k">UV</div><div class="wx-v">${escapeHtml(uv)}</div></div>
+            <div class="wx-metric"><div class="wx-k">Sun</div><div class="wx-v">${escapeHtml(sr)}–${escapeHtml(ss)}</div></div>
           </div>
-          <div class="wx-metric"><div class="wx-k">Temp</div><div class="wx-v">${escapeHtml(tHi)} / ${escapeHtml(tLo)}</div></div>
-          <div class="wx-metric"><div class="wx-k">Feels Like</div><div class="wx-v">${escapeHtml(fHi)} / ${escapeHtml(fLo)}</div></div>
-          <div class="wx-metric"><div class="wx-k">Rain</div><div class="wx-v">${escapeHtml(pProb)} • ${escapeHtml(pSum)}</div></div>
-          <div class="wx-metric"><div class="wx-k">Wind</div><div class="wx-v">${escapeHtml(w)}</div></div>
-          <div class="wx-metric"><div class="wx-k">UV</div><div class="wx-v">${escapeHtml(uv)}</div></div>
-          <div class="wx-metric"><div class="wx-k">Sun Rise & Sun Set</div><div class="wx-v">${escapeHtml(sr)}–${escapeHtml(ss)}</div></div>
+        `;
+      }
+
+      els.weatherBox.innerHTML = `
+        <div class="wx-onecard">
+          <div class="wx-onecard-hdr">
+            <div class="wx-place">${escapeHtml(placeLabel || "Destination")}</div>
+            <div class="wx-note">5-day forecast</div>
+          </div>
+          <div class="wx-rows">${rows}</div>
         </div>
       `;
-    }
 
-    els.weatherBox.innerHTML = `
-      <div class="wx-onecard">
-        <div class="wx-onecard-hdr">
-          <div class="wx-place">${escapeHtml(placeLabel || "Destination")}</div>
-          <div class="wx-note">5-day forecast</div>
-        </div>
-        <div class="wx-rows">${rows}</div>
-      </div>
-    `;
-  }
+}
+
+// Backwards-compat helper: older builds called renderTopStatus().
+// The current UI uses renderStatusBadge() + renderStatusBannerAndOps() + renderOpsBar(),
+// so this is intentionally a no-op to avoid runtime errors.
+function renderTopStatus(flat, id) {
+  // No-op: kept for compatibility.
+}
 
 // ---------- Route map: Leaflet basemap + animation, with SVG fallback ----------
   const ROUTE_SVG_W = 1000;
