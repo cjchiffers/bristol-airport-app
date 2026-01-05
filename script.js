@@ -211,7 +211,15 @@ function parseAviationEdgeTime(value){
     const d = new Date(s.replace(" ","T") + "Z");
     return Number.isFinite(d.getTime()) ? d : null;
   }
-  const d = new Date(s);
+  
+// Aviation Edge often returns ISO strings without timezone (e.g. 2026-01-04T19:10:00.000).
+// Treat these as UTC to avoid client-timezone shifting (important for users outside the UK).
+if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/.test(s)){
+  const d = new Date(s + "Z");
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+const d = new Date(s);
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
@@ -675,7 +683,7 @@ async function refreshAll({force=false} = {}){
     arrFlights = filterFlightsByTime(cachedArr.data);
     renderList(currentTab);
     renderedFromCache = true;
-    if (lr) lr.textContent = `Updated ${new Date(cachedDep.ts).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})} (cached)`;
+    if (lr) lr.textContent = `Updated ${LONDON_TIME_FMT.format(new Date(cachedDep.ts))} (cached)`;
   }
 
   if (!navigator.onLine){
@@ -706,7 +714,7 @@ async function refreshAll({force=false} = {}){
       renderList(currentTab);
     }
 
-    if (lr) lr.textContent = `Updated ${new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
+    if (lr) lr.textContent = `Updated ${LONDON_TIME_FMT.format(new Date())}`;
   } catch (err){
     console.error(err);
     showError("Couldn’t refresh flight data. Check your connection / API key, then retry.", {retry:true});
