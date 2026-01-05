@@ -1097,6 +1097,12 @@ if (els.arrKv) {
 
   const now = Date.now();
   const minsTo = (target && target.getTime()) ? Math.round((target.getTime() - now) / 60000) : null;
+
+const countdownText = (minsTo === null)
+  ? ""
+  : (minsTo >= 0
+      ? `${fmtRelative(minsTo)} before ${whenWord.toLowerCase()}`
+      : `${fmtRelative(Math.abs(minsTo))} after ${whenWord.toLowerCase()}`);
   const countdown = (typeof minsTo === "number")
     ? (minsTo >= 0 ? `${whenWord} in ${fmtRelative(minsTo)}` : `${whenWord} ${fmtRelative(minsTo)} ago`)
     : "";
@@ -1150,7 +1156,7 @@ els.statusBanner.innerHTML = `
       </div>
     ` : ``}
 
-    ${when ? `<div class="sb-countdown"><span class="clock">🕒</span> <span>${escapeHtml(when)}</span></div>` : ``}
+    ${countdownText ? `<div class="sb-countdown"><span class="clock">🕒</span> <span>${escapeHtml(countdownText)}</span></div>` : ``}
   </div>
 `;
 }
