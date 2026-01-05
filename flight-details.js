@@ -1114,36 +1114,45 @@ if (els.arrKv) {
   const arrPlace = getCityName(id.arr || "—");
   const routeText = `${depPlace} → ${arrPlace}`;
 els.statusBanner.innerHTML = `
-    <div class="sb-card">
-      <div class="sb-top">
-        <div class="sb-route">${escapeHtml(routeText)}</div>
-        <div class="sb-pills">
-          <span class="sb-pill ${depPill.cls}">Dep: ${escapeHtml(depPill.text)}</span>
-          <span class="sb-pill ${arrPill.cls}">Arr: ${escapeHtml(arrPill.text)}</span>
+  <div class="sb-card">
+    <div class="sb-grid">
+      <div class="sb-col">
+        <div class="sb-city">${escapeHtml(depPlace || (id.dep || "—"))}</div>
+        <div class="sb-timewrap">
+          <span class="sb-time">${escapeHtml(bigDep)}</span>
+          ${oldDep ? `<span class="sb-sched">${escapeHtml(oldDep)}</span>` : ``}
+        </div>
+        <div class="sb-delaypill ${depPill.cls === "good" ? "ok" : (depPill.cls === "bad" || depPill.cls === "warn" ? "bad" : "neutral")}">
+          ${escapeHtml(depPill.text)}
         </div>
       </div>
 
-      <div class="sb-two">
-        <div class="sb-col">
-          <div class="sb-place">${escapeHtml(depPlace || (id.dep || "—"))}</div>
-          <div class="sb-timewrap">
-            ${oldDep ? `<span class="sb-time-old">${escapeHtml(oldDep)}</span>` : ``}
-            <span class="sb-time">${escapeHtml(bigDep)}</span>
-          </div>
+      <div class="sb-col">
+        <div class="sb-city">${escapeHtml(arrPlace || (id.arr || "—"))}</div>
+        <div class="sb-timewrap">
+          <span class="sb-time">${escapeHtml(bigArr)}</span>
+          ${oldArr ? `<span class="sb-sched">${escapeHtml(oldArr)}</span>` : ``}
         </div>
-
-        <div class="sb-col right">
-          <div class="sb-place">${escapeHtml(arrPlace || (id.arr || "—"))}</div>
-          <div class="sb-timewrap">
-            ${oldArr ? `<span class="sb-time-old">${escapeHtml(oldArr)}</span>` : ``}
-            <span class="sb-time">${escapeHtml(bigArr)}</span>
-          </div>
+        <div class="sb-delaypill ${arrPill.cls === "good" ? "ok" : (arrPill.cls === "bad" || arrPill.cls === "warn" ? "bad" : "neutral")}">
+          ${escapeHtml(arrPill.text)}
         </div>
       </div>
-
-      <div class="sb-subline">${subLine}</div>
     </div>
-  `;
+
+    ${(gate || baggage) ? `
+      <div class="sb-midrow">
+        <div>
+          ${gate ? `<div class="sb-kv"><span class="label">New gate</span> <span class="sb-chip">${escapeHtml(String(gate))}</span></div>` : ``}
+        </div>
+        <div>
+          ${baggage ? `<div class="sb-kv"><span class="label">Baggage belt</span> <span class="sb-chip">${escapeHtml(String(baggage))}</span></div>` : ``}
+        </div>
+      </div>
+    ` : ``}
+
+    ${when ? `<div class="sb-countdown"><span class="clock">🕒</span> <span>${escapeHtml(when)}</span></div>` : ``}
+  </div>
+`;
 }
 
 
