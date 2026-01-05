@@ -1110,9 +1110,10 @@ if (els.arrKv) {
   els.statusBanner.className = `status-banner neutral`;
   els.statusBanner.style.display = "";
 
-  const routeText = `${(id.dep || "—")} → ${(id.arr || "—")}`;
-
-  els.statusBanner.innerHTML = `
+  const depPlace = getCityName(id.dep || "—");
+  const arrPlace = getCityName(id.arr || "—");
+  const routeText = `${depPlace} → ${arrPlace}`;
+els.statusBanner.innerHTML = `
     <div class="sb-card">
       <div class="sb-top">
         <div class="sb-route">${escapeHtml(routeText)}</div>
@@ -1124,7 +1125,7 @@ if (els.arrKv) {
 
       <div class="sb-two">
         <div class="sb-col">
-          <div class="sb-place">${escapeHtml(id.dep || "—")}</div>
+          <div class="sb-place">${escapeHtml(depPlace || (id.dep || "—"))}</div>
           <div class="sb-timewrap">
             ${oldDep ? `<span class="sb-time-old">${escapeHtml(oldDep)}</span>` : ``}
             <span class="sb-time">${escapeHtml(bigDep)}</span>
@@ -1132,7 +1133,7 @@ if (els.arrKv) {
         </div>
 
         <div class="sb-col right">
-          <div class="sb-place">${escapeHtml(id.arr || "—")}</div>
+          <div class="sb-place">${escapeHtml(arrPlace || (id.arr || "—"))}</div>
           <div class="sb-timewrap">
             ${oldArr ? `<span class="sb-time-old">${escapeHtml(oldArr)}</span>` : ``}
             <span class="sb-time">${escapeHtml(bigArr)}</span>
