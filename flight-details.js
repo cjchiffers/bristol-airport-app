@@ -624,6 +624,24 @@ init();
 }
 
 
+
+// Extract stored flight + context
+const flight = payload.flight || payload;
+const context = payload.context || {};
+const flat = flattenObject(flight || {});
+const id = deriveIdentity(flight || {});
+
+// Header: flight number only + last refresh time (London)
+const displayNo = id.flightNo || "—";
+setText(els.headline, displayNo);
+const refreshedTime = new Date().toLocaleTimeString("en-GB",{ timeZone:"Europe/London", hour:"2-digit", minute:"2-digit" });
+setText(els.subhead, `Updated ${refreshedTime}`);
+
+// Top card + ops + map
+if (els.statusBanner) renderStatusBanner(flight, flat, id);
+if (els.opsBar) renderOpsBar(flight);
+if (els.map) renderRouteMap(flight, flat, id);
+
     // Aircraft (best effort)
     const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
     const acText = pickAny(flat, ["aircraft.model.text", "flight.aircraft.model.text", "aircraftType", "aircraft.text", "aircraft.model"]) || "";
