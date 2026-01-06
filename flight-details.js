@@ -692,46 +692,7 @@ const depInfo = {
   est: fmtTime(pickAny(flat, ["departure.estimatedTime","departure.estimated","estimated_departure","departure_estimated","flight.time.estimated.departure"])),
   act: fmtTime(pickAny(flat, ["departure.actualTime","departure.actual","actual_departure","departure_actual","flight.time.actual.departure"])),
   term: pickAny(flat, ["departure.terminal","flight.departure.terminal","departureTerminal"]) || "",
-  gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }: pickAny(flat, ["departure.gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }","flight.departure.gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }","departureGate"]) || "",
+  gate: pickAny(flat, ["departure.gate","flight.departure.gate","departureGate"]) || "",
   stand: pickAny(flat, ["departure.stand","flight.departure.stand","departureStand"]) || "",
 };
 
@@ -740,46 +701,7 @@ const arrInfo = {
   est: fmtTime(pickAny(flat, ["arrival.estimatedTime","arrival.estimated","estimated_arrival","arrival_estimated","flight.time.estimated.arrival"])),
   act: fmtTime(pickAny(flat, ["arrival.actualTime","arrival.actual","actual_arrival","arrival_actual","flight.time.actual.arrival"])),
   term: pickAny(flat, ["arrival.terminal","flight.arrival.terminal","arrivalTerminal"]) || "",
-  gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }: pickAny(flat, ["arrival.gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }","flight.arrival.gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }","arrivalGate"]) || "",
+  gate: pickAny(flat, ["arrival.gate","flight.arrival.gate","arrivalGate"]) || "",
   belt: pickAny(flat, ["arrival.baggage","arrival.belt","flight.arrival.baggage","baggage"]) || "",
 };
 
@@ -795,20 +717,7 @@ if (els.depKv) {
       ${kvLine("Estimated", depInfo.est)}
       ${kvLine("Actual", depInfo.act)}
       ${kvLine("Terminal", depInfo.term)}
-      ${kvLine("Gate", depInfo.gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    })}
+      ${kvLine("Gate", depInfo.gate)}
       ${kvLine("Stand", depInfo.stand)}
     </div>
   `;
@@ -821,20 +730,7 @@ if (els.arrKv) {
       ${kvLine("Estimated", arrInfo.est)}
       ${kvLine("Actual", arrInfo.act)}
       ${kvLine("Terminal", arrInfo.term)}
-      ${kvLine("Gate", arrInfo.gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    })}
+      ${kvLine("Gate", arrInfo.gate)}
       ${kvLine("Belt", arrInfo.belt)}
     </div>
   `;
@@ -862,64 +758,14 @@ if (els.arrKv) {
     const isDeparture = t.includes("depart");
 
     const dep = (flight && flight.departure) || {};
-    const arr = (flight && flight.arrival) || {};gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    } = (isDeparture ? dep.gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    } : arr.gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }) || null;
+    const arr = (flight && flight.arrival) || {};
+
+    const gate = (isDeparture ? dep.gate : arr.gate) || null;
     const terminal = (isDeparture ? dep.terminal : arr.terminal) || null;
     const baggage = (!isDeparture ? arr.baggage : null) || null;
 
     // Hide if we have nothing useful.
-    if (!gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    } && !terminal && !baggage) {
+    if (!gate && !terminal && !baggage) {
       els.opsBar.style.display = "none";
       els.opsBar.innerHTML = "";
       return;
@@ -930,20 +776,7 @@ if (els.arrKv) {
     els.opsBar.innerHTML = `
       <div class="ops-item">
         <div class="ops-k">🚪 Gate</div>
-        <div class="ops-v">${escapeHtml(fmt(gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }))}</div>
+        <div class="ops-v">${escapeHtml(fmt(gate))}</div>
       </div>
       <div class="ops-item">
         <div class="ops-k">🏢 Terminal</div>
@@ -1064,64 +897,13 @@ if (els.arrKv) {
   const bigArr = arrTarget ? fmtTime(arrTarget) : "—";
   const oldArr = (arrSched && arrTarget && Math.abs(arrTarget.getTime() - arrSched.getTime()) >= 60_000) ? fmtTime(arrSched) : "";
 
-  // Ops hintsgate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    } = dep.gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    } || "";
+  // Ops hints
+  const gate = dep.gate || "";
   const terminal = dep.terminal || arr.terminal || "";
   const baggage = arr.baggage || "";
 
   const opsBits = [];
-  if (gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }) opsBits.push(`Gate <b>${escapeHtml(String(gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }))}</b>`);
+  if (gate) opsBits.push(`Gate <b>${escapeHtml(String(gate))}</b>`);
   if (terminal) opsBits.push(`Terminal <b>${escapeHtml(String(terminal))}</b>`);
   if (baggage) opsBits.push(`Belt <b>${escapeHtml(String(baggage))}</b>`);
 
@@ -1181,62 +963,10 @@ els.statusBanner.innerHTML = `
       </div>
     </div>
 
-    ${(gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    } || baggage) ? `
+    ${(gate || baggage) ? `
       <div class="sb-midrow">
         <div>
-          ${gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    } ? `<div class="sb-kv"><span class="label">gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }</span> <span class="sb-chip">${escapeHtml(String(gate = {
-        current: "14", 
-        updated: "false"
-    };
-    function setGateDisplay() {
-        let gateText = gate.current;
-        let gateClass = 'gate';
-        if(gate.updated) {
-            gateText = `New Gate: ${gate.current}`;
-            gateClass = 'new-gate';
-        }
-        setText(els.gate, gateText);
-        els.gateBox.classList.add(gateClass);
-    }))}</span></div>` : ``}
+          ${gate ? `<div class="sb-kv"><span class="label">New gate</span> <span class="sb-chip">${escapeHtml(String(gate))}</span></div>` : ``}
         </div>
         <div>
           ${baggage ? `<div class="sb-kv"><span class="label">Baggage belt</span> <span class="sb-chip">${escapeHtml(String(baggage))}</span></div>` : ``}
