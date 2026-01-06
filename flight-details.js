@@ -619,7 +619,7 @@ init();
   const flightParam = params.get("flight");
   setText(els.headline, flightParam ? `Flight ${flightParam}` : "Flight details");
   const refreshedTime = new Date().toLocaleTimeString("en-GB",{ timeZone:"Europe/London", hour:"2-digit", minute:"2-digit" });
-    setText(els.subhead, `Updated ${refreshedTime}`);
+    setText(els.subhead, `Last Refresh: ${refreshedTime}`);
   return;
 }
 
@@ -636,7 +636,7 @@ state.originalFlight = flight || {};
 const displayNo = id.flightNo || "—";
 setText(els.headline, displayNo);
 const refreshedTime = new Date().toLocaleTimeString("en-GB",{ timeZone:"Europe/London", hour:"2-digit", minute:"2-digit" });
-setText(els.subhead, `Updated ${refreshedTime}`);
+setText(els.subhead, `Last Refresh: ${refreshedTime}`);
 
 // Top card + ops + map
 if (els.statusBanner) renderStatusBanner(flight, flat, id);
