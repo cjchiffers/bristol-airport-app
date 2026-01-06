@@ -632,7 +632,7 @@ const flat = flattenObject(flight || {});
 const id = deriveIdentity(flight || {});
 
 // Header: flight number only + last refresh time (London)
-const displayNo = id.flightNo || "—";
+const logoUrl = `https://logo.clearbit.com/${id.airline?.iataCode || ""}.com`; const displayNo = id.flightNo || "—";
 setText(els.headline, displayNo);
 const refreshedTime = new Date().toLocaleTimeString("en-GB",{ timeZone:"Europe/London", hour:"2-digit", minute:"2-digit" });
 setText(els.subhead, `Updated ${refreshedTime}`);
