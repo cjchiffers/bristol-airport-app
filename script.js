@@ -683,7 +683,7 @@ async function refreshAll({force=false} = {}){
     arrFlights = filterFlightsByTime(cachedArr.data);
     renderList(currentTab);
     renderedFromCache = true;
-    if (lr) lr.textContent = `Updated ${LONDON_TIME_FMT.format(new Date(cachedDep.ts))} (cached)`;
+    if (lr) lr.textContent = `Last Updated: ${LONDON_TIME_FMT.format(new Date(cachedDep.ts))} (cached)`;
   }
 
   if (!navigator.onLine){
@@ -714,7 +714,7 @@ async function refreshAll({force=false} = {}){
       renderList(currentTab);
     }
 
-    if (lr) lr.textContent = `Updated ${LONDON_TIME_FMT.format(new Date())}`;
+    if (lr) lr.textContent = `Last Updated: ${LONDON_TIME_FMT.format(new Date())}`;
   } catch (err){
     console.error(err);
     showError("Couldn’t refresh flight data. Check your connection / API key, then retry.", {retry:true});
