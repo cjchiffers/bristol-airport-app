@@ -751,25 +751,12 @@ body.leaflet-on #routeSvg{ display:none; }
 }
 
 
-.topbar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 700;
+/* Gate chip colouring: default Gate = yellow, New gate = red */
+.sb-card .sb-chip.gate-yellow{
+  background: rgba(250, 204, 21, .45);
+  color: rgba(15,23,42,.95);
 }
-.flight-number {
-  font-size: 20px;
-  font-weight: 800;
-}
-.last-refresh {
-  font-size: 14px;
-  opacity: 0.7;
-}
-
-
-.airline-logo {
-  display: inline-block;
-  vertical-align: middle;
-  max-height: 20px;
-  margin-right: 8px;
+.sb-card .sb-chip.gate-red{
+  background: rgba(239, 68, 68, .55);
+  color: #fff;
 }
