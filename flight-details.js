@@ -761,7 +761,15 @@ if (els.arrKv) {
     const arr = (flight && flight.arrival) || {};
 
     const gate = (isDeparture ? dep.gate : arr.gate) || null;
-    const terminal = (isDeparture ? dep.terminal : arr.terminal) || null;
+    
+
+const prevDepGate = (((state.originalFlight||{}).departure)||{}).gate || "";
+const prevArrGate = (((state.originalFlight||{}).arrival)||{}).gate || "";
+const prevGate = (isDeparture ? prevDepGate : prevArrGate) || "";
+const gateChanged = gate && prevGate && String(gate) !== String(prevGate);
+const gateLabel = gateChanged ? "New gate" : "Gate";
+const gateChipClass = gateChanged ? "gate-red" : "gate-yellow";
+const terminal = (isDeparture ? dep.terminal : arr.terminal) || null;
     const baggage = (!isDeparture ? arr.baggage : null) || null;
 
     // Hide if we have nothing useful.
