@@ -445,7 +445,27 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
         "flight.time.scheduled.arrival",
       ]) || null;
 
-    return { flightNo, dep, arr, schedDep, schedArr };
+
+const airlineName =
+  pickAny(flat, [
+    "airline.name",
+    "codeshared.airline.name",
+    "airlineName",
+    "airline_name",
+  ]) || null;
+
+const airlineIata =
+  (pickAny(flat, [
+    "airline.iataCode",
+    "codeshared.airline.iataCode",
+    "airline.iata",
+    "airline_iata",
+    "airlineCode",
+  ]) || "")
+    .toString()
+    .toUpperCase() || null;
+
+return { flightNo, dep, arr, schedDep, schedArr, airlineName, airlineIata };
   }
 
   // ---------- Menu ----------
@@ -631,6 +651,9 @@ const context = payload.context || {};
 const flat = flattenObject(flight || {});
 const id = deriveIdentity(flight || {});
 state.originalFlight = flight || {};
+// Fallback airline name/iata from flight payload
+if (!id.airlineName) id.airlineName = (flight?.airline?.name || flight?.codeshared?.airline?.name || null);
+if (!id.airlineIata) id.airlineIata = (flight?.airline?.iataCode || flight?.codeshared?.airline?.iataCode || null);
 
 // Header: flight number only + last refresh time (London)
 const displayNo = id.flightNo || "—";
