@@ -9,6 +9,22 @@ function friendlyAircraftType(code){
   return AIRCRAFT_FRIENDLY[code]||code;
 }
 
+
+/**
+ * Returns the most user-friendly airline name available for a flight object.
+ * Mirrors the logic used on the list page (index.html/script.js), with an extra
+ * codeshare fallback when the operating carrier name isn't present.
+ */
+function getAirlineDisplayName(flight) {
+  return (
+    flight?.airline?.name ||
+    flight?.codeshared?.airline?.name ||
+    flight?.airline?.iataCode ||
+    flight?.codeshared?.airline?.iataCode ||
+    ""
+  );
+}
+
 console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 /* flight-details.js
    Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
@@ -656,8 +672,14 @@ if (!id.airlineName) id.airlineName = (flight?.airline?.name || flight?.codeshar
 if (!id.airlineIata) id.airlineIata = (flight?.airline?.iataCode || flight?.codeshared?.airline?.iataCode || null);
 
 // Header: flight number only + last refresh time (London)
-const displayNo = id.flightNo || "—";
-setText(els.headline, displayNo);
+/**
+   * Header: airline name + flight number, plus last refresh time (London).
+   * We reuse the same airline name resolution logic as the list page.
+   */
+  const displayNo = id.flightNo || "—";
+  const airlineName = getAirlineDisplayName(flight);
+  setText(els.headline, airlineName ? `${airlineName} ${displayNo}` : displayNo);
+
 const refreshedTime = new Date().toLocaleTimeString("en-GB",{ timeZone:"Europe/London", hour:"2-digit", minute:"2-digit" });
 setText(els.subhead, `Last Refresh: ${refreshedTime}`);
 
