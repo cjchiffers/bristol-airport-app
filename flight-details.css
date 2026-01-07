@@ -760,3 +760,9 @@ body.leaflet-on #routeSvg{ display:none; }
   background: rgba(239, 68, 68, .55);
   color: #fff;
 }
+
+
+.pill{display:inline-flex;align-items:center;justify-content:center;min-width:32px;padding:6px 10px;border-radius:10px;font-weight:800;font-size:14px}
+.gate-pill{background:rgba(255,193,7,.25);color:#5a3b00;border:1px solid rgba(255,193,7,.45)}
+.gate-pill.changed{background:rgba(231,76,60,.25);color:#7a1e1e;border-color:rgba(231,76,60,.45)}
+.belt-pill{background:rgba(0,0,0,.06);color:#111;border:1px solid rgba(0,0,0,.12)}
