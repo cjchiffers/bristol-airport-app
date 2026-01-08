@@ -762,11 +762,16 @@ body.leaflet-on #routeSvg{ display:none; }
 }
 
 
-/* --- Gate/Belt pills --- */
+/* --- Gate/Belt pills (always visible) --- */
 .pill{
-  display:inline-flex;align-items:center;justify-content:center;
-  min-width:32px;padding:6px 10px;border-radius:10px;
-  font-weight:800;font-size:14px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:32px;
+  padding:6px 10px;
+  border-radius:10px;
+  font-weight:800;
+  font-size:14px;
 }
 .gate-pill{
   background:rgba(255,193,7,.25);
@@ -794,8 +799,8 @@ body.leaflet-on #routeSvg{ display:none; }
   animation: flashRing 1.1s ease-out 1;
 }
 
-/* Make crossed-out scheduled times red when delayed */
+/* Crossed-out scheduled time red when delayed */
 .sb-card .sb-sched.delayed{
-  color: rgba(231,76,60,.9);
-  opacity: .9;
+  color: rgba(231,76,60,.95);
+  opacity: .95;
 }
