@@ -761,46 +761,47 @@ body.leaflet-on #routeSvg{ display:none; }
   color: #fff;
 }
 
-
-/* --- Gate/Belt pills (always visible) --- */
-.pill{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-width:32px;
-  padding:6px 10px;
-  border-radius:10px;
-  font-weight:800;
-  font-size:14px;
-}
-.gate-pill{
-  background:rgba(255,193,7,.25);
-  color:#5a3b00;
-  border:1px solid rgba(255,193,7,.45);
-}
-.gate-pill.changed{
-  background:rgba(231,76,60,.25);
-  color:#7a1e1e;
-  border-color:rgba(231,76,60,.45);
-}
-.belt-pill{
-  background:rgba(0,0,0,.06);
-  color:#111;
-  border:1px solid rgba(0,0,0,.12);
+/* Gate / belt badges in the Departure/Arrival detail cards */
+.kv-line--gate .kv-v,
+.kv-line--newgate .kv-v,
+.kv-line--belt .kv-v{
+  padding: 6px 10px;
+  border-radius: 10px;
+  min-width: 34px;
+  text-align: center;
+  display: inline-block;
 }
 
-/* Flash when value just changed */
-@keyframes flashRing {
-  0%   { box-shadow: 0 0 0 0 rgba(231,76,60,.75); transform: scale(1); }
-  30%  { box-shadow: 0 0 0 8px rgba(231,76,60,.25); transform: scale(1.02); }
-  100% { box-shadow: 0 0 0 0 rgba(231,76,60,0); transform: scale(1); }
-}
-.pill.just-changed{
-  animation: flashRing 1.1s ease-out 1;
+.kv-line--gate .kv-v{
+  background: #FFECB3; /* yellow */
+  border: 1px solid #F6C453;
 }
 
-/* Crossed-out scheduled time red when delayed */
-.sb-card .sb-sched.delayed{
-  color: rgba(231,76,60,.95);
-  opacity: .95;
+.kv-line--newgate .kv-v{
+  background: #FDE2E2; /* red-ish */
+  border: 1px solid #F3A3A3;
+}
+
+.kv-line--belt .kv-v{
+  background: #E9EEF6;
+  border: 1px solid #CFD9EA;
+}
+
+/* Flash when ops values change */
+@keyframes opsFlash {
+  0% { transform: scale(1); filter: brightness(1); }
+  25% { transform: scale(1.02); filter: brightness(1.12); }
+  50% { transform: scale(1); filter: brightness(1); }
+  75% { transform: scale(1.02); filter: brightness(1.12); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+.kv-line--newgate .kv-v{
+  animation: opsFlash 900ms ease-in-out 1;
+}
+
+/* Make crossed-out scheduled times red when delayed (status card) */
+.is-delayed .sb-time-old,
+.is-delayed .sb-card .sb-sched{
+  color: #B42318;
+  opacity: 0.9;
 }

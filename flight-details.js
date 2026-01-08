@@ -6,28 +6,9 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
-(() => {
   "use strict";
 
-  
-// -------- Ops (Gate/Belt) helpers --------
-function normalizeValue(v) {
-  if (v === null || v === undefined || v === "") return "-";
-  return String(v);
-}
-
-// Flash a pill when the value changes between refreshes
-function flashIfChanged(el, prevValue, nextValue) {
-  if (!el) return nextValue;
-  if (prevValue !== undefined && prevValue !== nextValue) {
-    el.classList.remove("just-changed");
-    void el.offsetWidth; // force reflow so animation can replay
-    el.classList.add("just-changed");
-  }
-  return nextValue;
-}
-
-// --- Airport code -> city name (for geocoding). Add as needed.
+  // --- Airport code -> city name (for geocoding). Add as needed.
   const airportCodeToCityName = {
     "ABZ": "Aberdeen",
     "AGP": "Malaga",
@@ -654,6 +635,10 @@ const depInfo = {
   stand: pickAny(flat, ["departure.stand","flight.departure.stand","departureStand"]) || "",
 };
 
+depInfo.gateChanged = opsChanged('gate_dep', depInfo.gate);
+depInfo.beltChanged = opsChanged('belt_dep', depInfo.belt);
+
+
 const arrInfo = {
   sched: fmtTime(pickAny(flat, ["flight.time.scheduled.arrival","arrival.scheduledTime","arrival.scheduled","scheduled_arrival","arrival_time","scheduledArrival"])),
   est: fmtTime(pickAny(flat, ["arrival.estimatedTime","arrival.estimated","estimated_arrival","arrival_estimated","flight.time.estimated.arrival"])),
@@ -662,6 +647,27 @@ const arrInfo = {
   gate: pickAny(flat, ["arrival.gate","flight.arrival.gate","arrivalGate"]) || "",
   belt: pickAny(flat, ["arrival.baggage","arrival.belt","flight.arrival.baggage","baggage"]) || "",
 };
+
+arrInfo.gateChanged = opsChanged('gate_arr', arrInfo.gate);
+arrInfo.beltChanged = opsChanged('belt_arr', arrInfo.belt);
+
+
+// Track per-flight operational fields so we can highlight changes (e.g. gate change)
+function getOpsKey(suffix) {
+  const k = state?.storageKey || "unknown";
+  return `fd_${k}_${suffix}`;
+}
+function opsChanged(suffix, nextVal) {
+  const key = getOpsKey(suffix);
+  const prev = sessionStorage.getItem(key);
+  const next = (nextVal == null) ? "" : String(nextVal);
+  // Only count as "changed" if we had a previous non-empty value and it differs.
+  const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
+  sessionStorage.setItem(key, next);
+  return changed;
+}
+
+
 
 function kvLine(label, val) {
   if (!val) return "";
@@ -675,7 +681,7 @@ if (els.depKv) {
       ${kvLine("Estimated", depInfo.est)}
       ${kvLine("Actual", depInfo.act)}
       ${kvLine("Terminal", depInfo.term)}
-      ${kvLine("Gate", depInfo.gate)}
+      ${kvLine(depInfo.gateChanged ? "New gate" : "Gate", depInfo.gate, true, depInfo.gateChanged ? "newgate" : "gate")}
       ${kvLine("Stand", depInfo.stand)}
     </div>
   `;
@@ -688,8 +694,8 @@ if (els.arrKv) {
       ${kvLine("Estimated", arrInfo.est)}
       ${kvLine("Actual", arrInfo.act)}
       ${kvLine("Terminal", arrInfo.term)}
-      ${kvLine("Gate", arrInfo.gate)}
-      ${kvLine("Belt", arrInfo.belt)}
+      ${kvLine(arrInfo.gateChanged ? "New gate" : "Gate", arrInfo.gate, true, arrInfo.gateChanged ? "newgate" : "gate")}
+      ${kvLine("Belt", arrInfo.belt, true, "belt")}
     </div>
   `;
 }
@@ -748,13 +754,6 @@ if (els.arrKv) {
   }
 
   function renderStatusBanner(flight, flat, id) {
-  const dep = (flight && flight.departure) || {};
-  const arr = (flight && flight.arrival) || {};
-
-  // Delay flags for styling crossed-out scheduled times
-  const depIsDelayed = Number(dep.delay || 0) > 0;
-  const arrIsDelayed = Number(arr.delay || 0) > 0;
-
     if (!els.statusBanner) return;
     const stRaw = pickAny(flat, ["status"]) || "Unknown";
     const st = String(stRaw).toLowerCase();
@@ -1284,7 +1283,6 @@ if (els.arrKv) {
         <div class="wx-rows">${rows}</div>
       </div>
     `;
-  }
 
 // ---------- Route map: Leaflet basemap + animation, with SVG fallback ----------
   const ROUTE_SVG_W = 1000;
@@ -1720,7 +1718,6 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
     setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 120);
   }
 
-})();
 function paintWeather(days){
  const wrap=document.getElementById("weather");
  if(!wrap||!Array.isArray(days))return;
@@ -1731,30 +1728,4 @@ function paintWeather(days){
  <div class="wx-meta"><span>💨 ${Math.round(d.wind)} km/h</span><span>☔ ${Math.round(d.rain*100)}%</span><span>UV ${Math.round(d.uv)}</span></div>
  </div>`).join("");
  wrap.innerHTML=`<div class="card"><div class="card-title">Weather</div><div class="wx-vertical">${rows}</div></div>`;
-}
-
-
-function renderGateAndBelt(flight) {
-  const gateEl = document.getElementById("gateValue");
-  const gateLabelEl = document.getElementById("gateLabel");
-  const beltEl = document.getElementById("beltValue");
-  if (!gateEl || !beltEl || !gateLabelEl) return;
-
-  state.lastOps = state.lastOps || {};
-
-  // Gate (departure)
-  const gate = normalizeValue(flight?.departure?.gate ?? null);
-  const prevGate = state.lastOps.gate;
-  const gateChanged = prevGate !== undefined && prevGate !== gate;
-
-  gateLabelEl.textContent = gateChanged ? "New gate" : "Gate";
-  gateEl.textContent = gate;
-  gateEl.classList.toggle("changed", gateChanged && gate !== "-");
-  state.lastOps.gate = flashIfChanged(gateEl, prevGate, gate);
-
-  // Belt (arrival)
-  const belt = normalizeValue(flight?.arrival?.baggage ?? flight?.arrival?.belt ?? null);
-  const prevBelt = state.lastOps.belt;
-  beltEl.textContent = belt;
-  state.lastOps.belt = flashIfChanged(beltEl, prevBelt, belt);
 }
