@@ -8,7 +8,9 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 
   "use strict";
 
-  // --- Airport code -> city name (for geocoding). Add as needed.
+  
+console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
+// --- Airport code -> city name (for geocoding). Add as needed.
   const airportCodeToCityName = {
     "ABZ": "Aberdeen",
     "AGP": "Malaga",
