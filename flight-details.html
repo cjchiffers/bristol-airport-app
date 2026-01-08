@@ -10,7 +10,7 @@
   <title>Flight Details</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css?v=20260105_light" />
-  <link rel="stylesheet" href="flight-details.css?v=20260105_v9" />
+  <link rel="stylesheet" href="flight-details.css?v=20260108_opsflash" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css?v=20260105_light" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 
@@ -45,6 +45,18 @@
   <main class="container details-container">
     <div id="netBanner" class="net-banner" style="display:none" role="status" aria-live="polite"></div>
     <div id="statusBanner" class="status-banner" style="display:none" role="status" aria-live="polite"></div>
+<div class="ops-bar" id="opsBar">
+  <div class="ops-item">
+    <div class="ops-k" id="gateLabel">Gate</div>
+    <div class="ops-v pill gate-pill" id="gateValue">-</div>
+  </div>
+
+  <div class="ops-item">
+    <div class="ops-k">Baggage belt</div>
+    <div class="ops-v pill belt-pill" id="beltValue">-</div>
+  </div>
+</div>
+
     <section class="card details-card">
       <div class="aircraft-row">
         <div>
@@ -58,19 +70,7 @@
         <img id="aircraftImage" class="aircraft-image" alt="Aircraft" />
         <div class="small" id="aircraftImageCredit"></div>
       </div>
-    
-<div class="ops-bar" id="opsBar">
-  <div class="ops-item">
-    <div class="ops-k" id="gateLabel">Gate</div>
-    <div class="ops-v pill gate-pill" id="gateValue">-</div>
-  </div>
-  <div class="ops-item">
-    <div class="ops-k">Baggage belt</div>
-    <div class="ops-v pill belt-pill" id="beltValue">-</div>
-  </div>
-</div>
-
-</section>
+    </section>
 
     <section class="card details-card">
       <div class="card-h">
@@ -119,7 +119,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="flight-details.js?v=20260106_rmAir2"></script>
+  <script src="flight-details.js?v=20260108_opsflash"></script>
 
 </body>
 </html>
