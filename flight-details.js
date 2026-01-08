@@ -917,6 +917,10 @@ const terminal = (isDeparture ? dep.terminal : arr.terminal) || null;
 
   const dep = (flight && flight.departure) || {};
   const arr = (flight && flight.arrival) || {};
+  // Delay flags for styling crossed-out scheduled times (safe defaults)
+  const depIsDelayed = Number(dep.delay || 0) > 0;
+  const arrIsDelayed = Number(arr.delay || 0) > 0;
+
 
   const depSched = toDate(dep.scheduledTime || null);
   const depEst   = toDate(dep.estimatedTime || null);
