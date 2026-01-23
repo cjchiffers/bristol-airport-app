@@ -1,4 +1,3 @@
-// Bump this when you change any app-shell file so users receive updates immediately.
 const CACHE_NAME = "brs-flights-v8";
 const APP_SHELL = [
   "./",
