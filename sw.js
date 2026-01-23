@@ -1,10 +1,11 @@
-const CACHE_NAME = "brs-flights-v8";
+const CACHE_NAME = "brs-flights-v9";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./script.js",
   "./flight-details.html",
+  "./flight-details.css",
   "./flight-details.js",
   "./manifest.json",
   "./assets/bristol-logo.png",

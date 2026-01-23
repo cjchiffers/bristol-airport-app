@@ -104,34 +104,33 @@
 .ops-k{ font-size: 11px; color: var(--muted); display:flex; align-items:center; gap:6px; }
 .ops-v{ font-weight: 950; font-size: 14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-/* --- Flight time hero (KLM-style) --- */
+/* Flight hero (big departure/arrival times like the reference screenshots) */
 .flight-hero{
   display:grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 14px;
   padding: 18px;
-  background: var(--surface2);
-  border: 1px solid var(--stroke);
   border-radius: 18px;
-  margin: 0 0 12px;
+  background: var(--surface2);
 }
-.flight-hero-col{ display:flex; flex-direction:column; gap:6px; min-width:0; }
-.flight-hero-arrow{ display:flex; align-items:center; font-size: 22px; opacity: .65; }
-.fh-date{ font-size: 13px; opacity: .7; }
-.fh-airport{ font-weight: 850; letter-spacing: .2px; }
-.fh-time{ display:flex; align-items:baseline; gap: 8px; }
-.fh-time-main{ font-size: 34px; font-weight: 950; letter-spacing: -0.6px; }
+
+.flight-hero-col{ display:flex; flex-direction:column; gap: 6px; min-width:0; }
+.flight-hero-arrow{ display:flex; align-items:center; font-size: 22px; opacity:.65; }
+.fh-date{ font-size: 13px; opacity: .75; }
+.fh-airport{ font-weight: 700; letter-spacing: .2px; }
+.fh-time{ display:flex; align-items:baseline; gap: 10px; }
+.fh-time-main{ font-size: 40px; font-weight: 900; letter-spacing: -0.8px; }
 .fh-time-old{ font-size: 15px; opacity: .55; text-decoration: line-through; }
 .fh-delay{
   align-self:flex-start;
+  margin-top: 6px;
   font-size: 13px;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
-  font-weight: 850;
-  border: 1px solid rgba(255,255,255,.12);
+  font-weight: 700;
 }
-.fh-delay-warn{ background: rgba(231, 76, 60, .18); color: rgba(255, 107, 107, .95); }
-.fh-delay-good{ background: rgba(46, 204, 113, .14); color: rgba(46, 204, 113, .98); }
+.fh-delay-warn{ background: color-mix(in oklab, #ff6b6b 18%, transparent); color: #ff6b6b; }
+.fh-delay-good{ background: color-mix(in oklab, #2ecc71 18%, transparent); color: #2ecc71; }
 
 /* Refresh spinner */
 .refresh-spin{

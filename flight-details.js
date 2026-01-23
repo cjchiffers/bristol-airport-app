@@ -567,10 +567,10 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     setText(els.subhead, depTime && arrTime ? `${depTime} → ${arrTime}` : depTime ? `Departs ${depTime}` : "—");
 
     renderStatusBadge(flat);
-    renderStatusBannerAndOps(flight, flat, id);
+
+    // UX: top "status" banner removed. Keep ops + time hero.
+    renderOpsBar(flight, flat, id);
     renderTopStatus(flat, id);
-    renderOpsBar(flat, id);
-    renderCountdownKpi(flat, id);
 
     // Airline basics
     const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
@@ -841,6 +841,122 @@ function renderStatusBanner(flight, flat, id) {
     const mm = m % 60;
     return mm ? `${h}h ${String(mm).padStart(2, "0")}m` : `${h}h`;
   }
+
+  // ---------- Hero (big times) ----------
+  function renderTopStatus(flat, id) {
+    // Populate the hero section at the top of the page.
+    // This function name is kept for backward-compat with older builds.
+    try {
+      // Times (scheduled vs estimated/actual)
+      const depSched = pickAny(flat, [
+        "flight.time.scheduled.departure",
+        "departure.scheduledTime",
+        "departure.scheduled",
+        "scheduled_departure",
+        "departure_time",
+        "scheduledDeparture",
+      ]);
+      const depBest = pickAny(flat, [
+        "flight.time.actual.departure",
+        "departure.actualTime",
+        "departure.actual",
+        "actual_departure",
+        "flight.time.estimated.departure",
+        "departure.estimatedTime",
+        "departure.estimated",
+        "estimated_departure",
+      ]) || depSched;
+
+      const arrSched = pickAny(flat, [
+        "flight.time.scheduled.arrival",
+        "arrival.scheduledTime",
+        "arrival.scheduled",
+        "scheduled_arrival",
+        "arrival_time",
+        "scheduledArrival",
+      ]);
+      const arrBest = pickAny(flat, [
+        "flight.time.actual.arrival",
+        "arrival.actualTime",
+        "arrival.actual",
+        "actual_arrival",
+        "flight.time.estimated.arrival",
+        "arrival.estimatedTime",
+        "arrival.estimated",
+        "estimated_arrival",
+      ]) || arrSched;
+
+      const setHero = (mainId, oldId, actual, sched) => {
+        const mainEl = document.getElementById(mainId);
+        const oldEl = document.getElementById(oldId);
+        if (!mainEl) return;
+        const a = fmtTime(actual);
+        const s = fmtTime(sched);
+        mainEl.textContent = a || s || "—";
+        if (oldEl) {
+          if (a && s && a !== s) {
+            oldEl.textContent = s;
+            oldEl.style.display = "";
+          } else {
+            oldEl.textContent = "";
+            oldEl.style.display = "none";
+          }
+        }
+      };
+
+      setHero("depTimeActual", "depTimeSched", depBest, depSched);
+      setHero("arrTimeActual", "arrTimeSched", arrBest, arrSched);
+
+      // Airports + dates
+      const depCode = (id && id.dep) ? String(id.dep).toUpperCase() : "—";
+      const arrCode = (id && id.arr) ? String(id.arr).toUpperCase() : "—";
+      const depAirport = document.getElementById("depAirport");
+      const arrAirport = document.getElementById("arrAirport");
+      if (depAirport) depAirport.textContent = depCode;
+      if (arrAirport) arrAirport.textContent = arrCode;
+
+      const fmtDay = (v) => {
+        const d = toDate(v);
+        if (!d) return "—";
+        return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+      };
+      const depDateEl = document.getElementById("depDate");
+      const arrDateEl = document.getElementById("arrDate");
+      if (depDateEl) depDateEl.textContent = fmtDay(depSched || depBest);
+      if (arrDateEl) arrDateEl.textContent = fmtDay(arrSched || arrBest);
+
+      // Delay / early chips (best-effort)
+      const delayChip = (elId, mins) => {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        const m = Number(mins);
+        if (!Number.isFinite(m) || m === 0) { el.hidden = true; el.textContent = ""; return; }
+        const abs = Math.abs(Math.round(m));
+        const early = m < 0;
+        el.className = `fh-delay ${early ? "fh-delay-good" : "fh-delay-warn"}`;
+        el.textContent = early ? `${abs}m early` : `${abs}m delayed`;
+        el.hidden = false;
+      };
+
+      // Prefer explicit delay fields if available; else derive from scheduled vs best.
+      const depDelay = pickAny(flat, ["departure.delay", "depDelay", "departure_delay"]);
+      const arrDelay = pickAny(flat, ["arrival.delay", "arrDelay", "arrival_delay"]);
+      const deriveDelay = (sched, best) => {
+        const a = toDate(sched);
+        const b = toDate(best);
+        if (!a || !b) return null;
+        return Math.round((b.getTime() - a.getTime()) / 60000);
+      };
+
+      delayChip("depDelay", depDelay ?? deriveDelay(depSched, depBest));
+      delayChip("arrDelay", arrDelay ?? deriveDelay(arrSched, arrBest));
+    } catch (e) {
+      console.warn("Hero render failed:", e);
+    }
+  }
+
+  // Backward-compat no-op (older builds called this; we now keep countdown elsewhere)
+  function renderCountdownKpi() {}
 
   function renderStatusBadge(flat) {
     if (!els.statusBadge) return;
