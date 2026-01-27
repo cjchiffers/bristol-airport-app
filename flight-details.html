@@ -10,7 +10,7 @@
   <title>Flight Details</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css?v=20260105_light" />
-  <link rel="stylesheet" href="flight-details.css?v=20260108_fixB" />
+  <link rel="stylesheet" href="flight-details.css?v=20260123_fixC" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css?v=20260105_light" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 
@@ -44,72 +44,7 @@
 
   <main class="container details-container">
     <div id="netBanner" class="net-banner" style="display:none" role="status" aria-live="polite"></div>
-
-    <!-- Hero: departure/arrival times (matches the reference screenshots) -->
-    <section class="card details-card" aria-label="Flight times">
-      <div class="flight-hero" id="flightHero">
-        <div class="flight-hero-col">
-          <div class="fh-date" id="depDate">—</div>
-          <div class="fh-airport" id="depAirport">—</div>
-          <div class="fh-time">
-            <span class="fh-time-main" id="depTimeActual">—</span>
-            <span class="fh-time-old" id="depTimeSched"></span>
-          </div>
-          <div class="fh-delay fh-delay-warn" id="depDelay" hidden></div>
-        </div>
-
-        <div class="flight-hero-arrow" aria-hidden="true">→</div>
-
-        <div class="flight-hero-col" style="text-align:right">
-          <div class="fh-date" id="arrDate">—</div>
-          <div class="fh-airport" id="arrAirport">—</div>
-          <div class="fh-time" style="justify-content:flex-end">
-            <span class="fh-time-main" id="arrTimeActual">—</span>
-            <span class="fh-time-old" id="arrTimeSched"></span>
-          </div>
-          <div class="fh-delay fh-delay-warn" id="arrDelay" hidden></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Ops: Gate / Terminal / Belt (best-effort from API) -->
-    <section class="card details-card" aria-label="Operational information">
-      <div id="opsBar" class="ops-bar" style="display:none"></div>
-    </section>
-
-    <!-- Airline basics -->
-    <section class="card details-card" aria-label="Airline">
-      <div class="airline-row">
-        <img id="airlineLogo" class="airline-logo" alt="" loading="lazy" />
-        <div>
-          <div class="airline-name" id="airlineName">—</div>
-          <div class="small" id="airlineCodeLine">Airline code: —</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Departure / Arrival detail blocks -->
-    <section class="card details-card" aria-label="Departure and arrival details">
-      <div class="two-col">
-        <div>
-          <div class="h-title">Departure</div>
-          <div id="depKv" class="kv"></div>
-        </div>
-        <div>
-          <div class="h-title">Arrival</div>
-          <div id="arrKv" class="kv"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- KPIs -->
-    <section class="card details-card" aria-label="Flight metrics">
-      <div class="card-h">
-        <div class="h-title">Flight metrics</div>
-        <div class="h-sub small">Best-effort from timetable data</div>
-      </div>
-      <div id="kpis" class="kpis"></div>
-    </section>
+    <div id="statusBanner" class="status-banner" style="display:none" role="status" aria-live="polite"></div>
     <section class="card details-card">
       <div class="aircraft-row">
         <div>
@@ -172,7 +107,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="flight-details.js?v=20260108_fixB"></script>
+  <script src="flight-details.js?v=20260123_fixC"></script>
 
 </body>
 </html>

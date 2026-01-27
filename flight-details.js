@@ -567,10 +567,10 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     setText(els.subhead, depTime && arrTime ? `${depTime} → ${arrTime}` : depTime ? `Departs ${depTime}` : "—");
 
     renderStatusBadge(flat);
-
-    // UX: top "status" banner removed. Keep ops + time hero.
-    renderOpsBar(flight, flat, id);
+    renderStatusBannerAndOps(flight, flat, id);
     renderTopStatus(flat, id);
+    renderOpsBar(flat, id);
+    renderCountdownKpi(flat, id);
 
     // Airline basics
     const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
@@ -638,6 +638,7 @@ const depInfo = {
 };
 
 depInfo.gateChanged = opsChanged('gate_dep', depInfo.gate);
+depInfo.beltChanged = opsChanged('belt_dep', depInfo.belt);
 
 
 const arrInfo = {
@@ -646,7 +647,7 @@ const arrInfo = {
   act: fmtTime(pickAny(flat, ["arrival.actualTime","arrival.actual","actual_arrival","arrival_actual","flight.time.actual.arrival"])),
   term: pickAny(flat, ["arrival.terminal","flight.arrival.terminal","arrivalTerminal"]) || "",
   gate: pickAny(flat, ["arrival.gate","flight.arrival.gate","arrivalGate"]) || "",
-  belt: pickAny(flat, ["arrival.baggage","arrival.belt","arrival.baggageBelt","arrival.baggage_belt","flight.arrival.baggage","flight.arrival.belt","baggage","baggage_belt","baggageBelt"]) || "",
+  belt: pickAny(flat, ["arrival.baggage","arrival.belt","flight.arrival.baggage","baggage"]) || "",
 };
 
 arrInfo.gateChanged = opsChanged('gate_arr', arrInfo.gate);
@@ -713,65 +714,48 @@ if (els.arrKv) {
   }
 
   function renderStatusBannerAndOps(flight, flat, id) {
-  renderOpsBar(flight, flat);
-  renderStatusBanner(flight, flat, id);
-}
-
-function renderOpsBar(flight, flat) {
-  if (!els.opsBar) return;
-
-  const t = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase();
-  const isDeparture = t.includes("depart");
-
-  const pick = (paths) => pickAny(flat || {}, paths) || "";
-
-  const gate = isDeparture
-    ? pick(["departure.gate", "flight.departure.gate", "departureGate", "departure.gateNumber"])
-    : pick(["arrival.gate", "flight.arrival.gate", "arrivalGate", "arrival.gateNumber"]);
-
-  const terminal = isDeparture
-    ? pick(["departure.terminal", "flight.departure.terminal", "departureTerminal"])
-    : pick(["arrival.terminal", "flight.arrival.terminal", "arrivalTerminal"]);
-
-  const belt = isDeparture
-    ? ""
-    : pick([
-        "arrival.baggage",
-        "arrival.belt",
-        "flight.arrival.baggage",
-        "flight.arrival.belt",
-        "baggage",
-        "baggage_belt",
-        "baggageBelt",
-      ]);
-
-  // Hide if nothing meaningful.
-  if (!gate && !terminal && !belt) {
-    els.opsBar.style.display = "none";
-    els.opsBar.innerHTML = "";
-    return;
+    renderOpsBar(flight);
+    renderStatusBanner(flight, flat, id);
   }
 
-  const fmt = (v) => (v == null || String(v).trim() === "" ? "—" : String(v));
+  function renderOpsBar(flight) {
+    if (!els.opsBar) return;
+    const t = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase();
+    const isDeparture = t.includes("depart");
 
-  els.opsBar.style.display = "";
-  els.opsBar.innerHTML = `
-    <div class="ops-item">
-      <div class="ops-k">🚪 Gate</div>
-      <div class="ops-v">${escapeHtml(fmt(gate))}</div>
-    </div>
-    <div class="ops-item">
-      <div class="ops-k">🏢 Terminal</div>
-      <div class="ops-v">${escapeHtml(fmt(terminal))}</div>
-    </div>
-    <div class="ops-item">
-      <div class="ops-k">🧳 Belt</div>
-      <div class="ops-v">${escapeHtml(fmt(belt))}</div>
-    </div>
-  `;
-}
+    const dep = (flight && flight.departure) || {};
+    const arr = (flight && flight.arrival) || {};
 
-function renderStatusBanner(flight, flat, id) {
+    const gate = (isDeparture ? dep.gate : arr.gate) || null;
+    const terminal = (isDeparture ? dep.terminal : arr.terminal) || null;
+    const baggage = (!isDeparture ? arr.baggage : null) || null;
+
+    // Hide if we have nothing useful.
+    if (!gate && !terminal && !baggage) {
+      els.opsBar.style.display = "none";
+      els.opsBar.innerHTML = "";
+      return;
+    }
+
+    const fmt = (v) => (v === null || v === undefined || String(v).trim() === "" ? "—" : String(v));
+    els.opsBar.style.display = "";
+    els.opsBar.innerHTML = `
+      <div class="ops-item">
+        <div class="ops-k">🚪 Gate</div>
+        <div class="ops-v">${escapeHtml(fmt(gate))}</div>
+      </div>
+      <div class="ops-item">
+        <div class="ops-k">🏢 Terminal</div>
+        <div class="ops-v">${escapeHtml(fmt(terminal))}</div>
+      </div>
+      <div class="ops-item">
+        <div class="ops-k">🧳 Belt</div>
+        <div class="ops-v">${escapeHtml(fmt(baggage))}</div>
+      </div>
+    `;
+  }
+
+  function renderStatusBanner(flight, flat, id) {
     if (!els.statusBanner) return;
     const stRaw = pickAny(flat, ["status"]) || "Unknown";
     const st = String(stRaw).toLowerCase();
@@ -842,122 +826,6 @@ function renderStatusBanner(flight, flat, id) {
     return mm ? `${h}h ${String(mm).padStart(2, "0")}m` : `${h}h`;
   }
 
-  // ---------- Hero (big times) ----------
-  function renderTopStatus(flat, id) {
-    // Populate the hero section at the top of the page.
-    // This function name is kept for backward-compat with older builds.
-    try {
-      // Times (scheduled vs estimated/actual)
-      const depSched = pickAny(flat, [
-        "flight.time.scheduled.departure",
-        "departure.scheduledTime",
-        "departure.scheduled",
-        "scheduled_departure",
-        "departure_time",
-        "scheduledDeparture",
-      ]);
-      const depBest = pickAny(flat, [
-        "flight.time.actual.departure",
-        "departure.actualTime",
-        "departure.actual",
-        "actual_departure",
-        "flight.time.estimated.departure",
-        "departure.estimatedTime",
-        "departure.estimated",
-        "estimated_departure",
-      ]) || depSched;
-
-      const arrSched = pickAny(flat, [
-        "flight.time.scheduled.arrival",
-        "arrival.scheduledTime",
-        "arrival.scheduled",
-        "scheduled_arrival",
-        "arrival_time",
-        "scheduledArrival",
-      ]);
-      const arrBest = pickAny(flat, [
-        "flight.time.actual.arrival",
-        "arrival.actualTime",
-        "arrival.actual",
-        "actual_arrival",
-        "flight.time.estimated.arrival",
-        "arrival.estimatedTime",
-        "arrival.estimated",
-        "estimated_arrival",
-      ]) || arrSched;
-
-      const setHero = (mainId, oldId, actual, sched) => {
-        const mainEl = document.getElementById(mainId);
-        const oldEl = document.getElementById(oldId);
-        if (!mainEl) return;
-        const a = fmtTime(actual);
-        const s = fmtTime(sched);
-        mainEl.textContent = a || s || "—";
-        if (oldEl) {
-          if (a && s && a !== s) {
-            oldEl.textContent = s;
-            oldEl.style.display = "";
-          } else {
-            oldEl.textContent = "";
-            oldEl.style.display = "none";
-          }
-        }
-      };
-
-      setHero("depTimeActual", "depTimeSched", depBest, depSched);
-      setHero("arrTimeActual", "arrTimeSched", arrBest, arrSched);
-
-      // Airports + dates
-      const depCode = (id && id.dep) ? String(id.dep).toUpperCase() : "—";
-      const arrCode = (id && id.arr) ? String(id.arr).toUpperCase() : "—";
-      const depAirport = document.getElementById("depAirport");
-      const arrAirport = document.getElementById("arrAirport");
-      if (depAirport) depAirport.textContent = depCode;
-      if (arrAirport) arrAirport.textContent = arrCode;
-
-      const fmtDay = (v) => {
-        const d = toDate(v);
-        if (!d) return "—";
-        return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-      };
-      const depDateEl = document.getElementById("depDate");
-      const arrDateEl = document.getElementById("arrDate");
-      if (depDateEl) depDateEl.textContent = fmtDay(depSched || depBest);
-      if (arrDateEl) arrDateEl.textContent = fmtDay(arrSched || arrBest);
-
-      // Delay / early chips (best-effort)
-      const delayChip = (elId, mins) => {
-        const el = document.getElementById(elId);
-        if (!el) return;
-        const m = Number(mins);
-        if (!Number.isFinite(m) || m === 0) { el.hidden = true; el.textContent = ""; return; }
-        const abs = Math.abs(Math.round(m));
-        const early = m < 0;
-        el.className = `fh-delay ${early ? "fh-delay-good" : "fh-delay-warn"}`;
-        el.textContent = early ? `${abs}m early` : `${abs}m delayed`;
-        el.hidden = false;
-      };
-
-      // Prefer explicit delay fields if available; else derive from scheduled vs best.
-      const depDelay = pickAny(flat, ["departure.delay", "depDelay", "departure_delay"]);
-      const arrDelay = pickAny(flat, ["arrival.delay", "arrDelay", "arrival_delay"]);
-      const deriveDelay = (sched, best) => {
-        const a = toDate(sched);
-        const b = toDate(best);
-        if (!a || !b) return null;
-        return Math.round((b.getTime() - a.getTime()) / 60000);
-      };
-
-      delayChip("depDelay", depDelay ?? deriveDelay(depSched, depBest));
-      delayChip("arrDelay", arrDelay ?? deriveDelay(arrSched, arrBest));
-    } catch (e) {
-      console.warn("Hero render failed:", e);
-    }
-  }
-
-  // Backward-compat no-op (older builds called this; we now keep countdown elsewhere)
-  function renderCountdownKpi() {}
-
   function renderStatusBadge(flat) {
     if (!els.statusBadge) return;
     const rawStatus = pickAny(flat, ["status", "flight_status", "arrival.status", "departure.status", "flight.status", "info.status"]) || "Unknown";
@@ -978,6 +846,128 @@ function renderStatusBanner(flight, flat, id) {
 
     els.statusBadge.className = `badge ${cls}`;
     els.statusBadge.textContent = label;
+  }
+
+  // ---------- Time hero (big dep/arr times at top) ----------
+  // Large time display with optional struck-through scheduled time + delay/early chip.
+  function fmtDateShort(v) {
+    const d = toDate(v);
+    if (!d) return "—";
+    try {
+      return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+    } catch {
+      return d.toDateString();
+    }
+  }
+
+  function showOldTime(elOld, actualOrEst, sched) {
+    if (!elOld) return;
+    const a = fmtTime(actualOrEst);
+    const s = fmtTime(sched);
+    if (actualOrEst && sched && a && s && a !== s) {
+      elOld.textContent = s;
+      elOld.style.display = "";
+    } else {
+      elOld.textContent = "";
+      elOld.style.display = "none";
+    }
+  }
+
+  function setChip(el, mins) {
+    if (!el) return;
+    const m = Number(mins);
+    if (!Number.isFinite(m) || m === 0) {
+      el.hidden = true;
+      el.textContent = "";
+      el.className = "fh-delay";
+      return;
+    }
+    el.hidden = false;
+    if (m > 0) {
+      el.textContent = `${Math.round(m)}m delayed`;
+      el.className = "fh-delay fh-delay-warn";
+      return;
+    }
+    el.textContent = `${Math.abs(Math.round(m))}m early`;
+    el.className = "fh-delay fh-delay-good";
+  }
+
+  // Called from render(). Keep defensive: if the hero isn't in the DOM, do nothing.
+  function renderTopStatus(flat, id) {
+    const depSched = pickAny(flat, [
+      "flight.time.scheduled.departure",
+      "departure.scheduledTime",
+      "departure.scheduled",
+      "scheduled_departure",
+      "departure_time",
+      "scheduledDeparture",
+    ]);
+    const depEst = pickAny(flat, [
+      "flight.time.estimated.departure",
+      "departure.estimatedTime",
+      "departure.estimated",
+      "estimated_departure",
+      "departure_estimated",
+      "departure.actualTime",
+      "departure.actual",
+      "flight.time.actual.departure",
+    ]);
+    const arrSched = pickAny(flat, [
+      "flight.time.scheduled.arrival",
+      "arrival.scheduledTime",
+      "arrival.scheduled",
+      "scheduled_arrival",
+      "arrival_time",
+      "scheduledArrival",
+    ]);
+    const arrEst = pickAny(flat, [
+      "flight.time.estimated.arrival",
+      "arrival.estimatedTime",
+      "arrival.estimated",
+      "estimated_arrival",
+      "arrival_estimated",
+      "arrival.actualTime",
+      "arrival.actual",
+      "flight.time.actual.arrival",
+    ]);
+
+    const depTimeMain = document.getElementById("depTimeActual");
+    const depTimeOld = document.getElementById("depTimeSched");
+    const arrTimeMain = document.getElementById("arrTimeActual");
+    const arrTimeOld = document.getElementById("arrTimeSched");
+
+    const depDateEl = document.getElementById("depDate");
+    const arrDateEl = document.getElementById("arrDate");
+    const depAirportEl = document.getElementById("depAirport");
+    const arrAirportEl = document.getElementById("arrAirport");
+
+    const depChip = document.getElementById("depDelay");
+    const arrChip = document.getElementById("arrDelay");
+
+    // If none of the hero elements exist, bail (avoids crashes if HTML changes).
+    if (!depTimeMain && !arrTimeMain && !depAirportEl && !arrAirportEl) return;
+
+    if (depAirportEl) depAirportEl.textContent = (id && id.dep) ? id.dep : "—";
+    if (arrAirportEl) arrAirportEl.textContent = (id && id.arr) ? id.arr : "—";
+    if (depDateEl) depDateEl.textContent = fmtDateShort(depSched || depEst || Date.now());
+    if (arrDateEl) arrDateEl.textContent = fmtDateShort(arrSched || arrEst || Date.now());
+
+    if (depTimeMain) depTimeMain.textContent = fmtTime(depEst || depSched) || "—";
+    if (arrTimeMain) arrTimeMain.textContent = fmtTime(arrEst || arrSched) || "—";
+
+    showOldTime(depTimeOld, depEst, depSched);
+    showOldTime(arrTimeOld, arrEst, arrSched);
+
+    // Delays: Aviation Edge sometimes provides minutes in departure.delay / arrival.delay.
+    // If not present, compute from schedule vs estimated/actual.
+    const depDelayRaw = pickAny(flat, ["departure.delay", "departureDelay", "flight.departure.delay"]);
+    const arrDelayRaw = pickAny(flat, ["arrival.delay", "arrivalDelay", "flight.arrival.delay"]);
+
+    const depDelay = Number.isFinite(Number(depDelayRaw)) ? Number(depDelayRaw) : minutesBetween(depSched, depEst);
+    const arrDelay = Number.isFinite(Number(arrDelayRaw)) ? Number(arrDelayRaw) : minutesBetween(arrSched, arrEst);
+
+    setChip(depChip, depDelay);
+    setChip(arrChip, arrDelay);
   }
 
 

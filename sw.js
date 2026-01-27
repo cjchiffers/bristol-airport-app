@@ -1,12 +1,12 @@
-const CACHE_NAME = "brs-flights-v9";
+const CACHE_NAME = "brs-flights-v8";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./script.js",
   "./flight-details.html",
-  "./flight-details.css",
   "./flight-details.js",
+  "./flight-details.css",
   "./manifest.json",
   "./assets/bristol-logo.png",
   "./assets/icon-192.png",
@@ -30,13 +30,13 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  
-  if ((req || request).method !== 'GET') {
+
+  if (req.method !== 'GET') {
     // Cache API only supports GET; bypass caching for non-GET.
-    event.respondWith(fetch(req || request));
+    event.respondWith(fetch(req));
     return;
   }
-const url = new URL(req.url);
+  const url = new URL(req.url);
 
   // Never intercept cross-origin (API) requests — let the browser handle CORS properly.
   if (url.origin !== self.location.origin) return;
