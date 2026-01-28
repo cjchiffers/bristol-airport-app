@@ -2,6 +2,221 @@
    This file intentionally reuses the design tokens + base components from styles.css.
 */
 
+/* ========================================
+   NEW HERO CARD - App-style Flight Overview
+   ======================================== */
+.hero-card {
+  background: linear-gradient(135deg, 
+    color-mix(in srgb, var(--surface2) 90%, transparent), 
+    color-mix(in srgb, var(--surface) 95%, transparent));
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.hero-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.hero-flight-number {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  font-family: var(--mono);
+}
+
+.icon-btn-mini {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.icon-btn-mini:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.icon-btn-mini svg {
+  width: 20px;
+  height: 20px;
+}
+
+.hero-times-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.hero-time-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hero-date {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.hero-city {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+
+.hero-time-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hero-time-main {
+  font-size: 36px;
+  font-weight: 950;
+  line-height: 1;
+  font-family: var(--mono);
+  letter-spacing: -0.5px;
+}
+
+.hero-time-old {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--muted);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.hero-delay-badge {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  margin-top: 6px;
+  width: fit-content;
+}
+
+.hero-delay-badge.hero-delay-bad {
+  background: color-mix(in srgb, var(--bad) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bad) 48%, var(--stroke));
+  color: var(--text);
+}
+
+.hero-delay-badge.hero-delay-warn {
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--stroke));
+  color: var(--text);
+}
+
+.hero-delay-badge.hero-delay-good {
+  background: color-mix(in srgb, var(--good) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--good) 46%, var(--stroke));
+  color: var(--text);
+}
+
+.hero-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.hero-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hero-info-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.hero-info-value {
+  font-size: 16px;
+  font-weight: 900;
+  font-family: var(--mono);
+  letter-spacing: 0.3px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--stroke));
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-align: center;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-info-value:empty::before {
+  content: "-";
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.hero-countdown {
+  background: color-mix(in srgb, var(--surface2) 80%, transparent);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hero-countdown-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.hero-countdown #heroCountdownText {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 380px) {
+  .hero-time-main {
+    font-size: 32px;
+  }
+  
+  .hero-info-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .hero-times-grid {
+    gap: 16px;
+  }
+}
+
+/* ======================================== */
+
 .details-page{
   min-height:100%;
 }

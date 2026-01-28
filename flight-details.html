@@ -46,6 +46,73 @@
     <div id="netBanner" class="net-banner" style="display:none" role="status" aria-live="polite"></div>
     <div id="statusBanner" class="status-banner" style="display:none" role="status" aria-live="polite"></div>
 
+    <!-- New Hero Card Section -->
+    <section class="hero-card" id="heroCard" aria-label="Flight overview">
+      <div class="hero-card-header">
+        <div class="hero-flight-number" id="heroFlightNumber">—</div>
+        <button class="icon-btn-mini" id="heroMenuBtn" aria-label="More options">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.2a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z" fill="currentColor"/></svg>
+        </button>
+      </div>
+
+      <div class="hero-times-grid">
+        <div class="hero-time-block">
+          <div class="hero-date" id="heroDepDate">—</div>
+          <div class="hero-city" id="heroDepCity">—</div>
+          <div class="hero-time-row">
+            <span class="hero-time-main" id="heroDepTime">—</span>
+            <span class="hero-time-old" id="heroDepTimeOld"></span>
+          </div>
+          <div class="hero-delay-badge hero-delay-bad" id="heroDepDelay" hidden>—</div>
+        </div>
+
+        <div class="hero-time-block">
+          <div class="hero-date" id="heroArrDate">—</div>
+          <div class="hero-city" id="heroArrCity">—</div>
+          <div class="hero-time-row">
+            <span class="hero-time-main" id="heroArrTime">—</span>
+            <span class="hero-time-old" id="heroArrTimeOld"></span>
+          </div>
+          <div class="hero-delay-badge hero-delay-bad" id="heroArrDelay" hidden>—</div>
+        </div>
+      </div>
+
+      <div class="hero-info-grid" id="heroInfoGrid">
+        <div class="hero-info-item">
+          <div class="hero-info-label">Departures</div>
+          <div class="hero-info-value" id="heroTerminalDep">—</div>
+        </div>
+        <div class="hero-info-item">
+          <div class="hero-info-label">Terminal</div>
+          <div class="hero-info-value" id="heroTerminalArr">—</div>
+        </div>
+        <div class="hero-info-item">
+          <div class="hero-info-label">Check-in</div>
+          <div class="hero-info-value" id="heroCheckIn">—</div>
+        </div>
+        <div class="hero-info-item">
+          <div class="hero-info-label">Gate</div>
+          <div class="hero-info-value" id="heroGate">—</div>
+        </div>
+        <div class="hero-info-item">
+          <div class="hero-info-label">Gate</div>
+          <div class="hero-info-value" id="heroGateArr">—</div>
+        </div>
+        <div class="hero-info-item">
+          <div class="hero-info-label">Baggage belt</div>
+          <div class="hero-info-value" id="heroBaggage">—</div>
+        </div>
+      </div>
+
+      <div class="hero-countdown" id="heroCountdown">
+        <svg class="hero-countdown-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+          <path d="M12 6v6l4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span id="heroCountdownText">—</span>
+      </div>
+    </section>
+
     <!-- Meta (last updated + source + status chip) -->
     <div class="details-meta" aria-live="polite">
       <div id="lastUpdated">—</div>
@@ -59,8 +126,8 @@
     <!-- Sticky ops (gate / terminal / belt) populated by JS when available -->
     <div id="opsBar" class="ops-bar" style="display:none" aria-live="polite"></div>
 
-    <!-- Flight time hero (inspired by your KLM-style screenshot) -->
-    <section class="flight-hero" id="flightHero" aria-label="Departure and arrival times">
+    <!-- Flight time hero (original - kept for compatibility) -->
+    <section class="flight-hero" id="flightHero" aria-label="Departure and arrival times" style="display:none">
       <div class="flight-hero-col">
         <div class="fh-date" id="depDate">—</div>
         <div class="fh-airport" id="depAirport">—</div>
