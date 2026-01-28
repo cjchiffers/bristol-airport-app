@@ -83,19 +83,6 @@ async function ensureAirportCached(iata, name){
   saveAirportGeoCache(cache);
 }
 
-function pickAny(obj, paths){
-  for(const p of paths){
-    const parts = p.split(".");
-    let v = obj;
-    for(const k of parts){
-      if(!v || typeof v !== "object") { v = undefined; break; }
-      v = v[k];
-    }
-    if(v !== undefined && v !== null && String(v).trim() !== "") return v;
-  }
-  return undefined;
-}
-
 async function prefetchAirportsFromFlights(depList, arrList){
   const flights = [...(depList||[]), ...(arrList||[])];
   const seen = new Set();
