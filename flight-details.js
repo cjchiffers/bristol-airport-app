@@ -582,9 +582,8 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     renderTimeHero(flight, flat, id);
 
     // Status + operational info
-    // Keep this page "glanceable": no duplicated top banners.
     renderStatusBadge(flat);
-    renderOpsBar(flight, flat);
+    renderStatusBannerAndOps(flight, flat, id);
 
     // Airline basics
     const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
@@ -727,17 +726,12 @@ if (els.arrKv) {
     renderWeatherByCityName(flat).catch((e) => console.warn("Weather render failed:", e));
   }
 
-  // Back-compat: older cached builds called this. We now avoid the big green banner entirely.
   function renderStatusBannerAndOps(flight, flat, id) {
-    renderOpsBar(flight, flat);
-    // Safety: if an old HTML still includes the banner element, hide it.
-    if (els.statusBanner) {
-      els.statusBanner.style.display = "none";
-      els.statusBanner.innerHTML = "";
-    }
+    renderOpsBar(flight);
+    renderStatusBanner(flight, flat, id);
   }
 
-  function renderOpsBar(flight, flat) {
+  function renderOpsBar(flight) {
     if (!els.opsBar) return;
     const t = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase();
     const isDeparture = t.includes("depart");
@@ -745,30 +739,9 @@ if (els.arrKv) {
     const dep = (flight && flight.departure) || {};
     const arr = (flight && flight.arrival) || {};
 
-    // Aviation Edge / timetables are inconsistent. Prefer multiple field shapes.
-    const gate = (
-      (isDeparture ? dep.gate : arr.gate) ||
-      pickAny(flat || {}, [
-        "departure.gate", "departure.gateNumber", "departureGate", "gate", "gate_number",
-        "arrival.gate", "arrival.gateNumber", "arrivalGate",
-      ])
-    ) || null;
-
-    const terminal = (
-      (isDeparture ? dep.terminal : arr.terminal) ||
-      pickAny(flat || {}, [
-        "departure.terminal", "departureTerminal", "terminal", "terminal_number",
-        "arrival.terminal", "arrivalTerminal",
-      ])
-    ) || null;
-
-    const baggage = (
-      (!isDeparture ? arr.baggage : null) ||
-      (!isDeparture ? pickAny(flat || {}, [
-        "arrival.baggage", "arrival.baggage_belt", "arrival.baggageBelt",
-        "arrival.belt", "arrival.beltNumber", "baggage", "baggage_belt", "belt",
-      ]) : null)
-    ) || null;
+    const gate = (isDeparture ? dep.gate : arr.gate) || null;
+    const terminal = (isDeparture ? dep.terminal : arr.terminal) || null;
+    const baggage = (!isDeparture ? arr.baggage : null) || null;
 
     // Hide if we have nothing useful.
     if (!gate && !terminal && !baggage) {
@@ -1339,25 +1312,6 @@ if (els.arrKv) {
     if (t <= 5) return "wx-cold";
     return "";
   }
-
-  
-    const tz = payload.timezone || "UTC";
-    const localNow = formatLocalTimeNow(tz);
-    if (els.wxHint) els.wxHint.textContent = `Local time in ${placeLabel || "destination"}: ${localNow}`;
-
-    const d = payload.daily;
-    const times = Array.isArray(d.time) ? d.time : [];
-    const tmax = Array.isArray(d.temperature_2m_max) ? d.temperature_2m_max : [];
-    const tmin = Array.isArray(d.temperature_2m_min) ? d.temperature_2m_min : [];
-    const feelsMax = Array.isArray(d.apparent_temperature_max) ? d.apparent_temperature_max : [];
-    const feelsMin = Array.isArray(d.apparent_temperature_min) ? d.apparent_temperature_min : [];
-    const wcode = Array.isArray(d.weathercode) ? d.weathercode : [];
-    const precipSum = Array.isArray(d.precipitation_sum) ? d.precipitation_sum : [];
-    const precipProb = Array.isArray(d.precipitation_probability_max) ? d.precipitation_probability_max : [];
-    const windMax = Array.isArray(d.windspeed_10m_max) ? d.windspeed_10m_max : [];
-    const uvMax = Array.isArray(d.uv_index_max) ? d.uv_index_max : [];
-    const sunrise = Array.isArray(d.sunrise) ? d.sunrise : [];
-    const sunset = Array.isArray(d.sunset) ? d.sunset : [];
 
     const n = Math.min(5, times.length, tmax.length, tmin.length, wcode.length);
     if (n <= 0) { els.weatherBox.innerHTML = ""; }
