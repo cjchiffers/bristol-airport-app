@@ -1367,7 +1367,7 @@ if (els.arrKv) {
     const sunrise = Array.isArray(d.sunrise) ? d.sunrise : [];
     const sunset = Array.isArray(d.sunset) ? d.sunset : [];
 
-    const n = Math.min(5, times.length, tmax.length, tmin.length, wcode.length);
+    const n = Math.min(5, (times || []).length, (tmax || []).length, (tmin || []).length, (wcode || []).length);
     if (n <= 0) {
       els.weatherBox.innerHTML = "";
       return;
