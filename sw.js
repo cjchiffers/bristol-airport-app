@@ -1,4 +1,5 @@
-const CACHE_NAME = "brs-flights-v8";
+// Bump this when you change any app-shell file so users receive updates immediately.
+const CACHE_NAME = "brs-flights-v9";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -31,11 +32,13 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
 
-  if (req.method !== 'GET') {
+  // Cache API only supports GET; bypass caching for non-GET.
+  if (!req || req.method !== "GET") {
     // Cache API only supports GET; bypass caching for non-GET.
     event.respondWith(fetch(req));
     return;
   }
+
   const url = new URL(req.url);
 
   // Never intercept cross-origin (API) requests — let the browser handle CORS properly.
