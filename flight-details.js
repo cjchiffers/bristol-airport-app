@@ -973,25 +973,65 @@ if (els.arrKv) {
   function renderHeroCard(flight, flat, id) {
     if (!flight || !flat || !els.heroCard) return;
 
+    // Debug: log the data to help diagnose issues
+    console.log('[Hero Card] Flight data:', flight);
+    console.log('[Hero Card] Flattened data:', flat);
+    console.log('[Hero Card] ID:', id);
+
     const dep = flight.departure || {};
     const arr = flight.arrival || {};
 
-    // Flight number
-    const flightNo = pickAny(flat, ["flight.iataNumber", "flight_iata", "flightNumber", "flight.iata", "flight.number", "iataNumber"]) || id?.flightNo || "—";
-    const airline = pickAny(flat, ["airline.iataCode", "airline.iata", "airlineIata"]) || "";
+    // Flight number - use the same logic as headline
+    const flightNo = id?.flightNo || "—";
+    const airlineIata = pickAny(flat, ["airline.iataCode", "airline.iata", "flight.airline.code.iata", "airline_iata", "airlineCode"]) || "";
     if (els.heroFlightNumber) {
-      els.heroFlightNumber.textContent = airline && flightNo !== "—" ? `${airline} ${flightNo}` : flightNo;
+      els.heroFlightNumber.textContent = airlineIata && flightNo !== "—" ? `${airlineIata} ${flightNo}` : flightNo;
     }
 
-    // Times
-    const depSched = dep.scheduledTime || pickAny(flat, ["departure.scheduledTime", "departure.scheduled", "scheduledDeparture"]);
-    const depActOrEst = dep.actualTime || dep.estimatedTime || pickAny(flat, ["departure.actualTime", "departure.estimatedTime", "departure.estimated"]);
-    const arrSched = arr.scheduledTime || pickAny(flat, ["arrival.scheduledTime", "arrival.scheduled", "scheduledArrival"]);
-    const arrActOrEst = arr.actualTime || arr.estimatedTime || pickAny(flat, ["arrival.actualTime", "arrival.estimatedTime", "arrival.estimated"]);
+    // Get times using the same paths as the rest of the code
+    const depSched = pickAny(flat, [
+      "departure.scheduledTime",
+      "departure.scheduled",
+      "flight.time.scheduled.departure",
+      "scheduled_departure",
+      "departure_time",
+      "scheduledDeparture",
+    ]);
+    const depActOrEst = pickAny(flat, [
+      "departure.actualTime",
+      "departure.estimatedTime",
+      "departure.estimated",
+      "departure.actual",
+      "flight.time.actual.departure",
+      "flight.time.estimated.departure",
+    ]);
+    
+    const arrSched = pickAny(flat, [
+      "arrival.scheduledTime",
+      "arrival.scheduled",
+      "flight.time.scheduled.arrival",
+      "scheduled_arrival",
+      "arrival_time",
+      "scheduledArrival",
+    ]);
+    const arrActOrEst = pickAny(flat, [
+      "arrival.actualTime",
+      "arrival.estimatedTime",
+      "arrival.estimated",
+      "arrival.actual",
+      "flight.time.actual.arrival",
+      "flight.time.estimated.arrival",
+    ]);
 
-    // Departure
-    if (els.heroDepDate) els.heroDepDate.textContent = fmtDayMon(depSched || depActOrEst || Date.now());
-    if (els.heroDepCity) els.heroDepCity.textContent = getCityName(id?.dep) || id?.dep || "—";
+    // Departure info
+    if (els.heroDepDate) {
+      const depDateVal = depSched || depActOrEst || Date.now();
+      els.heroDepDate.textContent = fmtDayMon(depDateVal);
+    }
+    if (els.heroDepCity) {
+      const depCode = id?.dep || pickAny(flat, ["departure.iataCode", "departure.iata"]) || "";
+      els.heroDepCity.textContent = getCityName(depCode) || depCode || "—";
+    }
     if (els.heroDepTime) {
       const mainTime = fmtTime(depActOrEst || depSched);
       els.heroDepTime.textContent = mainTime || "—";
@@ -1008,9 +1048,15 @@ if (els.arrKv) {
       }
     }
 
-    // Arrival
-    if (els.heroArrDate) els.heroArrDate.textContent = fmtDayMon(arrSched || arrActOrEst || Date.now());
-    if (els.heroArrCity) els.heroArrCity.textContent = getCityName(id?.arr) || id?.arr || "—";
+    // Arrival info
+    if (els.heroArrDate) {
+      const arrDateVal = arrSched || arrActOrEst || Date.now();
+      els.heroArrDate.textContent = fmtDayMon(arrDateVal);
+    }
+    if (els.heroArrCity) {
+      const arrCode = id?.arr || pickAny(flat, ["arrival.iataCode", "arrival.iata"]) || "";
+      els.heroArrCity.textContent = getCityName(arrCode) || arrCode || "—";
+    }
     if (els.heroArrTime) {
       const mainTime = fmtTime(arrActOrEst || arrSched);
       els.heroArrTime.textContent = mainTime || "—";
@@ -1028,9 +1074,9 @@ if (els.arrKv) {
     }
 
     // Delay badges
-    function paintHeroDelay(el, mins, isArr = false) {
+    function paintHeroDelay(el, delayVal) {
       if (!el) return;
-      const n = Number(mins);
+      const n = Number(delayVal);
       if (!Number.isFinite(n) || n === 0) {
         el.hidden = true;
         return;
@@ -1045,40 +1091,49 @@ if (els.arrKv) {
       }
       el.hidden = false;
     }
-    paintHeroDelay(els.heroDepDelay, dep.delay, false);
-    paintHeroDelay(els.heroArrDelay, arr.delay, true);
+    
+    const depDelay = pickAny(flat, ["departure.delay", "delay"]);
+    const arrDelay = pickAny(flat, ["arrival.delay", "delay"]);
+    paintHeroDelay(els.heroDepDelay, depDelay);
+    paintHeroDelay(els.heroArrDelay, arrDelay);
 
-    // Info grid - Terminal, Gate, Check-in, Baggage
+    // Info grid - Extract operational details
     const isDeparture = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase().includes("depart");
     
+    // Departures terminal (usually just called "terminal" for departures)
     if (els.heroTerminalDep) {
-      const term = pickAny(flat, ["departure.terminal", "terminal", "departure.terminalName"]);
-      els.heroTerminalDep.textContent = term ? String(term) : "";
+      const term = pickAny(flat, ["departure.terminal", "terminal"]);
+      els.heroTerminalDep.textContent = term || "";
     }
     
+    // Arrivals terminal
     if (els.heroTerminalArr) {
-      const term = pickAny(flat, ["arrival.terminal", "terminal", "arrival.terminalName"]);
-      els.heroTerminalArr.textContent = term ? String(term) : "";
+      const term = pickAny(flat, ["arrival.terminal", "terminal"]);
+      els.heroTerminalArr.textContent = term || "";
     }
 
+    // Check-in desk
     if (els.heroCheckIn) {
-      const checkin = pickAny(flat, ["departure.checkInDesk", "checkInDesk", "checkin"]);
-      els.heroCheckIn.textContent = checkin ? String(checkin) : "";
+      const checkin = pickAny(flat, ["departure.checkInDesk", "checkInDesk", "checkin", "departure.checkin"]);
+      els.heroCheckIn.textContent = checkin || "";
     }
 
+    // Departure gate
     if (els.heroGate) {
       const gate = pickAny(flat, ["departure.gate", "gate", "departure.gateNumber"]);
-      els.heroGate.textContent = gate ? String(gate) : "";
+      els.heroGate.textContent = gate || "";
     }
 
+    // Arrival gate
     if (els.heroGateArr) {
       const gate = pickAny(flat, ["arrival.gate", "gate", "arrival.gateNumber"]);
-      els.heroGateArr.textContent = gate ? String(gate) : "";
+      els.heroGateArr.textContent = gate || "";
     }
 
+    // Baggage belt
     if (els.heroBaggage) {
-      const baggage = pickAny(flat, ["arrival.baggage", "baggage", "arrival.belt", "baggageBelt"]);
-      els.heroBaggage.textContent = baggage ? String(baggage) : "";
+      const baggage = pickAny(flat, ["arrival.baggage", "baggage", "arrival.belt", "baggageBelt", "arrival.baggageBelt"]);
+      els.heroBaggage.textContent = baggage || "";
     }
 
     // Countdown
