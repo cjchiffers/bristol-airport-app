@@ -1,10 +1,12 @@
+console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 /* flight-details.js
    Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
    Notes:
    - Uses Leaflet tiles (no API key) when available; falls back to your SVG route if Leaflet isn't loaded.
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
-"use strict";
+
+  "use strict";
 
   
 console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
@@ -580,8 +582,9 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     renderTimeHero(flight, flat, id);
 
     // Status + operational info
+    // Keep this page "glanceable": no duplicated top banners.
     renderStatusBadge(flat);
-    renderStatusBannerAndOps(flight, flat, id);
+    renderOpsBar(flight, flat);
 
     // Airline basics
     const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
@@ -638,79 +641,81 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
       } else els.aircraftImageWrap.style.display = "none";
     }
 
-        // Basic panels (more details) ------------------------------------------------
-    // Track per-flight operational fields so we can highlight changes (e.g. gate change)
-    function getOpsKey(suffix) {
-      const k = state && state.storageKey ? state.storageKey : "unknown";
-      return `fd_${k}_${suffix}`;
-    }
+    // Basic panels (more details)
+const depInfo = {
+  sched: fmtTime(pickAny(flat, ["flight.time.scheduled.departure","departure.scheduledTime","departure.scheduled","scheduled_departure","departure_time","scheduledDeparture"])),
+  est: fmtTime(pickAny(flat, ["departure.estimatedTime","departure.estimated","estimated_departure","departure_estimated","flight.time.estimated.departure"])),
+  act: fmtTime(pickAny(flat, ["departure.actualTime","departure.actual","actual_departure","departure_actual","flight.time.actual.departure"])),
+  term: pickAny(flat, ["departure.terminal","flight.departure.terminal","departureTerminal"]) || "",
+  gate: pickAny(flat, ["departure.gate","flight.departure.gate","departureGate"]) || "",
+  stand: pickAny(flat, ["departure.stand","flight.departure.stand","departureStand"]) || "",
+};
 
-    function opsChanged(suffix, nextVal) {
-      const key = getOpsKey(suffix);
-      const prev = safeGetSession(key);
-      const next = (nextVal == null) ? "" : String(nextVal);
-      // Only count as "changed" if we had a previous non-empty value and it differs.
-      const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
-      safeSetSession(key, next);
-      return changed;
-    }
+depInfo.gateChanged = opsChanged('gate_dep', depInfo.gate);
+depInfo.beltChanged = opsChanged('belt_dep', depInfo.belt);
 
-    // Helper for KV lines (supports optional highlight class for the value)
-    function kvLine(label, val, valueClass = "") {
-      if (val === undefined || val === null) return "";
-      const s = String(val);
-      if (s.trim() === "") return "";
-      const cls = valueClass ? `kv-v ${valueClass}` : "kv-v";
-      return `<div class="kv-line"><span class="kv-k">${escapeHtml(label)}</span><span class="${cls}">${escapeHtml(s)}</span></div>`;
-    }
 
-    const depInfo = {
-      sched: fmtTime(pickAny(flat, ["flight.time.scheduled.departure","departure.scheduledTime","departure.scheduled","scheduled_departure","departure_time","scheduledDeparture"])),
-      est: fmtTime(pickAny(flat, ["departure.estimatedTime","departure.estimated","estimated_departure","departure_estimated","flight.time.estimated.departure"])),
-      act: fmtTime(pickAny(flat, ["departure.actualTime","departure.actual","actual_departure","departure_actual","flight.time.actual.departure"])),
-      term: pickAny(flat, ["departure.terminal","flight.departure.terminal","departureTerminal"]) || "",
-      gate: pickAny(flat, ["departure.gate","flight.departure.gate","departureGate"]) || "",
-      stand: pickAny(flat, ["departure.stand","flight.departure.stand","departureStand"]) || "",
-    };
+const arrInfo = {
+  sched: fmtTime(pickAny(flat, ["flight.time.scheduled.arrival","arrival.scheduledTime","arrival.scheduled","scheduled_arrival","arrival_time","scheduledArrival"])),
+  est: fmtTime(pickAny(flat, ["arrival.estimatedTime","arrival.estimated","estimated_arrival","arrival_estimated","flight.time.estimated.arrival"])),
+  act: fmtTime(pickAny(flat, ["arrival.actualTime","arrival.actual","actual_arrival","arrival_actual","flight.time.actual.arrival"])),
+  term: pickAny(flat, ["arrival.terminal","flight.arrival.terminal","arrivalTerminal"]) || "",
+  gate: pickAny(flat, ["arrival.gate","flight.arrival.gate","arrivalGate"]) || "",
+  belt: pickAny(flat, ["arrival.baggage","arrival.belt","flight.arrival.baggage","baggage"]) || "",
+};
 
-    const arrInfo = {
-      sched: fmtTime(pickAny(flat, ["flight.time.scheduled.arrival","arrival.scheduledTime","arrival.scheduled","scheduled_arrival","arrival_time","scheduledArrival"])),
-      est: fmtTime(pickAny(flat, ["arrival.estimatedTime","arrival.estimated","estimated_arrival","arrival_estimated","flight.time.estimated.arrival"])),
-      act: fmtTime(pickAny(flat, ["arrival.actualTime","arrival.actual","actual_arrival","arrival_actual","flight.time.actual.arrival"])),
-      term: pickAny(flat, ["arrival.terminal","flight.arrival.terminal","arrivalTerminal"]) || "",
-      gate: pickAny(flat, ["arrival.gate","flight.arrival.gate","arrivalGate"]) || "",
-      belt: pickAny(flat, ["arrival.baggage","arrival.belt","flight.arrival.baggage","baggage"]) || "",
-    };
+arrInfo.gateChanged = opsChanged('gate_arr', arrInfo.gate);
+arrInfo.beltChanged = opsChanged('belt_arr', arrInfo.belt);
 
-    const depGateChanged = opsChanged("gate_dep", depInfo.gate);
-    const arrGateChanged = opsChanged("gate_arr", arrInfo.gate);
-    const arrBeltChanged = opsChanged("belt_arr", arrInfo.belt);
 
-    if (els.depKv) {
-      els.depKv.innerHTML = `
-        <div class="kv-stack">
-          ${kvLine("Scheduled", depInfo.sched || "—")}
-          ${kvLine("Estimated", depInfo.est)}
-          ${kvLine("Actual", depInfo.act)}
-          ${kvLine("Terminal", depInfo.term || "—")}
-          ${kvLine(depGateChanged ? "New gate" : "Gate", depInfo.gate || "—", depGateChanged ? "kv-new" : "")}
-          ${kvLine("Stand", depInfo.stand)}
-        </div>
-      `;
-    }
+// Track per-flight operational fields so we can highlight changes (e.g. gate change)
+function getOpsKey(suffix) {
+  const k = state?.storageKey || "unknown";
+  return `fd_${k}_${suffix}`;
+}
+function opsChanged(suffix, nextVal) {
+  const key = getOpsKey(suffix);
+  const prev = sessionStorage.getItem(key);
+  const next = (nextVal == null) ? "" : String(nextVal);
+  // Only count as "changed" if we had a previous non-empty value and it differs.
+  const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
+  sessionStorage.setItem(key, next);
+  return changed;
+}
 
-    if (els.arrKv) {
-      els.arrKv.innerHTML = `
-        <div class="kv-stack">
-          ${kvLine("Scheduled", arrInfo.sched || "—")}
-          ${kvLine("Estimated", arrInfo.est)}
-          ${kvLine("Actual", arrInfo.act)}
-          ${kvLine("Terminal", arrInfo.term || "—")}
-          ${kvLine(arrGateChanged ? "New gate" : "Gate", arrInfo.gate || "—", arrGateChanged ? "kv-new" : "")}
-          ${kvLine(arrBeltChanged ? "New belt" : "Belt", arrInfo.belt || "—", arrBeltChanged ? "kv-new" : "")}
-        </div>
-      `;
-    }
+
+
+function kvLine(label, val) {
+  if (!val) return "";
+  return `<div class="kv-line"><span class="kv-k">${escapeHtml(label)}</span><span class="kv-v">${escapeHtml(val)}</span></div>`;
+}
+
+if (els.depKv) {
+  els.depKv.innerHTML = `
+    <div class="kv-stack">
+      ${kvLine("Scheduled", depInfo.sched || "—")}
+      ${kvLine("Estimated", depInfo.est)}
+      ${kvLine("Actual", depInfo.act)}
+      ${kvLine("Terminal", depInfo.term)}
+      ${kvLine(depInfo.gateChanged ? "New gate" : "Gate", depInfo.gate, true, depInfo.gateChanged ? "newgate" : "gate")}
+      ${kvLine("Stand", depInfo.stand)}
+    </div>
+  `;
+}
+
+if (els.arrKv) {
+  els.arrKv.innerHTML = `
+    <div class="kv-stack">
+      ${kvLine("Scheduled", arrInfo.sched || "—")}
+      ${kvLine("Estimated", arrInfo.est)}
+      ${kvLine("Actual", arrInfo.act)}
+      ${kvLine("Terminal", arrInfo.term)}
+      ${kvLine(arrInfo.gateChanged ? "New gate" : "Gate", arrInfo.gate, true, arrInfo.gateChanged ? "newgate" : "gate")}
+      ${kvLine("Belt", arrInfo.belt, true, "belt")}
+    </div>
+  `;
+}
+
 
     // Raw JSON
     if (els.rawJson) els.rawJson.textContent = JSON.stringify(flight, null, 2);
@@ -722,12 +727,17 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     renderWeatherByCityName(flat).catch((e) => console.warn("Weather render failed:", e));
   }
 
+  // Back-compat: older cached builds called this. We now avoid the big green banner entirely.
   function renderStatusBannerAndOps(flight, flat, id) {
-    renderOpsBar(flight);
-    renderStatusBanner(flight, flat, id);
+    renderOpsBar(flight, flat);
+    // Safety: if an old HTML still includes the banner element, hide it.
+    if (els.statusBanner) {
+      els.statusBanner.style.display = "none";
+      els.statusBanner.innerHTML = "";
+    }
   }
 
-  function renderOpsBar(flight) {
+  function renderOpsBar(flight, flat) {
     if (!els.opsBar) return;
     const t = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase();
     const isDeparture = t.includes("depart");
@@ -735,9 +745,30 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     const dep = (flight && flight.departure) || {};
     const arr = (flight && flight.arrival) || {};
 
-    const gate = (isDeparture ? dep.gate : arr.gate) || null;
-    const terminal = (isDeparture ? dep.terminal : arr.terminal) || null;
-    const baggage = (!isDeparture ? arr.baggage : null) || null;
+    // Aviation Edge / timetables are inconsistent. Prefer multiple field shapes.
+    const gate = (
+      (isDeparture ? dep.gate : arr.gate) ||
+      pickAny(flat || {}, [
+        "departure.gate", "departure.gateNumber", "departureGate", "gate", "gate_number",
+        "arrival.gate", "arrival.gateNumber", "arrivalGate",
+      ])
+    ) || null;
+
+    const terminal = (
+      (isDeparture ? dep.terminal : arr.terminal) ||
+      pickAny(flat || {}, [
+        "departure.terminal", "departureTerminal", "terminal", "terminal_number",
+        "arrival.terminal", "arrivalTerminal",
+      ])
+    ) || null;
+
+    const baggage = (
+      (!isDeparture ? arr.baggage : null) ||
+      (!isDeparture ? pickAny(flat || {}, [
+        "arrival.baggage", "arrival.baggage_belt", "arrival.baggageBelt",
+        "arrival.belt", "arrival.beltNumber", "baggage", "baggage_belt", "belt",
+      ]) : null)
+    ) || null;
 
     // Hide if we have nothing useful.
     if (!gate && !terminal && !baggage) {
@@ -1312,32 +1343,34 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   function paintWeather(payload, placeLabel) {
     if (!els.weatherBox) return;
 
-    const daily = payload && payload.daily ? payload.daily : null;
-    const tz = (payload && payload.timezone) ? payload.timezone : "UTC";
-    const times = (daily && Array.isArray(daily.time)) ? daily.time : [];
-    const tmax = (daily && Array.isArray(daily.temperature_2m_max)) ? daily.temperature_2m_max : [];
-    const tmin = (daily && Array.isArray(daily.temperature_2m_min)) ? daily.temperature_2m_min : [];
-    const wcode = (daily && Array.isArray(daily.weathercode)) ? daily.weathercode : [];
-
-    const feelsMax = (daily && Array.isArray(daily.apparent_temperature_max)) ? daily.apparent_temperature_max : [];
-    const feelsMin = (daily && Array.isArray(daily.apparent_temperature_min)) ? daily.apparent_temperature_min : [];
-    const precipSum = (daily && Array.isArray(daily.precipitation_sum)) ? daily.precipitation_sum : [];
-    const precipProb = (daily && Array.isArray(daily.precipitation_probability_max)) ? daily.precipitation_probability_max : [];
-    const windMax = (daily && Array.isArray(daily.windspeed_10m_max)) ? daily.windspeed_10m_max : [];
-    const uvMax = (daily && Array.isArray(daily.uv_index_max)) ? daily.uv_index_max : [];
-    const sunrise = (daily && Array.isArray(daily.sunrise)) ? daily.sunrise : [];
-    const sunset = (daily && Array.isArray(daily.sunset)) ? daily.sunset : [];
-
-    const n = Math.min(5, times.length, tmax.length, tmin.length, wcode.length);
-    if (n <= 0) {
+    if (!payload || !payload.daily) {
       if (els.wxHint) els.wxHint.textContent = "Weather unavailable.";
       els.weatherBox.innerHTML = "";
       return;
     }
 
-    if (els.wxHint) {
-      const localNow = formatLocalTimeNow(tz);
-      els.wxHint.textContent = `Local time: ${localNow}`;
+    const tz = payload.timezone || "UTC";
+    const localNow = formatLocalTimeNow(tz);
+    if (els.wxHint) els.wxHint.textContent = `Local time in ${placeLabel || "destination"}: ${localNow}`;
+
+    const d = payload.daily;
+    const times = Array.isArray(d.time) ? d.time : [];
+    const tmax = Array.isArray(d.temperature_2m_max) ? d.temperature_2m_max : [];
+    const tmin = Array.isArray(d.temperature_2m_min) ? d.temperature_2m_min : [];
+    const feelsMax = Array.isArray(d.apparent_temperature_max) ? d.apparent_temperature_max : [];
+    const feelsMin = Array.isArray(d.apparent_temperature_min) ? d.apparent_temperature_min : [];
+    const wcode = Array.isArray(d.weathercode) ? d.weathercode : [];
+    const precipSum = Array.isArray(d.precipitation_sum) ? d.precipitation_sum : [];
+    const precipProb = Array.isArray(d.precipitation_probability_max) ? d.precipitation_probability_max : [];
+    const windMax = Array.isArray(d.windspeed_10m_max) ? d.windspeed_10m_max : [];
+    const uvMax = Array.isArray(d.uv_index_max) ? d.uv_index_max : [];
+    const sunrise = Array.isArray(d.sunrise) ? d.sunrise : [];
+    const sunset = Array.isArray(d.sunset) ? d.sunset : [];
+
+    const n = Math.min(5, times.length, tmax.length, tmin.length, wcode.length);
+    if (n <= 0) {
+      els.weatherBox.innerHTML = "";
+      return;
     }
 
     // One card containing 5-day rows
@@ -1382,6 +1415,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
       </div>
     `;
   }
+
 
 // ---------- Route map: Leaflet basemap + animation, with SVG fallback ----------
   const ROUTE_SVG_W = 1000;
