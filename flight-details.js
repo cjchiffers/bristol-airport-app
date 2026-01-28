@@ -1,4 +1,3 @@
-console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 /* flight-details.js
    Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
    Notes:
@@ -1302,7 +1301,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     }
   }
 
-    function tempClass(tMax) {
+  function tempClass(tMax) {
     const t = Number(tMax);
     if (!Number.isFinite(t)) return "";
     if (t >= 25) return "wx-hot";

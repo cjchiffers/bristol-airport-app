@@ -1,13 +1,13 @@
 // Bump this when you change any app-shell file so users receive updates immediately.
-const CACHE_NAME = "brs-flights-v11";
+const CACHE_NAME = "brs-flights-v10";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./script.js",
   "./flight-details.html",
-  "./flight-details.css",
   "./flight-details.js",
+  "./flight-details.css",
   "./manifest.json",
   "./assets/bristol-logo.png",
   "./assets/icon-192.png",
@@ -31,14 +31,13 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  
-  if ((req || request).method !== 'GET') {
-    // Cache API only supports GET; bypass caching for non-GET.
-    event.respondWith(fetch(req || request));
+
+  // Cache API only supports GET; bypass caching for non-GET.
+  if (req.method !== "GET") {
+    event.respondWith(fetch(req));
     return;
   }
-const url = new URL(req.url);
-
+  const url = new URL(req.url);
   // Never intercept cross-origin (API) requests — let the browser handle CORS properly.
   if (url.origin !== self.location.origin) return;
 
