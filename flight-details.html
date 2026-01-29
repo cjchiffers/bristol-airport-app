@@ -10,7 +10,7 @@
   <title>Flight Details</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css?v=20260105_light" />
-  <link rel="stylesheet" href="flight-details.css?v=20260129_pills3" />
+  <link rel="stylesheet" href="flight-details.css?v=20260129_pills4" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css?v=20260105_light" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 
@@ -78,17 +78,16 @@
       </div>
 
       <div class="hero-info-grid" id="heroInfoGrid">
-        <div class="hero-info-item">
-          <div class="hero-info-label">Terminal</div>
-          <div class="hero-info-value" id="heroTerminalArr">—</div>
-        </div>
         <div class="hero-info-item" id="heroGateItem">
           <div class="hero-info-label">Gate</div>
-          <div class="hero-info-value" id="heroGate">—</div>
+          <div class="hero-info-value pill-gate" id="heroGate">—</div>
         </div>
-        <div class="hero-info-item">
-          <div class="hero-info-label">Baggage</div>
-          <div class="hero-info-value" id="heroBaggage">—</div>
+
+        <div class="hero-info-item hero-info-item--right" id="heroBeltItem">
+          <div class="hero-info-stack">
+            <div class="hero-info-label">Belt</div>
+            <div class="hero-info-value pill-belt" id="heroBaggage">—</div>
+          </div>
         </div>
       </div>
 

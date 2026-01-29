@@ -157,19 +157,16 @@
 
 
 
-/* Right-hand item (Belt): align label + pill together on the right */
+/* Right-hand item (Belt): keep the group on the right, but left-align the label above the pill */
 .hero-info-item--right {
-  align-items: flex-end;
+  align-items: stretch;
 }
-
-.hero-info-item--right .hero-info-label,
-.hero-info-item--right .hero-info-value {
-  align-self: flex-end;
-}
-
-.hero-info-item--right .hero-info-label {
-  width: fit-content;
-  text-align: right;
+.hero-info-item--right .hero-info-stack {
+  margin-left: auto;             /* pushes the stack to the right edge of the grid cell */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;       /* label + pill share the same left edge */
 }
 .hero-info-label {
   font-size: 11px;

@@ -1111,32 +1111,39 @@ if (els.arrKv) {
     paintHeroStatus(els.heroDepDelay, dep, flightStatus, dep.delay);
     paintHeroStatus(els.heroArrDelay, arr, flightStatus, arr.delay);
 
-    // Info grid - Aviation Edge provides these fields directly in departure/arrival objects
+    // Info pills (always visible): Gate (departure) + Belt (arrival)
     const isDeparture = String(flight.type || "").toLowerCase() === "departure";
-    
-    // Terminal (show arrival terminal, or departure terminal if no arrival)
-    if (els.heroTerminalArr) {
-      const term = arr.terminal || dep.terminal || "";
-      els.heroTerminalArr.textContent = term || "—";
-    }
 
-    // Gate (show departure or arrival gate, hide if neither exists)
+    // ---- Gate (departure.gate) ----
+    const gateEl = els.heroGate;
     const gateItem = document.getElementById("heroGateItem");
-    if (els.heroGate) {
-      const gate = dep.gate || arr.gate || "";
-      if (gate) {
-        els.heroGate.textContent = gate;
-        if (gateItem) gateItem.style.display = "";
-      } else {
-        els.heroGate.textContent = "—";
-        if (gateItem) gateItem.style.display = "none";
-      }
+    const rawGate = (dep && dep.gate != null) ? String(dep.gate).trim() : "";
+    const gate = rawGate || "";
+
+    if (gateEl) {
+      // Always show; dash when missing
+      gateEl.textContent = gate || "—";
+      if (gateItem) gateItem.style.display = "";
+
+      // Gate change detection (only when we previously had a real gate value)
+      const storageKey = (state && state.storageKey) ? String(state.storageKey) : "";
+      const gateTrackKey = storageKey ? `brs_gate_last:${storageKey}` : "";
+      const lastGate = gateTrackKey ? (safeGetSession(gateTrackKey) || "") : "";
+
+      // Only treat as a "change" if both old and new are non-empty and differ
+      const changed = Boolean(lastGate) && Boolean(gate) && lastGate !== gate;
+      gateEl.classList.toggle("is-changed", changed);
+
+      // Only update stored last gate when we have a real gate
+      if (gateTrackKey && gate) safeSetSession(gateTrackKey, gate);
     }
 
-    // Baggage belt (from arrival object)
-    if (els.heroBaggage) {
-      const baggage = arr.baggage || "";
-      els.heroBaggage.textContent = baggage || "—";
+    // ---- Belt (arrival.baggage) ----
+    const beltEl = els.heroBaggage;
+    const rawBelt = (arr && arr.baggage != null) ? String(arr.baggage).trim() : "";
+    const belt = rawBelt || "";
+    if (beltEl) {
+      beltEl.textContent = belt || "—";
     }
 
     // Countdown
