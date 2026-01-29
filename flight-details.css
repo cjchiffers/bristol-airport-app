@@ -147,24 +147,30 @@
   margin-bottom: 16px;
 }
 
+/* Each item is a small vertical stack: label above pill */
+.hero-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start; /* stop pills stretching across the column */
+}
 
+
+
+/* Right-hand item (Belt): align label + pill together on the right */
 .hero-info-item--right {
   align-items: flex-end;
 }
 
+.hero-info-item--right .hero-info-label,
+.hero-info-item--right .hero-info-value {
+  align-self: flex-end;
+}
+
 .hero-info-item--right .hero-info-label {
+  width: fit-content;
   text-align: right;
-  width: 100%;
 }
-
-.hero-info-item {
-  display: flex;
-  flex-direction: column;
-  /* Prevent pills from stretching full column width (matches Belt behaviour). */
-  align-items: flex-start;
-  gap: 4px;
-}
-
 .hero-info-label {
   font-size: 11px;
   font-weight: 600;
@@ -187,40 +193,6 @@
   align-items: center;
   justify-content: center;
 }
-
-
-/* Pills */
-.pill-gate {
-  /* Default gate pill: yellow */
-  background: color-mix(in srgb, var(--warn) 28%, transparent);
-  border-color: color-mix(in srgb, var(--warn) 52%, var(--stroke));
-}
-
-.pill-gate.is-changed {
-  /* Gate changed: red */
-  background: color-mix(in srgb, var(--bad) 22%, transparent);
-  border-color: color-mix(in srgb, var(--bad) 48%, var(--stroke));
-}
-
-
-/* Smaller gate pill (override hero-info-value defaults) */
-.hero-info-value.pill-gate{
-  /* Same visual size as Belt pill (compact, fits up to 3 digits). */
-  width: fit-content;
-  min-width: 44px;
-  max-width: 56px;
-  min-height: 38px; /* match default hero-info-value height */
-  padding: 8px 10px; /* match Belt padding */
-  font-size: 16px;   /* match Belt size */
-  line-height: 1;
-}
-.pill-belt {
-  /* Neutral pill for arrival belt */
-  background: color-mix(in srgb, var(--surface2) 75%, transparent);
-  border-color: color-mix(in srgb, var(--stroke) 85%, transparent);
-}
-
-
 
 .hero-info-value:empty::before {
   content: "-";
@@ -1103,4 +1075,34 @@ body.leaflet-on #routeSvg{ display:none; }
 .is-delayed .sb-card .sb-sched{
   color: #B42318;
   opacity: 0.9;
+}
+
+/* Hero pills: Gate (yellow/red) + Belt (neutral) — compact, 3-digit friendly */
+.hero-info-value.pill-gate,
+.hero-info-value.pill-belt {
+  width: fit-content;      /* compact pill, not full-column width */
+  min-width: 44px;         /* fits up to 3 digits */
+  max-width: 56px;         /* prevents wide pills */
+  min-height: 30px;        /* compact height */
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  line-height: 1;
+  justify-content: center;
+}
+
+/* Gate pill colours */
+.pill-gate {
+  background: color-mix(in srgb, var(--warn) 28%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 52%, var(--stroke));
+}
+
+.pill-gate.is-changed {
+  background: color-mix(in srgb, var(--bad) 22%, transparent);
+  border-color: color-mix(in srgb, var(--bad) 48%, var(--stroke));
+}
+
+/* Belt pill: subtle neutral */
+.pill-belt {
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  border-color: color-mix(in srgb, var(--muted) 28%, var(--stroke));
 }
