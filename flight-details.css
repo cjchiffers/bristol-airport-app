@@ -192,13 +192,21 @@
   /* Default gate pill: yellow */
   background: color-mix(in srgb, var(--warn) 28%, transparent);
   border-color: color-mix(in srgb, var(--warn) 52%, var(--stroke));
+  min-width: 48px;
+  padding: 5px 8px;
+  font-size: 0.8rem;
 }
+
 
 .pill-gate.is-changed {
   /* Gate changed: red */
   background: color-mix(in srgb, var(--bad) 22%, transparent);
   border-color: color-mix(in srgb, var(--bad) 48%, var(--stroke));
+  min-width: 48px;
+  padding: 5px 8px;
+  font-size: 0.8rem;
 }
+
 
 .pill-belt {
   /* Neutral pill for arrival belt */
