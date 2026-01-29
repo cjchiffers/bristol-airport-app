@@ -160,6 +160,8 @@
 .hero-info-item {
   display: flex;
   flex-direction: column;
+  /* Prevent pills from stretching full column width (matches Belt behaviour). */
+  align-items: flex-start;
   gap: 4px;
 }
 
@@ -203,10 +205,13 @@
 
 /* Smaller gate pill (override hero-info-value defaults) */
 .hero-info-value.pill-gate{
-  min-width: 48px;
-  min-height: 30px; /* default was taller */
-  padding: 5px 8px;
-  font-size: 0.8rem;
+  /* Same visual size as Belt pill (compact, fits up to 3 digits). */
+  width: fit-content;
+  min-width: 44px;
+  max-width: 56px;
+  min-height: 38px; /* match default hero-info-value height */
+  padding: 8px 10px; /* match Belt padding */
+  font-size: 16px;   /* match Belt size */
   line-height: 1;
 }
 .pill-belt {
