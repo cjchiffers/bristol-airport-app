@@ -229,9 +229,12 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     heroArrTime: document.getElementById("heroArrTime"),
     heroArrTimeOld: document.getElementById("heroArrTimeOld"),
     heroArrDelay: document.getElementById("heroArrDelay"),
-    // Hero pills
-    heroGateDep: document.getElementById("heroGateDep"),
-    heroBelt: document.getElementById("heroBelt"),
+    heroTerminalDep: document.getElementById("heroTerminalDep"),
+    heroTerminalArr: document.getElementById("heroTerminalArr"),
+    heroCheckIn: document.getElementById("heroCheckIn"),
+    heroGate: document.getElementById("heroGate"),
+    heroGateArr: document.getElementById("heroGateArr"),
+    heroBaggage: document.getElementById("heroBaggage"),
     heroCountdown: document.getElementById("heroCountdown"),
     heroCountdownText: document.getElementById("heroCountdownText"),
   };
@@ -263,34 +266,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     lastRouteKey: null,
     prefersDark: window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null,
   };
-
-  // ---------- Ops change tracking (session scoped) ----------
-  // Used to detect "gate changed" and highlight accordingly.
-  function getOpsKey(suffix) {
-    const k = state && state.storageKey ? state.storageKey : "unknown";
-    return `fd_${k}_${suffix}`;
-  }
-
-  function opsChanged(suffix, nextVal) {
-    try {
-      const key = getOpsKey(suffix);
-      const prev = sessionStorage.getItem(key);
-      const next = (nextVal == null) ? "" : String(nextVal).trim();
-      // Only count as "changed" if we had a previous non-empty value and it differs.
-      // IMPORTANT: if the API temporarily stops returning a value, we DO NOT overwrite the stored
-      // previous value. Otherwise we lose change detection and create false positives.
-      const prevNorm = (prev == null) ? "" : String(prev).trim();
-      const nextNorm = next;
-      const changed = (prevNorm !== "" && nextNorm !== "" && prevNorm !== nextNorm);
-
-      // Only persist when we have a real value.
-      if (nextNorm !== "") sessionStorage.setItem(key, nextNorm);
-
-      return changed;
-    } catch {
-      return false;
-    }
-  }
 
   // ---------- Storage helpers ----------
   function safeGetLocal(key) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -702,6 +677,7 @@ const depInfo = {
 };
 
 depInfo.gateChanged = opsChanged('gate_dep', depInfo.gate);
+depInfo.beltChanged = opsChanged('belt_dep', depInfo.belt);
 
 
 const arrInfo = {
@@ -715,6 +691,38 @@ const arrInfo = {
 
 arrInfo.gateChanged = opsChanged('gate_arr', arrInfo.gate);
 arrInfo.beltChanged = opsChanged('belt_arr', arrInfo.belt);
+
+
+// Track per-flight operational fields so we can highlight changes (e.g. gate change)
+function getOpsKey(suffix) {
+  const k = state?.storageKey || "unknown";
+  return `fd_${k}_${suffix}`;
+}
+function opsChanged(suffix, nextVal) {
+  const key = getOpsKey(suffix);
+  const prev = sessionStorage.getItem(key);
+  const next = (nextVal == null) ? "" : String(nextVal);
+  // Only count as "changed" if we had a previous non-empty value and it differs.
+  const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
+  sessionStorage.setItem(key, next);
+  return changed;
+}
+
+
+
+function opsChangedSticky(suffix, nextVal) {
+  const key = getOpsKey(suffix);
+  const prev = sessionStorage.getItem(key) || "";
+  const next = (nextVal == null) ? "" : String(nextVal).trim();
+
+  // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
+  if (!next) return false;
+
+  const changed = (prev !== "" && prev !== next);
+  sessionStorage.setItem(key, next);
+  return changed;
+}
+
 
 
 function kvLine(label, val) {
@@ -1118,43 +1126,36 @@ if (els.arrKv) {
     paintHeroStatus(els.heroDepDelay, dep, flightStatus, dep.delay);
     paintHeroStatus(els.heroArrDelay, arr, flightStatus, arr.delay);
 
-    // Info pills (glanceable)
-    // Per your requirement:
-    // - Gate pill = *departure gate* (always from timetable departure.gate)
-    // - Belt pill = *arrival baggage belt* (always from timetable arrival.baggage)
-    // Both pills must ALWAYS render (dash when missing).
-    // Gate pill defaults yellow; turns red if the departure gate changes.
-    if (els.heroGateDep) {
-      const gateVal = (
-        (flight.departure && flight.departure.gate) ||
-        pickAny(flat, [
-          "departure.gate", "departure.gateNumber", "departureGate",
-          "flight.departure.gate", "flight.departure.gateNumber",
-        ])
-      ) || "";
-
-      els.heroGateDep.textContent = gateVal ? String(gateVal) : "—";
-      const changed = opsChanged("gate_dep", gateVal);
-      els.heroGateDep.classList.toggle("is-changed", !!changed);
-    }
-
-    // Belt pill: ALWAYS shown, aligned right via CSS.
-    if (els.heroBelt) {
-      const beltVal = (
-        (flight.arrival && flight.arrival.baggage) ||
-        pickAny(flat, [
-          "arrival.baggage", "arrival.baggage_belt", "arrival.baggageBelt",
-          "arrival.belt", "arrival.beltNumber",
-          "flight.arrival.baggage", "flight.arrival.belt",
-          "baggage", "baggage_belt", "belt",
-        ])
-      ) || "";
-
-      els.heroBelt.textContent = beltVal ? String(beltVal) : "—";
-    }
-
-    // Info grid uses the flight.type to decide the countdown copy (departure vs arrival)
+    // Info grid - Aviation Edge provides these fields directly in departure/arrival objects
     const isDeparture = String(flight.type || "").toLowerCase() === "departure";
+    
+    // Gate + Belt pills (always shown)
+    const gateEl = els.heroGate;
+    const beltEl = els.heroBaggage;
+
+    const gateRaw =
+      pickAny(flat, ["departure.gate", "flight.departure.gate", "departureGate"]) ||
+      dep.gate ||
+      "";
+    const gate = String(gateRaw || "").trim();
+
+    if (gateEl) {
+      gateEl.textContent = gate || "—";
+
+      // Default: yellow. If gate changes (sticky), turn red.
+      const changed = opsChangedSticky("hero_gate", gate);
+      gateEl.classList.toggle("is-changed", changed);
+    }
+
+    const beltRaw =
+      pickAny(flat, ["arrival.baggage", "arrival.belt", "flight.arrival.baggage", "baggage", "belt"]) ||
+      arr.baggage ||
+      "";
+    const belt = String(beltRaw || "").trim();
+
+    if (beltEl) {
+      beltEl.textContent = belt || "—";
+    }
 
     // Countdown
     if (els.heroCountdownText) {

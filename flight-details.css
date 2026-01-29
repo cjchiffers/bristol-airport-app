@@ -142,22 +142,19 @@
 
 .hero-info-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 14px;
   margin-bottom: 16px;
 }
 
-/* Hero info row variants */
-.hero-info-grid--2{
-  grid-template-columns: 1fr 1fr;
+
+.hero-info-item--right {
+  align-items: flex-end;
 }
 
-.hero-info-item--right{
+.hero-info-item--right .hero-info-label {
   text-align: right;
-}
-
-.hero-info-item--right .hero-info-value{
-  margin-left: auto;
+  width: 100%;
 }
 
 .hero-info-item {
@@ -189,22 +186,32 @@
   justify-content: center;
 }
 
+
+/* Pills */
+.pill-gate {
+  /* Default gate pill: yellow */
+  background: color-mix(in srgb, var(--warn) 28%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 52%, var(--stroke));
+}
+
+.pill-gate.is-changed {
+  /* Gate changed: red */
+  background: color-mix(in srgb, var(--bad) 22%, transparent);
+  border-color: color-mix(in srgb, var(--bad) 48%, var(--stroke));
+}
+
+.pill-belt {
+  /* Neutral pill for arrival belt */
+  background: color-mix(in srgb, var(--surface2) 75%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 85%, transparent);
+}
+
+
+
 .hero-info-value:empty::before {
   content: "-";
   color: var(--muted);
   font-weight: 600;
-}
-
-/* Gate pill colouring: default Gate = yellow, New gate = red */
-.hero-info-value.hero-pill-gate{
-  background: rgba(250, 204, 21, .40);
-  border-color: rgba(250, 204, 21, .55);
-  color: rgba(15,23,42,.95);
-}
-.hero-info-value.hero-pill-gate.is-changed{
-  background: rgba(239, 68, 68, .55);
-  border-color: rgba(239, 68, 68, .65);
-  color: #fff;
 }
 
 .hero-countdown {
@@ -1036,19 +1043,6 @@ body.leaflet-on #routeSvg{ display:none; }
 }
 .sb-card .sb-chip.gate-red{
   background: rgba(239, 68, 68, .55);
-  color: #fff;
-}
-
-/* Hero Gate pill colouring: default = yellow, changed = red */
-.hero-info-value.gate-yellow{
-  background: rgba(250, 204, 21, .45);
-  border: 1px solid rgba(250, 204, 21, .70);
-  color: rgba(15,23,42,.95);
-}
-
-.hero-info-value.gate-red{
-  background: rgba(239, 68, 68, .55);
-  border: 1px solid rgba(239, 68, 68, .70);
   color: #fff;
 }
 
