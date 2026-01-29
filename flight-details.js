@@ -1045,6 +1045,14 @@ if (els.arrKv) {
       const delay = Number(delayVal);
       const hasDelay = Number.isFinite(delay) && delay !== 0;
       
+      // Debug logging
+      console.log('[Hero Status]', {
+        element: el.id,
+        status: flightStatus,
+        delay: delay,
+        hasDelay: hasDelay
+      });
+      
       // Reset classes
       el.classList.remove("hero-delay-good", "hero-delay-warn", "hero-delay-bad", "hero-delay-neutral");
       
@@ -1066,22 +1074,22 @@ if (els.arrKv) {
         text = "Landed";
         className = "hero-delay-good";
       }
-      // Priority 3: Delayed
+      // Priority 3: Delayed (has positive delay value)
       else if (hasDelay && delay > 0) {
         text = `${Math.round(delay)}m delayed`;
         className = "hero-delay-bad";
       }
-      // Priority 4: On time / Scheduled / Active
-      else if (flightStatus.includes("on time") || 
-               flightStatus.includes("scheduled") || 
+      // Priority 4: Early (negative delay)
+      else if (hasDelay && delay < 0) {
+        text = `${Math.abs(Math.round(delay))}m early`;
+        className = "hero-delay-good";
+      }
+      // Priority 5: On time (scheduled with no delay)
+      else if (flightStatus.includes("scheduled") || 
+               flightStatus.includes("on time") || 
                flightStatus.includes("active") ||
                flightStatus.includes("boarding")) {
         text = "On time";
-        className = "hero-delay-good";
-      }
-      // Priority 5: Early (negative delay)
-      else if (hasDelay && delay < 0) {
-        text = `${Math.abs(Math.round(delay))}m early`;
         className = "hero-delay-good";
       }
       
@@ -1090,8 +1098,10 @@ if (els.arrKv) {
         el.textContent = text;
         el.classList.add(className);
         el.hidden = false;
+        console.log('[Hero Status] Showing:', text, className);
       } else {
         el.hidden = true;
+        console.log('[Hero Status] Hidden - no status to show');
       }
     }
     
