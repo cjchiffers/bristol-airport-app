@@ -134,6 +134,12 @@
   color: var(--text);
 }
 
+.hero-delay-badge.hero-delay-neutral {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--muted) 35%, var(--stroke));
+  color: var(--muted);
+}
+
 .hero-info-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

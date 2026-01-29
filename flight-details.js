@@ -973,72 +973,35 @@ if (els.arrKv) {
   function renderHeroCard(flight, flat, id) {
     if (!flight || !flat || !els.heroCard) return;
 
-    // Debug: log the data to help diagnose issues
+    // Debug: log the data to help diagnose issues (can be removed later)
     console.log('[Hero Card] Flight data:', flight);
-    console.log('[Hero Card] Flattened data:', flat);
-    console.log('[Hero Card] ID:', id);
 
     const dep = flight.departure || {};
     const arr = flight.arrival || {};
 
-    // Flight number - use the same logic as headline
-    const flightNo = id?.flightNo || "—";
-    const airlineIata = pickAny(flat, ["airline.iataCode", "airline.iata", "flight.airline.code.iata", "airline_iata", "airlineCode"]) || "";
+    // Flight number - Aviation Edge uses flight.iataNumber
+    const flightNo = flight.flight?.iataNumber || id?.flightNo || "—";
+    const airlineIata = flight.airline?.iataCode || "";
     if (els.heroFlightNumber) {
-      els.heroFlightNumber.textContent = airlineIata && flightNo !== "—" ? `${airlineIata} ${flightNo}` : flightNo;
+      els.heroFlightNumber.textContent = flightNo;
     }
-
-    // Get times using the same paths as the rest of the code
-    const depSched = pickAny(flat, [
-      "departure.scheduledTime",
-      "departure.scheduled",
-      "flight.time.scheduled.departure",
-      "scheduled_departure",
-      "departure_time",
-      "scheduledDeparture",
-    ]);
-    const depActOrEst = pickAny(flat, [
-      "departure.actualTime",
-      "departure.estimatedTime",
-      "departure.estimated",
-      "departure.actual",
-      "flight.time.actual.departure",
-      "flight.time.estimated.departure",
-    ]);
-    
-    const arrSched = pickAny(flat, [
-      "arrival.scheduledTime",
-      "arrival.scheduled",
-      "flight.time.scheduled.arrival",
-      "scheduled_arrival",
-      "arrival_time",
-      "scheduledArrival",
-    ]);
-    const arrActOrEst = pickAny(flat, [
-      "arrival.actualTime",
-      "arrival.estimatedTime",
-      "arrival.estimated",
-      "arrival.actual",
-      "flight.time.actual.arrival",
-      "flight.time.estimated.arrival",
-    ]);
 
     // Departure info
     if (els.heroDepDate) {
-      const depDateVal = depSched || depActOrEst || Date.now();
+      const depDateVal = dep.scheduledTime || dep.estimatedTime || Date.now();
       els.heroDepDate.textContent = fmtDayMon(depDateVal);
     }
     if (els.heroDepCity) {
-      const depCode = id?.dep || pickAny(flat, ["departure.iataCode", "departure.iata"]) || "";
+      const depCode = dep.iataCode || id?.dep || "";
       els.heroDepCity.textContent = getCityName(depCode) || depCode || "—";
     }
     if (els.heroDepTime) {
-      const mainTime = fmtTime(depActOrEst || depSched);
+      const mainTime = fmtTime(dep.actualTime || dep.estimatedTime || dep.scheduledTime);
       els.heroDepTime.textContent = mainTime || "—";
     }
     if (els.heroDepTimeOld) {
-      const schedTime = fmtTime(depSched);
-      const actualTime = fmtTime(depActOrEst);
+      const schedTime = fmtTime(dep.scheduledTime);
+      const actualTime = fmtTime(dep.actualTime || dep.estimatedTime);
       if (schedTime && actualTime && schedTime !== actualTime) {
         els.heroDepTimeOld.textContent = schedTime;
         els.heroDepTimeOld.style.display = "";
@@ -1050,20 +1013,20 @@ if (els.arrKv) {
 
     // Arrival info
     if (els.heroArrDate) {
-      const arrDateVal = arrSched || arrActOrEst || Date.now();
+      const arrDateVal = arr.scheduledTime || arr.estimatedTime || Date.now();
       els.heroArrDate.textContent = fmtDayMon(arrDateVal);
     }
     if (els.heroArrCity) {
-      const arrCode = id?.arr || pickAny(flat, ["arrival.iataCode", "arrival.iata"]) || "";
+      const arrCode = arr.iataCode || id?.arr || "";
       els.heroArrCity.textContent = getCityName(arrCode) || arrCode || "—";
     }
     if (els.heroArrTime) {
-      const mainTime = fmtTime(arrActOrEst || arrSched);
+      const mainTime = fmtTime(arr.actualTime || arr.estimatedTime || arr.scheduledTime);
       els.heroArrTime.textContent = mainTime || "—";
     }
     if (els.heroArrTimeOld) {
-      const schedTime = fmtTime(arrSched);
-      const actualTime = fmtTime(arrActOrEst);
+      const schedTime = fmtTime(arr.scheduledTime);
+      const actualTime = fmtTime(arr.actualTime || arr.estimatedTime);
       if (schedTime && actualTime && schedTime !== actualTime) {
         els.heroArrTimeOld.textContent = schedTime;
         els.heroArrTimeOld.style.display = "";
@@ -1073,67 +1036,97 @@ if (els.arrKv) {
       }
     }
 
-    // Delay badges
-    function paintHeroDelay(el, delayVal) {
+    // Status badges - show flight status with appropriate colors
+    function paintHeroStatus(el, segment, status, delayVal) {
       if (!el) return;
-      const n = Number(delayVal);
-      if (!Number.isFinite(n) || n === 0) {
-        el.hidden = true;
-        return;
+      
+      // Get flight status
+      const flightStatus = String(status || "").toLowerCase();
+      const delay = Number(delayVal);
+      const hasDelay = Number.isFinite(delay) && delay !== 0;
+      
+      // Reset classes
+      el.classList.remove("hero-delay-good", "hero-delay-warn", "hero-delay-bad", "hero-delay-neutral");
+      
+      // Determine status and styling
+      let text = "";
+      let className = "";
+      
+      // Priority 1: Cancelled
+      if (flightStatus.includes("cancel")) {
+        text = "Cancelled";
+        className = "hero-delay-neutral";
       }
-      el.classList.remove("hero-delay-good", "hero-delay-warn", "hero-delay-bad");
-      if (n > 0) {
-        el.textContent = `${Math.round(n)}m delayed`;
-        el.classList.add("hero-delay-bad");
+      // Priority 2: Departed/Landed (completed)
+      else if (flightStatus.includes("departed") || flightStatus.includes("depart")) {
+        text = "Departed";
+        className = "hero-delay-good";
+      }
+      else if (flightStatus.includes("landed") || flightStatus.includes("land")) {
+        text = "Landed";
+        className = "hero-delay-good";
+      }
+      // Priority 3: Delayed
+      else if (hasDelay && delay > 0) {
+        text = `${Math.round(delay)}m delayed`;
+        className = "hero-delay-bad";
+      }
+      // Priority 4: On time / Scheduled / Active
+      else if (flightStatus.includes("on time") || 
+               flightStatus.includes("scheduled") || 
+               flightStatus.includes("active") ||
+               flightStatus.includes("boarding")) {
+        text = "On time";
+        className = "hero-delay-good";
+      }
+      // Priority 5: Early (negative delay)
+      else if (hasDelay && delay < 0) {
+        text = `${Math.abs(Math.round(delay))}m early`;
+        className = "hero-delay-good";
+      }
+      
+      // Show badge only if we have status information
+      if (text) {
+        el.textContent = text;
+        el.classList.add(className);
+        el.hidden = false;
       } else {
-        el.textContent = `${Math.abs(Math.round(n))}m early`;
-        el.classList.add("hero-delay-good");
+        el.hidden = true;
       }
-      el.hidden = false;
     }
     
-    const depDelay = pickAny(flat, ["departure.delay", "delay"]);
-    const arrDelay = pickAny(flat, ["arrival.delay", "delay"]);
-    paintHeroDelay(els.heroDepDelay, depDelay);
-    paintHeroDelay(els.heroArrDelay, arrDelay);
+    // Get flight status
+    const flightStatus = flight.status || "";
+    
+    paintHeroStatus(els.heroDepDelay, dep, flightStatus, dep.delay);
+    paintHeroStatus(els.heroArrDelay, arr, flightStatus, arr.delay);
 
-    // Info grid - Extract operational details
-    const isDeparture = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase().includes("depart");
+    // Info grid - Aviation Edge provides these fields directly in departure/arrival objects
+    const isDeparture = String(flight.type || "").toLowerCase() === "departure";
     
-    // Departures terminal (usually just called "terminal" for departures)
-    if (els.heroTerminalDep) {
-      const term = pickAny(flat, ["departure.terminal", "terminal"]);
-      els.heroTerminalDep.textContent = term || "";
-    }
-    
-    // Arrivals terminal
+    // Terminal (show arrival terminal, or departure terminal if no arrival)
     if (els.heroTerminalArr) {
-      const term = pickAny(flat, ["arrival.terminal", "terminal"]);
-      els.heroTerminalArr.textContent = term || "";
+      const term = arr.terminal || dep.terminal || "";
+      els.heroTerminalArr.textContent = term || "—";
     }
 
-    // Check-in desk
-    if (els.heroCheckIn) {
-      const checkin = pickAny(flat, ["departure.checkInDesk", "checkInDesk", "checkin", "departure.checkin"]);
-      els.heroCheckIn.textContent = checkin || "";
-    }
-
-    // Departure gate
+    // Gate (show departure or arrival gate, hide if neither exists)
+    const gateItem = document.getElementById("heroGateItem");
     if (els.heroGate) {
-      const gate = pickAny(flat, ["departure.gate", "gate", "departure.gateNumber"]);
-      els.heroGate.textContent = gate || "";
+      const gate = dep.gate || arr.gate || "";
+      if (gate) {
+        els.heroGate.textContent = gate;
+        if (gateItem) gateItem.style.display = "";
+      } else {
+        els.heroGate.textContent = "—";
+        if (gateItem) gateItem.style.display = "none";
+      }
     }
 
-    // Arrival gate
-    if (els.heroGateArr) {
-      const gate = pickAny(flat, ["arrival.gate", "gate", "arrival.gateNumber"]);
-      els.heroGateArr.textContent = gate || "";
-    }
-
-    // Baggage belt
+    // Baggage belt (from arrival object)
     if (els.heroBaggage) {
-      const baggage = pickAny(flat, ["arrival.baggage", "baggage", "arrival.belt", "baggageBelt", "arrival.baggageBelt"]);
-      els.heroBaggage.textContent = baggage || "";
+      const baggage = arr.baggage || "";
+      els.heroBaggage.textContent = baggage || "—";
     }
 
     // Countdown
