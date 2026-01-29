@@ -83,6 +83,19 @@ async function ensureAirportCached(iata, name){
   saveAirportGeoCache(cache);
 }
 
+function pickAny(obj, paths){
+  for(const p of paths){
+    const parts = p.split(".");
+    let v = obj;
+    for(const k of parts){
+      if(!v || typeof v !== "object") { v = undefined; break; }
+      v = v[k];
+    }
+    if(v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return undefined;
+}
+
 async function prefetchAirportsFromFlights(depList, arrList){
   const flights = [...(depList||[]), ...(arrList||[])];
   const seen = new Set();
@@ -562,7 +575,17 @@ function initSearch(){
   const input = document.getElementById("searchInput");
   const clear = document.getElementById("clearSearchBtn");
   if (!input) return;
-  input.addEventListener("input", () => { searchQuery = input.value || ""; renderList(currentTab); });
+  
+  // Debounce search for better performance
+  let searchTimeout;
+  input.addEventListener("input", () => { 
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      searchQuery = input.value || ""; 
+      renderList(currentTab);
+    }, 250); // Wait 250ms after user stops typing
+  });
+  
   clear?.addEventListener("click", () => { input.value=""; searchQuery=""; renderList(currentTab); input.focus(); });
 }
 function initOverflowMenu(){
@@ -798,6 +821,15 @@ function initSecurityUI(){
 // Init
 // =======================
 (function init(){
+  // iOS Safari viewport fix
+  function updateVH() {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+  }
+  updateVH();
+  window.addEventListener('resize', updateVH);
+  window.addEventListener('orientationchange', updateVH);
+
   initOverflowMenu();
   initSearch();
   initSavedUI();

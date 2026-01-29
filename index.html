@@ -7,6 +7,10 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Bristol Airport — Flights</title>
+  <!-- Preconnect to external domains for faster loading -->
+  <link rel="preconnect" href="https://flightapp-workers.chiffers.com">
+  <link rel="dns-prefetch" href="https://geocoding-api.open-meteo.com">
+  <link rel="dns-prefetch" href="https://api.open-meteo.com">
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css?v=20260105_light" />
 </head>
@@ -78,7 +82,15 @@
           <div class="small">Tap a flight for details</div>
         </div>
         <div class="flight-list" id="departureList" aria-live="polite"></div>
-        <div class="empty" id="depEmpty" style="display:none;">No departures match your filters.</div>
+        <div class="empty" id="depEmpty" style="display:none;">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+          <h3>No departures found</h3>
+          <p>Try adjusting your filters or search terms</p>
+        </div>
       </div>
 
       <div class="tab-panel" id="tab-arrivals">
@@ -87,7 +99,15 @@
           <div class="small">Tap a flight for details</div>
         </div>
         <div class="flight-list" id="arrivalList" aria-live="polite"></div>
-        <div class="empty" id="arrEmpty" style="display:none;">No arrivals match your filters.</div>
+        <div class="empty" id="arrEmpty" style="display:none;">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+          <h3>No arrivals found</h3>
+          <p>Try adjusting your filters or search terms</p>
+        </div>
       </div>
     </section>
 
