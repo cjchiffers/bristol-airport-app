@@ -192,22 +192,23 @@
   /* Default gate pill: yellow */
   background: color-mix(in srgb, var(--warn) 28%, transparent);
   border-color: color-mix(in srgb, var(--warn) 52%, var(--stroke));
-  min-width: 48px;
-  padding: 5px 8px;
-  font-size: 0.8rem;
 }
-
 
 .pill-gate.is-changed {
   /* Gate changed: red */
   background: color-mix(in srgb, var(--bad) 22%, transparent);
   border-color: color-mix(in srgb, var(--bad) 48%, var(--stroke));
-  min-width: 48px;
-  padding: 5px 8px;
-  font-size: 0.8rem;
 }
 
 
+/* Smaller gate pill (override hero-info-value defaults) */
+.hero-info-value.pill-gate{
+  min-width: 48px;
+  min-height: 30px; /* default was taller */
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  line-height: 1;
+}
 .pill-belt {
   /* Neutral pill for arrival belt */
   background: color-mix(in srgb, var(--surface2) 75%, transparent);
