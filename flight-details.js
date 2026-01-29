@@ -277,8 +277,15 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
       const prev = sessionStorage.getItem(key);
       const next = (nextVal == null) ? "" : String(nextVal).trim();
       // Only count as "changed" if we had a previous non-empty value and it differs.
-      const changed = (prev != null && String(prev).trim() !== "" && next !== "" && String(prev).trim() !== next);
-      sessionStorage.setItem(key, next);
+      // IMPORTANT: if the API temporarily stops returning a value, we DO NOT overwrite the stored
+      // previous value. Otherwise we lose change detection and create false positives.
+      const prevNorm = (prev == null) ? "" : String(prev).trim();
+      const nextNorm = next;
+      const changed = (prevNorm !== "" && nextNorm !== "" && prevNorm !== nextNorm);
+
+      // Only persist when we have a real value.
+      if (nextNorm !== "") sessionStorage.setItem(key, nextNorm);
+
       return changed;
     } catch {
       return false;
@@ -1112,34 +1119,29 @@ if (els.arrKv) {
     paintHeroStatus(els.heroArrDelay, arr, flightStatus, arr.delay);
 
     // Info pills (glanceable)
-    // Gate pill: ALWAYS shown.
-    // - default yellow
-    // - dash when missing
-    // - turn red if the gate changes (we only count a "change" when we previously had a non-empty gate)
+    // Per your requirement:
+    // - Gate pill = *departure gate* (always from timetable departure.gate)
+    // - Belt pill = *arrival baggage belt* (always from timetable arrival.baggage)
+    // Both pills must ALWAYS render (dash when missing).
+    // Gate pill defaults yellow; turns red if the departure gate changes.
     if (els.heroGateDep) {
       const gateVal = (
-        dep.gate ||
+        (flight.departure && flight.departure.gate) ||
         pickAny(flat, [
           "departure.gate", "departure.gateNumber", "departureGate",
           "flight.departure.gate", "flight.departure.gateNumber",
-          // last-resort: sometimes the API nests gate at root
-          "gate", "gate_number",
         ])
       ) || "";
 
-      const gateText = gateVal ? String(gateVal) : "—";
-      els.heroGateDep.textContent = gateText;
-
+      els.heroGateDep.textContent = gateVal ? String(gateVal) : "—";
       const changed = opsChanged("gate_dep", gateVal);
-      els.heroGateDep.classList.remove("gate-yellow", "gate-red");
-      els.heroGateDep.classList.add(changed ? "gate-red" : "gate-yellow");
+      els.heroGateDep.classList.toggle("is-changed", !!changed);
     }
 
     // Belt pill: ALWAYS shown, aligned right via CSS.
     if (els.heroBelt) {
       const beltVal = (
-        arr.baggage ||
-        arr.belt ||
+        (flight.arrival && flight.arrival.baggage) ||
         pickAny(flat, [
           "arrival.baggage", "arrival.baggage_belt", "arrival.baggageBelt",
           "arrival.belt", "arrival.beltNumber",
@@ -1147,6 +1149,7 @@ if (els.arrKv) {
           "baggage", "baggage_belt", "belt",
         ])
       ) || "";
+
       els.heroBelt.textContent = beltVal ? String(beltVal) : "—";
     }
 
