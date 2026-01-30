@@ -635,8 +635,8 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
 if (els.aircraftReg) {
   els.aircraftReg.textContent = reg
-    ? `Registration: ${reg}`
-    : "Registration: —";
+    ? `Tail Number: ${reg}`
+    : "Tail Number: —";
 }
 
 
