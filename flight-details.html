@@ -10,7 +10,7 @@
   <title>Flight Details</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css?v=20260105_light" />
-  <link rel="stylesheet" href="flight-details.css?v=20260130_pills" />
+  <link rel="stylesheet" href="flight-details.css?v=20260130_nometa" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css?v=20260105_light" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 
@@ -96,21 +96,13 @@
         <span id="heroCountdownText">—</span>
       </div>
     </section>
-
-    <!-- Meta (last updated + source + status chip) -->
-    <div class="details-meta" aria-live="polite">
-      <div id="lastUpdated">—</div>
-      <span class="dot">•</span>
+<span class="dot">•</span>
       <div id="sourceLine">—</div>
       <div class="spacer"></div>
       <span id="statusBadge" class="status-chip">—</span>
       <span id="refreshSpin" class="refresh-spin" aria-hidden="true"></span>
     </div>
-
-    <!-- Sticky ops (gate / terminal / belt) populated by JS when available -->
-    <div id="opsBar" class="ops-bar" style="display:none" aria-live="polite"></div>
-
-    <!-- Flight time hero (original - kept for compatibility) -->
+<!-- Flight time hero (original - kept for compatibility) -->
     <section class="flight-hero" id="flightHero" aria-label="Departure and arrival times" style="display:none">
       <div class="flight-hero-col">
         <div class="fh-date" id="depDate">—</div>
