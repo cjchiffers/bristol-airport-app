@@ -637,9 +637,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     const reg = pickAny(flat, ["aircraft.regNumber", "flight.aircraft.registration", "aircraft.registration", "registration"]) || "";
     const icao24 = pickAny(flat, ["aircraft.icao24", "icao24"]) || "";
     if (els.aircraftReg) {
-      els.aircraftReg.textContent = reg
-        ? `Registration: ${reg}${icao24 ? ` B ICAO24: ${icao24}` : ""}`
-        : icao24 ? `ICAO24: ${icao24}` : "Registration: —";
+      els.aircraftReg.textContent = reg ? `Registration: ${reg}` : "Registration: —";
     }
 
     // Aircraft image (if exists)
@@ -708,20 +706,11 @@ function opsChanged(suffix, nextVal) {
   return changed;
 }
 
-
-
+// Back-compat: some builds call opsChangedSticky(). Treat as opsChanged().
 function opsChangedSticky(suffix, nextVal) {
-  const key = getOpsKey(suffix);
-  const prev = sessionStorage.getItem(key) || "";
-  const next = (nextVal == null) ? "" : String(nextVal).trim();
-
-  // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
-  if (!next) return false;
-
-  const changed = (prev !== "" && prev !== next);
-  sessionStorage.setItem(key, next);
-  return changed;
+  return opsChanged(suffix, nextVal);
 }
+
 
 
 
@@ -1129,32 +1118,29 @@ if (els.arrKv) {
     // Info grid - Aviation Edge provides these fields directly in departure/arrival objects
     const isDeparture = String(flight.type || "").toLowerCase() === "departure";
     
-    // Gate + Belt pills (always shown)
-    const gateEl = els.heroGate;
-    const beltEl = els.heroBaggage;
-
-    const gateRaw =
-      pickAny(flat, ["departure.gate", "flight.departure.gate", "departureGate"]) ||
-      dep.gate ||
-      "";
-    const gate = String(gateRaw || "").trim();
-
-    if (gateEl) {
-      gateEl.textContent = gate || "—";
-
-      // Default: yellow. If gate changes (sticky), turn red.
-      const changed = opsChangedSticky("hero_gate", gate);
-      gateEl.classList.toggle("is-changed", changed);
+    // Terminal (show arrival terminal, or departure terminal if no arrival)
+    if (els.heroTerminalArr) {
+      const term = arr.terminal || dep.terminal || "";
+      els.heroTerminalArr.textContent = term || "—";
     }
 
-    const beltRaw =
-      pickAny(flat, ["arrival.baggage", "arrival.belt", "flight.arrival.baggage", "baggage", "belt"]) ||
-      arr.baggage ||
-      "";
-    const belt = String(beltRaw || "").trim();
+    // Gate (show departure or arrival gate, hide if neither exists)
+    const gateItem = document.getElementById("heroGateItem");
+    if (els.heroGate) {
+      const gate = dep.gate || arr.gate || "";
+      if (gate) {
+        els.heroGate.textContent = gate;
+        if (gateItem) gateItem.style.display = "";
+      } else {
+        els.heroGate.textContent = "—";
+        if (gateItem) gateItem.style.display = "none";
+      }
+    }
 
-    if (beltEl) {
-      beltEl.textContent = belt || "—";
+    // Baggage belt (from arrival object)
+    if (els.heroBaggage) {
+      const baggage = arr.baggage || "";
+      els.heroBaggage.textContent = baggage || "—";
     }
 
     // Countdown
