@@ -1,9 +1,7 @@
-/* Airline card in hero */
 /* Flight Details — aligned to mobile redesign (2025-12)
    This file intentionally reuses the design tokens + base components from styles.css.
 */
 
-.airline-card--hero {
 /* ========================================
    NEW HERO CARD - App-style Flight Overview
    ======================================== */
@@ -21,16 +19,10 @@
 .hero-card-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
   justify-content: space-between;
   margin-bottom: 20px;
 }
 
-.airline-card--hero img {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
 .hero-flight-number {
   font-size: 18px;
   font-weight: 900;
@@ -63,7 +55,6 @@
   height: 20px;
 }
 
-.airline-meta {
 .hero-times-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -79,18 +70,12 @@
   gap: 6px;
 }
 
-.airline-name {
-  font-size: 0.9rem;
-  font-weight: 600;
 .hero-date {
   font-size: 13px;
   font-weight: 700;
   color: var(--muted);
 }
 
-.airline-code {
-  font-size: 0.75rem;
-  color: #666;
 .hero-city {
   font-size: 15px;
   font-weight: 800;
@@ -112,7 +97,6 @@
   letter-spacing: -0.5px;
 }
 
-/* Gate / Belt layout */
 .hero-time-old {
   font-size: 18px;
   font-weight: 700;
@@ -158,47 +142,24 @@
 
 .hero-info-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 12px;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-bottom: 16px;
-}
-
-
-.hero-info-item--right {
-  align-items: flex-end;
-}
-
-.hero-info-item--right .hero-info-label {
-  text-align: right;
-  width: 100%;
 }
 
 .hero-info-item {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-    align-items: flex-start;
-gap: 4px;
+  gap: 4px;
 }
 
 .hero-info-label {
-  font-size: 0.75rem;
-  color: #666;
-  margin-bottom: 4px;
   font-size: 11px;
   font-weight: 600;
   color: var(--muted);
   text-transform: capitalize;
 }
 
-/* Shared pill sizing */
-
-.hero-info-value.pill-gate,
-.hero-info-value.pill-belt {
-  display: inline-flex;
 .hero-info-value {
   font-size: 16px;
   font-weight: 900;
@@ -213,40 +174,7 @@ gap: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  max-width: 56px;
-  min-height: 30px;
-  padding: 6px 10px;
-  font-size: 0.85rem;
-  line-height: 1;
-  border-radius: 10px;
-  border: 1px solid var(--stroke);
-  font-variant-numeric: tabular-nums;
 }
-
-
-/* Pills */
-.pill-gate {
-  /* Default gate pill: yellow */
-  background: color-mix(in srgb, var(--warn) 28%, transparent);
-  border-color: color-mix(in srgb, var(--warn) 52%, var(--stroke));
-}
-
-.pill-gate.is-changed {
-  /* Gate changed: red */
-  background: color-mix(in srgb, var(--bad) 22%, transparent);
-  border-color: color-mix(in srgb, var(--bad) 48%, var(--stroke));
-}
-
-.pill-belt {
-  background: color-mix(in srgb, #9aa3ad 18%, transparent);
-  border-color: color-mix(in srgb, #9aa3ad 40%, var(--stroke));
-  /* Neutral pill for arrival belt */
-  background: color-mix(in srgb, var(--surface2) 75%, transparent);
-  border-color: color-mix(in srgb, var(--stroke) 85%, transparent);
-}
-
-
 
 .hero-info-value:empty::before {
   content: "-";
@@ -1129,57 +1057,4 @@ body.leaflet-on #routeSvg{ display:none; }
 .is-delayed .sb-card .sb-sched{
   color: #B42318;
   opacity: 0.9;
-}
-
-/* --- Compact Gate + Belt pills (match size, fit 3 digits) --- */
-.hero-info-value.pill-gate,
-.hero-info-value.pill-belt {
-  min-width: 44px;   /* enough for 3 digits */
-  max-width: 56px;   /* prevents stretching */
-  min-height: 30px;  /* matches compact look */
-  padding: 6px 10px;
-  font-size: 0.85rem;
-  line-height: 1;
-}
-
-
-/* Airline block moved into hero header (above flight number) */
-.hero-card-header{
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-/* Keep existing menu button aligned right if present */
-.hero-card-header .icon-btn-mini{
-  position: absolute;
-  top: 12px;
-  right: 12px;
-}
-
-.airline-row--hero{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  margin: 0;
-  padding: 0;
-}
-
-.airline-row--hero .airline-logo{
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-}
-
-.airline-row--hero .airline-name{
-  font-size: 0.95rem;
-  font-weight: 600;
-  line-height: 1.1;
-}
-
-.airline-row--hero .small{
-  font-size: 0.75rem;
-  line-height: 1.1;
-  color: var(--muted, #666);
 }
