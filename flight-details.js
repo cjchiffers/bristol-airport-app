@@ -665,10 +665,21 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
       els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
     }
     const reg = pickAny(flat, ["aircraft.regNumber", "flight.aircraft.registration", "aircraft.registration", "registration"]) || "";
+<<<<<<< HEAD
 if (els.aircraftReg) {
       els.aircraftReg.textContent = reg ? `Registration: ${reg}` : "Registration: —";
     }
 // Aircraft image (if exists)
+=======
+    const icao24 = pickAny(flat, ["aircraft.icao24", "icao24"]) || "";
+    if (els.aircraftReg) {
+      els.aircraftReg.textContent = reg
+        ? `Registration: ${reg}${icao24 ? ` • ICAO24: ${icao24}` : ""}`
+        : icao24 ? `ICAO24: ${icao24}` : "Registration: —";
+    }
+
+    // Aircraft image (if exists)
+>>>>>>> parent of 6c413c2 (update tail number)
     const imgSrc = pickAny(flat, [
       "flight.aircraft.images.large[0].src",
       "flight.aircraft.images.medium[0].src",
