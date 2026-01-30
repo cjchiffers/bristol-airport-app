@@ -629,18 +629,19 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     }
 
     // Aircraft (best effort)
-    const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
-    const acText = pickAny(flat, ["aircraft.model.text", "flight.aircraft.model.text", "aircraftType", "aircraft.text", "aircraft.model"]) || "";
-    if (els.aircraftType) {
-      els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
-    }
-    const reg = pickAny(flat, ["aircraft.regNumber", "flight.aircraft.registration", "aircraft.registration", "registration"]) || "";
-    const icao24 = pickAny(flat, ["aircraft.icao24", "icao24"]) || "";
-    if (els.aircraftReg) {
+    const reg = pickAny(flat, [
+  "aircraft.regNumber",
+  "flight.aircraft.registration",
+  "aircraft.registration",
+  "registration"
+]) || "";
+
+if (els.aircraftReg) {
   els.aircraftReg.textContent = reg
-    ? `Tail Number: ${reg}`
-    : "Tail Number: —";
+    ? `Registration: ${reg}`
+    : "Registration: —";
 }
+
 
     // Aircraft image (if exists)
     const imgSrc = pickAny(flat, [
