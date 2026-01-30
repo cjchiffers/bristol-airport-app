@@ -1,3 +1,5 @@
+(function () {
+  const flight = window.__FLIGHT__ || {};
 console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 /* flight-details.js
    Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
@@ -6,8 +8,14 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
+  const airlineNameEl = document.getElementById("airlineName");
+  const airlineCodeEl = document.getElementById("airlineCode");
+  const airlineLogoEl = document.getElementById("airlineLogo");
   "use strict";
 
+  if (flight.airline) {
+    airlineNameEl.textContent = flight.airline.name || "—";
+    airlineCodeEl.textContent = "Airline code: " + (flight.airline.iataCode || "—");
   
 console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 // --- Airport code -> city name (for geocoding). Add as needed.
@@ -60,6 +68,9 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     "ZRH": "Zurich",
   };
 
+    if (flight.airline.logo) {
+      airlineLogoEl.src = flight.airline.logo;
+      airlineLogoEl.alt = flight.airline.name || "";
   // Optional: airport coordinates lookup (IATA -> {lat, lon}).
   // If you have a full table, you can set window.airportCoords = {...} before this script.
   const airportCoords = (typeof window !== "undefined" && window.airportCoords && typeof window.airportCoords === "object")
@@ -637,21 +648,10 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     const reg = pickAny(flat, ["aircraft.regNumber", "flight.aircraft.registration", "aircraft.registration", "registration"]) || "";
     const icao24 = pickAny(flat, ["aircraft.icao24", "icao24"]) || "";
     if (els.aircraftReg) {
-    const reg = pickAny(flat, [
-  "aircraft.regNumber",
-  "flight.aircraft.registration",
-  "aircraft.registration",
-  "registration"
-]) || "";
-
-if (els.aircraftReg) {
-  els.aircraftReg.textContent = reg
-    ? `Tail Number: ${reg}`
-    : "Tail Number: —";
-    ? `Registration: ${reg}`
-    : "Registration: —";
-}
-
+      els.aircraftReg.textContent = reg
+        ? `Registration: ${reg}${icao24 ? ` • ICAO24: ${icao24}` : ""}`
+        : icao24 ? `ICAO24: ${icao24}` : "Registration: —";
+    }
 
     // Aircraft image (if exists)
     const imgSrc = pickAny(flat, [
@@ -1921,6 +1921,8 @@ if (els.arrKv) {
     return true;
   }
 
+  const gateEl = document.getElementById("heroGate");
+  const beltEl = document.getElementById("heroBaggage");
   async function renderRouteMapFromFlight(flight, id, flat) {
     const depCode = normIata(id?.dep);
     const arrCode = normIata(id?.arr);
@@ -2092,4 +2094,7 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
     // Ensure Leaflet sizes correctly after animation + layout settles
     setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 120);
   }
-}
+
+  if (gateEl) gateEl.textContent = flight.departure?.gate || "—";
+  if (beltEl) beltEl.textContent = flight.arrival?.baggage || "—";
+})();
