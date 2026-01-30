@@ -630,10 +630,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
     // Aircraft (best effort)
     const reg = pickAny(flat, [
-  "aircraft.regNumber",
-  "flight.aircraft.registration",
-  "aircraft.registration",
-  "registration"
+  "aircraft.regNumber"
 ]) || "";
 
 if (els.aircraftReg) {
