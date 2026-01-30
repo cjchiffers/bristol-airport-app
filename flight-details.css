@@ -23,6 +23,36 @@
   margin-bottom: 20px;
 }
 
+
+.hero-header-left{
+  display:flex;
+  flex-direction:column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hero-airline-row{
+  padding: 0; /* override details-card spacing */
+}
+
+.hero-airline-row .airline-logo{
+  width: 24px;
+  height: 24px;
+  border-radius: 10px;
+  padding: 5px;
+}
+
+.hero-airline-row .airline-name{
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--muted);
+}
+
+.hero-airline-row #airlineCodeLine{
+  font-size: 11px;
+  margin-top: 1px;
+}
+
 .hero-flight-number {
   font-size: 18px;
   font-weight: 900;

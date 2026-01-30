@@ -49,7 +49,15 @@
     <!-- New Hero Card Section -->
     <section class="hero-card" id="heroCard" aria-label="Flight overview">
       <div class="hero-card-header">
-        <div class="hero-flight-number" id="heroFlightNumber">—</div>
+        <div class="hero-header-left">
+          <div class="airline-row hero-airline-row">
+        <img class="airline-logo" id="airlineLogo" alt="" style="display:none" />
+        <div>
+          <div class="airline-name" id="airlineName">—</div>
+          <div class="small" id="airlineCodeLine">Airline code: —</div>
+        </div>
+      </div>
+          
         <button class="icon-btn-mini" id="heroMenuBtn" aria-label="More options">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.2a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z" fill="currentColor"/></svg>
         </button>
@@ -147,14 +155,6 @@
       <div id="kpis" class="kpis" aria-label="Flight metrics"></div>
     </section>
     <section class="card details-card">
-      <div class="airline-row">
-        <img class="airline-logo" id="airlineLogo" alt="" style="display:none" />
-        <div>
-          <div class="airline-name" id="airlineName">—</div>
-          <div class="small" id="airlineCodeLine">Airline code: —</div>
-        </div>
-      </div>
-
       <div class="aircraft-row">
         <div>
           <div class="aircraft-type" id="aircraftType">—</div>
