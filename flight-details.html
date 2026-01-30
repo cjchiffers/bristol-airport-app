@@ -10,7 +10,7 @@
   <title>Flight Details</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css?v=20260105_light" />
-  <link rel="stylesheet" href="flight-details.css?v=20260130_airline_top_fixed" />
+  <link rel="stylesheet" href="flight-details.css?v=20260130_nometa" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css?v=20260105_light" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 
@@ -49,12 +49,6 @@
     <!-- New Hero Card Section -->
     <section class="hero-card" id="heroCard" aria-label="Flight overview">
       <div class="hero-card-header">
-        <div class="airline-row airline-row--hero">
-        <img class="airline-logo" id="airlineLogo" alt="" style="display:none" />
-        <div>
-          <div class="airline-name" id="airlineName">—</div>
-        </div>
-      </div>
         <div class="hero-flight-number" id="heroFlightNumber">—</div>
         <button class="icon-btn-mini" id="heroMenuBtn" aria-label="More options">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.2a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z" fill="currentColor"/></svg>
@@ -102,6 +96,10 @@
         <span id="heroCountdownText">—</span>
       </div>
     </section>
+      <div id="sourceLine">—</div>
+      <div class="spacer"></div>
+      <span id="statusBadge" class="status-chip">—</span>
+      <span id="refreshSpin" class="refresh-spin" aria-hidden="true"></span>
     </div>
 <!-- Flight time hero (original - kept for compatibility) -->
     <section class="flight-hero" id="flightHero" aria-label="Departure and arrival times" style="display:none">
@@ -149,13 +147,20 @@
       <div id="kpis" class="kpis" aria-label="Flight metrics"></div>
     </section>
     <section class="card details-card">
-      
+      <div class="airline-row">
+        <img class="airline-logo" id="airlineLogo" alt="" style="display:none" />
+        <div>
+          <div class="airline-name" id="airlineName">—</div>
+          <div class="small" id="airlineCodeLine">Airline code: —</div>
+        </div>
+      </div>
 
       <div class="aircraft-row">
         <div>
           <div class="aircraft-type" id="aircraftType">—</div>
           <div class="small" id="aircraftReg">—</div>
         </div>
+        <div class="small map-hint" id="mapHint">—</div>
       </div>
 
       <div class="aircraft-image-wrap" id="aircraftImageWrap" style="display:none;">
