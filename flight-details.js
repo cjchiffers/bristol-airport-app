@@ -638,7 +638,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     const icao24 = pickAny(flat, ["aircraft.icao24", "icao24"]) || "";
     if (els.aircraftReg) {
       els.aircraftReg.textContent = reg
-        ? `Registration: ${reg}${icao24 ? ` • ICAO24: ${icao24}` : ""}`
+        ? `Registration: ${reg}${icao24 ? ` B ICAO24: ${icao24}` : ""}`
         : icao24 ? `ICAO24: ${icao24}` : "Registration: —";
     }
 
