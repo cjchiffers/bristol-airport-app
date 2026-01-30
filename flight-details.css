@@ -16,6 +16,40 @@
   box-shadow: var(--shadow);
 }
 
+
+.hero-airline-row{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--stroke);
+  min-width: 0;
+}
+
+.hero-airline-row .airline-logo{
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  padding: 4px;
+  flex: 0 0 auto;
+}
+
+.hero-airline-row .airline-name{
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--muted);
+  line-height: 1.15;
+}
+
+.hero-airline-row #airlineCodeLine{
+  font-size: 11px;
+  margin-top: 1px;
+  line-height: 1.15;
+  color: var(--muted);
+}
+
+
 .hero-card-header {
   display: flex;
   align-items: center;
@@ -24,34 +58,10 @@
 }
 
 
-.hero-header-left{
-  display:flex;
-  flex-direction:column;
-  gap: 6px;
-  min-width: 0;
-}
 
-.hero-airline-row{
-  padding: 0; /* override details-card spacing */
-}
 
-.hero-airline-row .airline-logo{
-  width: 24px;
-  height: 24px;
-  border-radius: 10px;
-  padding: 5px;
-}
 
-.hero-airline-row .airline-name{
-  font-size: 12px;
-  font-weight: 900;
-  color: var(--muted);
-}
 
-.hero-airline-row #airlineCodeLine{
-  font-size: 11px;
-  margin-top: 1px;
-}
 
 .hero-flight-number {
   font-size: 18px;
