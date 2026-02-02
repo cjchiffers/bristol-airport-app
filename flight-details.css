@@ -18,7 +18,7 @@
 
 .hero-card-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
 }
@@ -142,7 +142,7 @@
 
 .hero-info-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-bottom: 16px;
 }
@@ -1058,85 +1058,3 @@ body.leaflet-on #routeSvg{ display:none; }
   color: #B42318;
   opacity: 0.9;
 }
-
-
-/* =========================
-   Gate / Belt pills
-   ========================= */
-
-/* Keep the gate/belt row aligned with the 2-column times grid */
-.hero-info-grid{
-  grid-template-columns: 1fr 1fr;
-}
-
-/* Default pill base stays accent; override gate/belt explicitly for consistency */
-.hero-info-value.pill-gate{
-  min-width: 3ch;
-  background: #ffe8b5;
-  border-color: rgba(107,78,0,.35);
-  color: #6b4e00;
-}
-
-.hero-info-value.pill-gate.is-changed{
-  background: #f8d7da;
-  border-color: rgba(138,28,28,.35);
-  color: #8a1c1c;
-}
-
-.hero-info-value.pill-belt{
-  min-width: 3ch;
-}
-
-
-/* =========================
-   Hero airline (logo + name + initials fallback)
-   ========================= */
-
-.hero-title{
-  display:flex;
-  flex-direction:column;
-  gap: 8px;
-}
-
-.hero-airline{
-  display:flex;
-  align-items:center;
-  gap: 10px;
-  min-height: 28px;
-}
-
-.airline-logo--hero{
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  border-radius: 8px;
-  background: #fff;
-  display: block;
-}
-
-.airline-name--hero{
-  font-size: 0.95rem;
-  font-weight: 650;
-  letter-spacing: 0.2px;
-  opacity: 0.82;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-}
-
-.airline-initials--hero{
-  display:none;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: rgba(229,231,235,.9);
-  color: #374151;
-  font-size: 0.75rem;
-  font-weight: 800;
-  line-height: 28px;
-  text-align: center;
-}
-
-.hero-airline.is-fallback .airline-logo--hero{ display:none; }
-.hero-airline.is-fallback .airline-initials--hero{ display:block; }

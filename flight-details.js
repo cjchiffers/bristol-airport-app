@@ -6,6 +6,29 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
+// --- Safety: ensure opsChangedSticky exists globally (prevents ReferenceError during rapid iteration/caching) ---
+// This function tracks changes for operational values (gate/belt) but *does not* wipe the last known value
+// when the API temporarily returns empty/undefined.
+if (typeof window.opsChangedSticky !== "function") {
+  window.opsChangedSticky = function window.opsChangedSticky(suffix, nextVal) {
+    // If getOpsKey exists, use it; otherwise fall back to a simple per-page key.
+    const key = (typeof window.getOpsKey === "function")
+      ? window.getOpsKey(suffix)
+      : `fd_unknown_${suffix}`;
+
+    const prev = sessionStorage.getItem(key) || "";
+    const next = (nextVal == null) ? "" : String(nextVal).trim();
+
+    // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
+    if (!next) return false;
+
+    const changed = (prev !== "" && prev !== next);
+    sessionStorage.setItem(key, next);
+    return changed;
+  };
+}
+
+
   "use strict";
 
   
@@ -190,8 +213,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     // Airline / aircraft
     airlineLogo: document.getElementById("airlineLogo"),
     airlineName: document.getElementById("airlineName"),
-    airlineInitials: document.getElementById("airlineInitials"),
-    heroAirline: document.getElementById("heroAirline"),
     airlineCodeLine: document.getElementById("airlineCodeLine"),
     aircraftType: document.getElementById("aircraftType"),
     aircraftReg: document.getElementById("aircraftReg"),
@@ -712,27 +733,7 @@ function opsChanged(suffix, nextVal) {
 
 
 
-
-function getAirlineInitials(airlineName, airlineIata, flightNo) {
-  const iata = (airlineIata || "").trim();
-  if (iata) return iata.toUpperCase();
-
-  const fn = (flightNo || "").trim();
-  const prefix = fn.slice(0, 2);
-  if (/^[A-Za-z0-9]{2}$/.test(prefix)) return prefix.toUpperCase();
-
-  const name = (airlineName || "").trim();
-  if (!name) return "";
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(w => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function opsChangedSticky(suffix, nextVal) {
+function window.opsChangedSticky(suffix, nextVal) {
   const key = getOpsKey(suffix);
   const prev = sessionStorage.getItem(key) || "";
   const next = (nextVal == null) ? "" : String(nextVal).trim();
@@ -1165,7 +1166,7 @@ if (els.arrKv) {
       gateEl.textContent = gate || "—";
 
       // Default: yellow. If gate changes (sticky), turn red.
-      const changed = opsChangedSticky("hero_gate", gate);
+      const changed = window.opsChangedSticky("hero_gate", gate);
       gateEl.classList.toggle("is-changed", changed);
     }
 
