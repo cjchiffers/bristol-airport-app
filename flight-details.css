@@ -1058,3 +1058,43 @@ body.leaflet-on #routeSvg{ display:none; }
   color: #B42318;
   opacity: 0.9;
 }
+
+
+/* Hero Airline (Logo + Name + Initials Fallback) */
+.hero-airline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px; /* keeps hierarchy: airline -> flight number */
+}
+
+/* Larger hero logo */
+.airline-logo--hero {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #fff;
+  display: none; /* JS will enable when loaded */
+}
+
+/* Initials fallback occupies same footprint as logo */
+.airline-initials--hero {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #e5e7eb;
+  color: #374151;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 28px;
+  text-align: center;
+  display: none; /* JS toggles */
+}
+
+.airline-name--hero {
+  font-size: 0.95rem;
+  font-weight: 600;
+  opacity: 0.9;
+  white-space: nowrap;
+}
