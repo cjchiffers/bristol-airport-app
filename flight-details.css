@@ -258,7 +258,27 @@
 /* ======================================== */
 
 .details-page{
+  /*
+    The global app background uses layered radial gradients.
+    On some mobile browsers this can look like it "ends" and restarts as you scroll.
+    For the details page, render the background as a fixed layer so it stays continuous.
+  */
   min-height:100%;
+  position: relative;
+  background: var(--bg);
+}
+
+.details-page::before{
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* Match the global background, but as a fixed layer to avoid visible "restarts" */
+  background:
+    radial-gradient(1000px 600px at 12% 0%, rgba(98,178,255,.22), transparent 55%),
+    radial-gradient(900px 600px at 95% 10%, rgba(56,211,159,.12), transparent 55%),
+    var(--bg);
 }
 
 .details-container{
