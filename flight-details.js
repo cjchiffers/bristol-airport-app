@@ -1,27 +1,3 @@
-"use strict";
-
-// --- Safety: opsChangedSticky must exist in global scope ---
-// Prevents hard crashes if refactors move helpers or partial deploys occur.
-if (typeof window.opsChangedSticky !== "function") {
-  window.opsChangedSticky = function window.opsChangedSticky(suffix, nextVal) {
-    const key = (typeof window.getOpsKey === "function")
-      ? window.getOpsKey(suffix)
-      : `fd_ops_${suffix}`;
-
-    let prev = "";
-    try { prev = sessionStorage.getItem(key) || ""; } catch (e) { prev = ""; }
-
-    const next = (nextVal == null) ? "" : String(nextVal).trim();
-
-    // If next is empty, keep the previous non-empty value (don't "forget" last known gate/belt).
-    if (!next) return false;
-
-    const changed = (prev !== "" && prev !== next);
-    try { sessionStorage.setItem(key, next); } catch (e) { /* ignore */ }
-    return changed;
-  };
-}
-
 console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 /* flight-details.js
    Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
@@ -30,6 +6,9 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
+  "use strict";
+
+  
 console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 // --- Airport code -> city name (for geocoding). Add as needed.
   const airportCodeToCityName = {
@@ -212,6 +191,12 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     airlineLogo: document.getElementById("airlineLogo"),
     airlineName: document.getElementById("airlineName"),
     airlineCodeLine: document.getElementById("airlineCodeLine"),
+
+    // Hero airline (above the flight number)
+    heroAirlineWrap: document.getElementById("heroAirline"),
+    heroAirlineLogo: document.getElementById("heroAirlineLogo"),
+    heroAirlineInitials: document.getElementById("heroAirlineInitials"),
+    heroAirlineName: document.getElementById("heroAirlineName"),
     aircraftType: document.getElementById("aircraftType"),
     aircraftReg: document.getElementById("aircraftReg"),
     aircraftImageWrap: document.getElementById("aircraftImageWrap"),
@@ -633,10 +618,59 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     renderOpsBar(flight, flat);
 
     // Airline basics
+    // NOTE: Aviation Edge fields are inconsistent. Always pick best-effort and never assume presence.
     const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
     const airlineIata = pickAny(flat, ["airline.iata", "airline.iataCode", "flight.airline.code.iata", "airline_iata", "airlineCode"]) || "";
+    const airlineIcao = pickAny(flat, ["airline.icao", "airline.icaoCode", "flight.airline.code.icao", "airline_icao"]) || "";
     if (els.airlineName) els.airlineName.textContent = airlineNameVal;
     if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
+
+    // Hero airline (logo/name) — shown above flight number for quick recognition.
+    // We show initials immediately to avoid flicker, then swap to logo once it loads.
+    if (els.heroAirlineWrap) {
+      // Hide the entire row if we have no name and no usable code.
+      var hasAnyAirline = (airlineNameVal && airlineNameVal !== "—") || !!airlineIata;
+      els.heroAirlineWrap.style.display = hasAnyAirline ? "" : "none";
+    }
+
+    if (els.heroAirlineName) {
+      els.heroAirlineName.textContent = (airlineNameVal && airlineNameVal !== "—") ? airlineNameVal : "";
+      els.heroAirlineName.style.display = (els.heroAirlineName.textContent ? "" : "none");
+    }
+
+    // Pick a code for logos. Google-hosted logos typically use IATA.
+    var heroLogoCode = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
+    var heroInitials = getAirlineInitials(airlineIata, airlineIcao, airlineNameVal);
+
+    // Initials fallback (shown immediately; replaced by logo on successful load)
+    if (els.heroAirlineInitials) {
+      els.heroAirlineInitials.textContent = heroInitials || "";
+      els.heroAirlineInitials.style.display = heroInitials ? "" : "none";
+    }
+
+    if (els.heroAirlineLogo) {
+      // Default to hidden until we know it loaded.
+      els.heroAirlineLogo.style.display = "none";
+
+      if (heroLogoCode) {
+        els.heroAirlineLogo.alt = airlineNameVal && airlineNameVal !== "—" ? (airlineNameVal + " logo") : "Airline logo";
+        els.heroAirlineLogo.src = "https://www.gstatic.com/flights/airline_logos/70px/" + encodeURIComponent(heroLogoCode) + ".png";
+
+        els.heroAirlineLogo.onload = function () {
+          // Swap: show logo, hide initials
+          if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "";
+          if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
+        };
+
+        els.heroAirlineLogo.onerror = function () {
+          // Keep initials (already shown)
+          if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "none";
+          if (els.heroAirlineInitials) {
+            els.heroAirlineInitials.style.display = heroInitials ? "" : "none";
+          }
+        };
+      }
+    }
 
     // Logo (best effort)
     const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
@@ -662,6 +696,30 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     ? `Tail Number: ${reg}`
     : "Tail Number: —";
 }
+
+// Build a short airline marker for fallback UI.
+// Preference order:
+//  1) IATA (e.g. "U2")
+//  2) ICAO (e.g. "EZY")
+//  3) Name initials (e.g. "EJ")
+function getAirlineInitials(iata, icao, name) {
+  var a = (iata || "").trim();
+  if (a) return a.toUpperCase().slice(0, 3);
+
+  var b = (icao || "").trim();
+  if (b) return b.toUpperCase().slice(0, 3);
+
+  var n = (name || "").trim();
+  if (!n) return "";
+  var parts = n.split(/\s+/);
+  var out = "";
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i]) out += parts[i].charAt(0);
+    if (out.length >= 2) break;
+  }
+  return out.toUpperCase();
+}
+
 
     // Aircraft image (if exists)
     const imgSrc = pickAny(flat, [
@@ -731,7 +789,7 @@ function opsChanged(suffix, nextVal) {
 
 
 
-function window.opsChangedSticky(suffix, nextVal) {
+function opsChangedSticky(suffix, nextVal) {
   const key = getOpsKey(suffix);
   const prev = sessionStorage.getItem(key) || "";
   const next = (nextVal == null) ? "" : String(nextVal).trim();
@@ -1164,7 +1222,7 @@ if (els.arrKv) {
       gateEl.textContent = gate || "—";
 
       // Default: yellow. If gate changes (sticky), turn red.
-      const changed = window.opsChangedSticky("hero_gate", gate);
+      const changed = opsChangedSticky("hero_gate", gate);
       gateEl.classList.toggle("is-changed", changed);
     }
 

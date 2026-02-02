@@ -9,8 +9,8 @@
   <meta http-equiv="Expires" content="0" />
   <title>Flight Details</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="flight-details.css" />
+  <link rel="stylesheet" href="styles.css?v=20260105_light" />
+  <link rel="stylesheet" href="flight-details.css?v=20260130_gatepill" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css?v=20260105_light" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 
@@ -49,6 +49,14 @@
     <!-- New Hero Card Section -->
     <section class="hero-card" id="heroCard" aria-label="Flight overview">
       <div class="hero-card-header">
+        <!-- Airline (hero): logo + name with initials fallback.
+             Populated defensively in flight-details.js (works offline / missing data). -->
+        <div class="hero-airline" id="heroAirline" aria-label="Airline">
+          <img class="airline-logo airline-logo--hero" id="heroAirlineLogo" alt="" loading="lazy" />
+          <div class="airline-initials airline-initials--hero" id="heroAirlineInitials" aria-hidden="true"></div>
+          <span class="airline-name airline-name--hero" id="heroAirlineName"></span>
+        </div>
+
         <div class="hero-flight-number" id="heroFlightNumber">—</div>
         <button class="icon-btn-mini" id="heroMenuBtn" aria-label="More options">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.2a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z" fill="currentColor"/></svg>
@@ -216,7 +224,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="flight-details.js"></script>
+  <script src="flight-details.js?v=20260129_status"></script>
 
 </body>
 </html>
