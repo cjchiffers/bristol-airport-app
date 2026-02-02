@@ -8,6 +8,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 
   "use strict";
 
+  
 console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 // --- Airport code -> city name (for geocoding). Add as needed.
   const airportCodeToCityName = {
@@ -188,6 +189,8 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
     // Airline / aircraft
     airlineLogo: document.getElementById("airlineLogo"),
+    airlineInitials: document.getElementById("airlineInitials"),
+    heroAirline: document.getElementById("heroAirline"),
     airlineName: document.getElementById("airlineName"),
     airlineCodeLine: document.getElementById("airlineCodeLine"),
     aircraftType: document.getElementById("aircraftType"),
@@ -272,37 +275,78 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   function safeGetSession(key) { try { return sessionStorage.getItem(key); } catch { return null; } }
   function safeSetSession(key, value) { try { sessionStorage.setItem(key, value); return true; } catch { return false; } }
 
-  // ---------- Ops-change helpers ----------
-  // We use sessionStorage (per-tab) to detect when operational fields change
-  // between refreshes (e.g. gate changes). Keyed per-flight via state.storageKey.
-  function getOpsKey(suffix) {
-    const k = state && state.storageKey ? state.storageKey : "unknown";
+  // ---------- Operational change tracking (hero only) ----------
+  // We keep these helpers in the outer scope so renderHeroCard can always access them.
+  // (Previously they were nested inside render(), which caused "... is not defined" errors.)
+  function getOpsKeyHero(suffix) {
+    const k = state?.storageKey || "unknown";
     return `fd_${k}_${suffix}`;
   }
 
-  // "Changed" only when a previous non-empty value existed and differs.
-  function opsChanged(suffix, nextVal) {
-    const key = getOpsKey(suffix);
-    const prev = safeGetSession(key);
-    const next = (nextVal == null) ? "" : String(nextVal).trim();
-    const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
-    safeSetSession(key, next);
-    return changed;
-  }
-
-  // Like opsChanged, but does *not* overwrite the stored value with empty.
-  // This avoids "forgetting" the last known gate when some API responses omit it.
-  function opsChangedSticky(suffix, nextVal) {
-    const key = getOpsKey(suffix);
+  // Sticky change detector: remembers the last non-empty value across refreshes.
+  // If the new value is empty, we keep the last known value and return "not changed".
+  function opsChangedStickyHero(suffix, nextVal) {
+    const key = getOpsKeyHero(suffix);
     const prev = safeGetSession(key) || "";
     const next = (nextVal == null) ? "" : String(nextVal).trim();
 
-    // If next is empty, keep previous value and report "no change".
+    // If next is empty, don't overwrite the previous known value.
     if (!next) return false;
 
     const changed = (prev !== "" && prev !== next);
     safeSetSession(key, next);
     return changed;
+  }
+
+  // ---------- Airline logo/initials helpers ----------
+  function getAirlineInitials(name, iata, flightNo) {
+    // Prefer IATA code (U2, KL, FR) as the cleanest initials.
+    const i = (iata || "").trim();
+    if (i) return i.toUpperCase().slice(0, 3);
+
+    // Fall back to flight number prefix (e.g. U2322 -> U2)
+    const fn = (flightNo || "").trim();
+    if (fn.length >= 2) return fn.slice(0, 2).toUpperCase();
+
+    // As a last resort, derive from airline name.
+    const n = (name || "").trim();
+    if (!n) return "";
+    return n
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  function setHeroAirlineLogoOrInitials({ airlineName, airlineIata, flightNo }) {
+    const wrap = els.heroAirline;
+    const logoEl = els.airlineLogo;
+    const initialsEl = els.airlineInitials;
+    if (!wrap || !logoEl || !initialsEl) return;
+
+    const initials = getAirlineInitials(airlineName, airlineIata, flightNo) || "";
+    initialsEl.textContent = initials;
+
+    // Logo URL is best-effort. If it fails, show initials.
+    const logoIata = (airlineIata || (flightNo ? String(flightNo).slice(0, 2) : "")).trim();
+    if (!logoIata) {
+      wrap.classList.add("is-fallback");
+      logoEl.removeAttribute("src");
+      logoEl.alt = "";
+      return;
+    }
+
+    wrap.classList.remove("is-fallback");
+    logoEl.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(logoIata)}.png`;
+    logoEl.alt = "";
+
+    // On failure, permanently switch to initials for this session view.
+    logoEl.onerror = () => {
+      wrap.classList.add("is-fallback");
+      logoEl.removeAttribute("src");
+    };
   }
 
   // ---------- Utilities ----------
@@ -643,22 +687,19 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     renderStatusBadge(flat);
     renderOpsBar(flight, flat);
 
-    // Airline basics
-    const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
+    // Airline basics (logo-only with initials fallback in the hero)
+    const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "";
     const airlineIata = pickAny(flat, ["airline.iata", "airline.iataCode", "flight.airline.code.iata", "airline_iata", "airlineCode"]) || "";
-    if (els.airlineName) els.airlineName.textContent = airlineNameVal;
+
+    // Keep these assignments optional (some older layouts still include them)
+    if (els.airlineName) els.airlineName.textContent = airlineNameVal || "—";
     if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
 
-    // Logo (best effort)
-    const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
-    if (els.airlineLogo) {
-      if (logoIata) {
-        els.airlineLogo.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(logoIata)}.png`;
-        els.airlineLogo.alt = `${airlineNameVal} logo`;
-        els.airlineLogo.onerror = () => { els.airlineLogo.style.display = "none"; };
-        els.airlineLogo.style.display = "";
-      } else els.airlineLogo.style.display = "none";
-    }
+    setHeroAirlineLogoOrInitials({
+      airlineName: airlineNameVal,
+      airlineIata,
+      flightNo: displayNo,
+    });
 
     // Aircraft (best effort)
     const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
@@ -709,7 +750,8 @@ const depInfo = {
 };
 
 depInfo.gateChanged = opsChanged('gate_dep', depInfo.gate);
-// NOTE: departures do not have a belt; keep ops-change tracking for arrival belt only.
+
+// Note: belt is an arrival-only field, so we do not track it for departures.
 
 
 const arrInfo = {
@@ -723,6 +765,38 @@ const arrInfo = {
 
 arrInfo.gateChanged = opsChanged('gate_arr', arrInfo.gate);
 arrInfo.beltChanged = opsChanged('belt_arr', arrInfo.belt);
+
+
+// Track per-flight operational fields so we can highlight changes (e.g. gate change)
+function getOpsKey(suffix) {
+  const k = state?.storageKey || "unknown";
+  return `fd_${k}_${suffix}`;
+}
+function opsChanged(suffix, nextVal) {
+  const key = getOpsKey(suffix);
+  const prev = sessionStorage.getItem(key);
+  const next = (nextVal == null) ? "" : String(nextVal);
+  // Only count as "changed" if we had a previous non-empty value and it differs.
+  const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
+  sessionStorage.setItem(key, next);
+  return changed;
+}
+
+
+
+function opsChangedSticky(suffix, nextVal) {
+  const key = getOpsKey(suffix);
+  const prev = sessionStorage.getItem(key) || "";
+  const next = (nextVal == null) ? "" : String(nextVal).trim();
+
+  // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
+  if (!next) return false;
+
+  const changed = (prev !== "" && prev !== next);
+  sessionStorage.setItem(key, next);
+  return changed;
+}
+
 
 
 function kvLine(label, val) {
@@ -1143,7 +1217,7 @@ if (els.arrKv) {
       gateEl.textContent = gate || "—";
 
       // Default: yellow. If gate changes (sticky), turn red.
-      const changed = opsChangedSticky("hero_gate", gate);
+      const changed = opsChangedStickyHero("hero_gate", gate);
       gateEl.classList.toggle("is-changed", changed);
     }
 

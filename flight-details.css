@@ -18,9 +18,60 @@
 
 .hero-card-header {
   display: flex;
-  align-items: center;
+  /* Airline logo/initials can sit above the flight number */
+  align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 20px;
+}
+
+/* Header stack: airline logo/initials above flight number */
+.hero-header-stack{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Airline (hero): logo only with initials fallback */
+.flight-airline{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.airline-logo--hero{
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+}
+
+.airline-initials--hero{
+  display: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface2) 85%, #fff);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 22px;
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+
+/* When the logo is missing/broken, show initials */
+.flight-airline.is-fallback .airline-logo--hero{
+  display: none;
+}
+.flight-airline.is-fallback .airline-initials--hero{
+  display: block;
 }
 
 .hero-flight-number {
@@ -142,9 +193,9 @@
 
 .hero-info-grid {
   display: grid;
-  /* Gate + Belt only. Keep this grid in sync with the 2-column departure/arrival grid above. */
+  /* Only Gate + Belt are shown in this view. Match the 2-column departure/arrival layout. */
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 14px;
   margin-bottom: 16px;
 }
 
@@ -152,8 +203,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Keep tiles left-aligned within their column (including the Belt in the arrival column). */
-  align-items: flex-start;
 }
 
 .hero-info-label {
@@ -179,34 +228,30 @@
   justify-content: center;
 }
 
-/*
-  Gate/Belt pills
-  - Stable width: room for 3 characters (e.g., A12)
-  - Gate: yellow by default, red if it has changed
-  - Belt: blue (kept distinct from status badges)
-  Note: we use solid colours instead of color-mix() so appearance is consistent across browsers.
-*/
+/* Gate/Belt pills: stable width for 3 characters (e.g. "A12", "10", "—") */
 .hero-info-value.pill-gate,
-.hero-info-value.pill-belt {
-  width: fit-content;
+.hero-info-value.pill-belt{
   min-width: 3ch;
 }
 
-.hero-info-value.pill-gate {
-  background: #ffe8b5; /* soft yellow */
-  border-color: #e0b86a;
+/* Gate: yellow by default */
+.hero-info-value.pill-gate{
+  background: #ffe8b5;
+  border: 1px solid #f0c96b;
   color: #6b4e00;
 }
 
-.hero-info-value.pill-gate.is-changed {
-  background: #f8d7da; /* soft red */
-  border-color: #e39aa3;
+/* Gate changed: red */
+.hero-info-value.pill-gate.is-changed{
+  background: #f8d7da;
+  border: 1px solid #f1aeb5;
   color: #8a1c1c;
 }
 
-.hero-info-value.pill-belt {
-  background: #dbeafe; /* soft blue */
-  border-color: #93c5fd;
+/* Belt: keep blue */
+.hero-info-value.pill-belt{
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
   color: #1e3a8a;
 }
 
@@ -258,27 +303,7 @@
 /* ======================================== */
 
 .details-page{
-  /*
-    The global app background uses layered radial gradients.
-    On some mobile browsers this can look like it "ends" and restarts as you scroll.
-    For the details page, render the background as a fixed layer so it stays continuous.
-  */
   min-height:100%;
-  position: relative;
-  background: var(--bg);
-}
-
-.details-page::before{
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  /* Match the global background, but as a fixed layer to avoid visible "restarts" */
-  background:
-    radial-gradient(1000px 600px at 12% 0%, rgba(98,178,255,.22), transparent 55%),
-    radial-gradient(900px 600px at 95% 10%, rgba(56,211,159,.12), transparent 55%),
-    var(--bg);
 }
 
 .details-container{
