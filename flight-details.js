@@ -1,3 +1,27 @@
+"use strict";
+
+// --- Safety: opsChangedSticky must exist in global scope ---
+// Prevents hard crashes if refactors move helpers or partial deploys occur.
+if (typeof window.opsChangedSticky !== "function") {
+  window.opsChangedSticky = function window.opsChangedSticky(suffix, nextVal) {
+    const key = (typeof window.getOpsKey === "function")
+      ? window.getOpsKey(suffix)
+      : `fd_ops_${suffix}`;
+
+    let prev = "";
+    try { prev = sessionStorage.getItem(key) || ""; } catch (e) { prev = ""; }
+
+    const next = (nextVal == null) ? "" : String(nextVal).trim();
+
+    // If next is empty, keep the previous non-empty value (don't "forget" last known gate/belt).
+    if (!next) return false;
+
+    const changed = (prev !== "" && prev !== next);
+    try { sessionStorage.setItem(key, next); } catch (e) { /* ignore */ }
+    return changed;
+  };
+}
+
 console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 /* flight-details.js
    Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
@@ -6,23 +30,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
-  "use strict";
-
-
-// Build a short airline marker (prefer IATA/ICAO, else initials from name)
-function getAirlineInitials(airlineIata, airlineIcao, airlineName) {
-  const a = (airlineIata || "").trim();
-  if (a) return a.toUpperCase().slice(0, 3);
-  const b = (airlineIcao || "").trim();
-  if (b) return b.toUpperCase().slice(0, 3);
-  const name = (airlineName || "").trim();
-  if (!name) return "";
-  const parts = name.split(/\s+/).filter(Boolean);
-  const initials = parts.map(p => p[0]).join("");
-  return initials.toUpperCase().slice(0, 2);
-}
-
-  
 console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 // --- Airport code -> city name (for geocoding). Add as needed.
   const airportCodeToCityName = {
@@ -205,11 +212,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     airlineLogo: document.getElementById("airlineLogo"),
     airlineName: document.getElementById("airlineName"),
     airlineCodeLine: document.getElementById("airlineCodeLine"),
-
-    // Hero airline (above flight number)
-    heroAirlineLogo: document.getElementById("heroAirlineLogo"),
-    heroAirlineName: document.getElementById("heroAirlineName"),
-    heroAirlineInitials: document.getElementById("heroAirlineInitials"),
     aircraftType: document.getElementById("aircraftType"),
     aircraftReg: document.getElementById("aircraftReg"),
     aircraftImageWrap: document.getElementById("aircraftImageWrap"),
@@ -636,57 +638,15 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     if (els.airlineName) els.airlineName.textContent = airlineNameVal;
     if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
 
-    // Logo (best effort) + Hero airline (logo + name + initials fallback)
-    const airlineIcao = pickAny(flat, ["airline.icaoCode", "airlineIcao", "icao", "airline_code"]) || "";
-    const initials = getAirlineInitials(airlineIata, airlineIcao, airlineNameVal);
-
-    // Prefer IATA for Google-hosted logo. Fall back to flight prefix if needed.
+    // Logo (best effort)
     const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
-
-    // Helper to set one logo+initials pair
-    function applyLogoOrInitials(logoEl, initialsEl, nameForAlt) {
-      if (!logoEl || !initialsEl) return;
-
-      // Default: show initials if we have any
-      const showInitials = () => {
-        if (initials) {
-          initialsEl.textContent = initials;
-          initialsEl.style.display = "";
-        } else {
-          initialsEl.style.display = "none";
-        }
-        logoEl.style.display = "none";
-      };
-
-      if (!logoIata) {
-        showInitials();
-        return;
-      }
-
-      // Try logo
-      logoEl.alt = nameForAlt ? `${nameForAlt} logo` : "Airline logo";
-      logoEl.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(logoIata)}.png`;
-
-      logoEl.onerror = () => showInitials();
-      logoEl.onload = () => {
-        logoEl.style.display = "";
-        initialsEl.style.display = "none";
-      };
-
-      // While loading, keep initials visible to avoid layout flicker
-      showInitials();
-    }
-
-    // Bottom airline row: keep name visible; logo/initials is optional eye-candy
-    // If you don't want initials in the bottom row, leave initialsEl null.
-    if (els.airlineLogo) { els.airlineLogo.style.display = "none"; }
-
-    // Hero airline (always: logo or initials + name)
-    applyLogoOrInitials(els.heroAirlineLogo, els.heroAirlineInitials, airlineNameVal);
-
-    if (els.heroAirlineName) {
-      els.heroAirlineName.textContent = airlineNameVal || "";
-      els.heroAirlineName.style.display = airlineNameVal ? "" : "none";
+    if (els.airlineLogo) {
+      if (logoIata) {
+        els.airlineLogo.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(logoIata)}.png`;
+        els.airlineLogo.alt = `${airlineNameVal} logo`;
+        els.airlineLogo.onerror = () => { els.airlineLogo.style.display = "none"; };
+        els.airlineLogo.style.display = "";
+      } else els.airlineLogo.style.display = "none";
     }
 
     // Aircraft (best effort)
@@ -771,7 +731,7 @@ function opsChanged(suffix, nextVal) {
 
 
 
-function opsChangedSticky(suffix, nextVal) {
+function window.opsChangedSticky(suffix, nextVal) {
   const key = getOpsKey(suffix);
   const prev = sessionStorage.getItem(key) || "";
   const next = (nextVal == null) ? "" : String(nextVal).trim();
@@ -1204,7 +1164,7 @@ if (els.arrKv) {
       gateEl.textContent = gate || "—";
 
       // Default: yellow. If gate changes (sticky), turn red.
-      const changed = opsChangedSticky("hero_gate", gate);
+      const changed = window.opsChangedSticky("hero_gate", gate);
       gateEl.classList.toggle("is-changed", changed);
     }
 
