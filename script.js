@@ -1,10 +1,12 @@
+"use strict";
+
+// Toggle verbose console logging during development.
+const DEBUG = false;
 const API_BASE = "https://flightapp-workers.chiffers.com/api";
 // Bristol Airport — redesigned mobile UI (stable build)
 // - Aviation Edge timetable (departures/arrivals)
 // - Saved (starred) flights stored in localStorage
 // - Install button (optional) + security wait samples
-"use strict";
-
 // =======================
 // Configuration
 // =======================

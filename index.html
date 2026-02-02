@@ -3,16 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
   <title>Bristol Airport — Flights</title>
   <!-- Preconnect to external domains for faster loading -->
   <link rel="preconnect" href="https://flightapp-workers.chiffers.com">
   <link rel="dns-prefetch" href="https://geocoding-api.open-meteo.com">
   <link rel="dns-prefetch" href="https://api.open-meteo.com">
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=20260202_final" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
@@ -114,7 +111,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </main>
 
-  <script src="script.js?v=20260202_final"></script>
+  <script src="script.js"></script>
   <script>
     // Service workers (and sometimes manifests) will error when opened via file://.
     // Run via http:// (e.g., VS Code Live Server / python -m http.server) for full PWA behavior.

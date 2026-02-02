@@ -1,4 +1,32 @@
-console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
+"use strict";
+
+// Toggle verbose console logging during development.
+const DEBUG = false;
+
+
+// --- Global safety prelude (opsChangedSticky) ---
+// Prevents hard crashes if helper functions move during refactors.
+(function () {
+  if (typeof window.opsChangedSticky !== "function") {
+    window.opsChangedSticky = function window.opsChangedSticky(suffix, nextVal) {
+      const key = (typeof window.getOpsKey === "function")
+        ? window.getOpsKey(suffix)
+        : `fd_unknown_${suffix}`;
+
+      // sessionStorage can throw in some hardened contexts; fail safe.
+      let prev = "";
+      try { prev = sessionStorage.getItem(key) || ""; } catch (e) { prev = ""; }
+
+      const next = (nextVal == null) ? "" : String(nextVal).trim();
+      if (!next) return false;
+
+      const changed = (prev !== "" && prev !== next);
+      try { sessionStorage.setItem(key, next); } catch (e) { /* ignore */ }
+      return changed;
+    };
+  }
+})();
+if (DEBUG) console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 /* flight-details.js
    Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
    Notes:
@@ -6,33 +34,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
-// --- Safety: ensure opsChangedSticky exists globally (prevents ReferenceError during rapid iteration/caching) ---
-// This function tracks changes for operational values (gate/belt) but *does not* wipe the last known value
-// when the API temporarily returns empty/undefined.
-if (typeof window.opsChangedSticky !== "function") {
-  window.opsChangedSticky = function window.opsChangedSticky(suffix, nextVal) {
-    // If getOpsKey exists, use it; otherwise fall back to a simple per-page key.
-    const key = (typeof window.getOpsKey === "function")
-      ? window.getOpsKey(suffix)
-      : `fd_unknown_${suffix}`;
-
-    const prev = sessionStorage.getItem(key) || "";
-    const next = (nextVal == null) ? "" : String(nextVal).trim();
-
-    // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
-    if (!next) return false;
-
-    const changed = (prev !== "" && prev !== next);
-    sessionStorage.setItem(key, next);
-    return changed;
-  };
-}
-
-
-  "use strict";
-
-  
-console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
+if (DEBUG) console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 // --- Airport code -> city name (for geocoding). Add as needed.
   const airportCodeToCityName = {
     "ABZ": "Aberdeen",
