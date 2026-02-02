@@ -18,51 +18,10 @@
 
 .hero-card-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
 }
-
-/* Hero airline block (logo above flight number) */
-.hero-header-left{
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-width: 0;
-}
-
-.hero-airline{
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0; /* override .airline-row padding style when reused */
-  min-width: 0;
-}
-
-.airline-logo.airline-logo--hero{
-  width: 26px;
-  height: 26px;
-  border-radius: 10px;
-  background: rgba(255,255,255,.10);
-}
-
-.airline-name--hero{
-  font-size: 13px;
-  line-height: 1.1;
-}
-
-.hero-airline-text{
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.hero-airline-code{
-  opacity: 0.75;
-}
-
 
 .hero-flight-number {
   font-size: 18px;
@@ -183,8 +142,7 @@
 
 .hero-info-grid {
   display: grid;
-  /* Match the 2-column departure/arrival layout above */
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-bottom: 16px;
 }
@@ -193,13 +151,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-/* Right column (arrival) should align to the arrival time block */
-.hero-info-item:nth-child(2){
-  justify-self: end;
-  align-items: flex-end;
-  text-align: right;
 }
 
 .hero-info-label {
@@ -223,23 +174,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-/* Gate/belt pills: fixed to ~3 characters wide (plus padding) for a stable layout */
-.hero-info-value.pill-gate,
-.hero-info-value.pill-belt{
-  width: fit-content;
-  min-width: calc(3ch + 20px);
-}
-
-/* Gate pill: yellow by default, red when the gate changes */
-.hero-info-value.pill-gate{
-  background: color-mix(in srgb, var(--warn) 22%, transparent);
-  border-color: color-mix(in srgb, var(--warn) 50%, var(--stroke));
-}
-.hero-info-value.pill-gate.is-changed{
-  background: color-mix(in srgb, var(--bad) 18%, transparent);
-  border-color: color-mix(in srgb, var(--bad) 48%, var(--stroke));
 }
 
 .hero-info-value:empty::before {
@@ -1123,19 +1057,4 @@ body.leaflet-on #routeSvg{ display:none; }
 .is-delayed .sb-card .sb-sched{
   color: #B42318;
   opacity: 0.9;
-}
-
-
-/* Hero airline: logo + name */
-.airline-logo--hero {
-  width: 28px;
-  height: 28px;
-}
-
-.airline-name--hero {
-  display: inline-block;
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin-left: 8px;
-  opacity: 0.85;
 }
