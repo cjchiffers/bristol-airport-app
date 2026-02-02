@@ -189,8 +189,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
     // Airline / aircraft
     airlineLogo: document.getElementById("airlineLogo"),
-    airlineInitials: document.getElementById("airlineInitials"),
-    heroAirline: document.getElementById("heroAirline"),
     airlineName: document.getElementById("airlineName"),
     airlineCodeLine: document.getElementById("airlineCodeLine"),
     aircraftType: document.getElementById("aircraftType"),
@@ -274,80 +272,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   function safeSetLocal(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
   function safeGetSession(key) { try { return sessionStorage.getItem(key); } catch { return null; } }
   function safeSetSession(key, value) { try { sessionStorage.setItem(key, value); return true; } catch { return false; } }
-
-  // ---------- Operational change tracking (hero only) ----------
-  // We keep these helpers in the outer scope so renderHeroCard can always access them.
-  // (Previously they were nested inside render(), which caused "... is not defined" errors.)
-  function getOpsKeyHero(suffix) {
-    const k = state?.storageKey || "unknown";
-    return `fd_${k}_${suffix}`;
-  }
-
-  // Sticky change detector: remembers the last non-empty value across refreshes.
-  // If the new value is empty, we keep the last known value and return "not changed".
-  function opsChangedStickyHero(suffix, nextVal) {
-    const key = getOpsKeyHero(suffix);
-    const prev = safeGetSession(key) || "";
-    const next = (nextVal == null) ? "" : String(nextVal).trim();
-
-    // If next is empty, don't overwrite the previous known value.
-    if (!next) return false;
-
-    const changed = (prev !== "" && prev !== next);
-    safeSetSession(key, next);
-    return changed;
-  }
-
-  // ---------- Airline logo/initials helpers ----------
-  function getAirlineInitials(name, iata, flightNo) {
-    // Prefer IATA code (U2, KL, FR) as the cleanest initials.
-    const i = (iata || "").trim();
-    if (i) return i.toUpperCase().slice(0, 3);
-
-    // Fall back to flight number prefix (e.g. U2322 -> U2)
-    const fn = (flightNo || "").trim();
-    if (fn.length >= 2) return fn.slice(0, 2).toUpperCase();
-
-    // As a last resort, derive from airline name.
-    const n = (name || "").trim();
-    if (!n) return "";
-    return n
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((w) => w[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-  }
-
-  function setHeroAirlineLogoOrInitials({ airlineName, airlineIata, flightNo }) {
-    const wrap = els.heroAirline;
-    const logoEl = els.airlineLogo;
-    const initialsEl = els.airlineInitials;
-    if (!wrap || !logoEl || !initialsEl) return;
-
-    const initials = getAirlineInitials(airlineName, airlineIata, flightNo) || "";
-    initialsEl.textContent = initials;
-
-    // Logo URL is best-effort. If it fails, show initials.
-    const logoIata = (airlineIata || (flightNo ? String(flightNo).slice(0, 2) : "")).trim();
-    if (!logoIata) {
-      wrap.classList.add("is-fallback");
-      logoEl.removeAttribute("src");
-      logoEl.alt = "";
-      return;
-    }
-
-    wrap.classList.remove("is-fallback");
-    logoEl.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(logoIata)}.png`;
-    logoEl.alt = "";
-
-    // On failure, permanently switch to initials for this session view.
-    logoEl.onerror = () => {
-      wrap.classList.add("is-fallback");
-      logoEl.removeAttribute("src");
-    };
-  }
 
   // ---------- Utilities ----------
   function escapeHtml(s) {
@@ -687,19 +611,22 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     renderStatusBadge(flat);
     renderOpsBar(flight, flat);
 
-    // Airline basics (logo-only with initials fallback in the hero)
-    const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "";
+    // Airline basics
+    const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
     const airlineIata = pickAny(flat, ["airline.iata", "airline.iataCode", "flight.airline.code.iata", "airline_iata", "airlineCode"]) || "";
-
-    // Keep these assignments optional (some older layouts still include them)
-    if (els.airlineName) els.airlineName.textContent = airlineNameVal || "—";
+    if (els.airlineName) els.airlineName.textContent = airlineNameVal;
     if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
 
-    setHeroAirlineLogoOrInitials({
-      airlineName: airlineNameVal,
-      airlineIata,
-      flightNo: displayNo,
-    });
+    // Logo (best effort)
+    const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
+    if (els.airlineLogo) {
+      if (logoIata) {
+        els.airlineLogo.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(logoIata)}.png`;
+        els.airlineLogo.alt = `${airlineNameVal} logo`;
+        els.airlineLogo.onerror = () => { els.airlineLogo.style.display = "none"; };
+        els.airlineLogo.style.display = "";
+      } else els.airlineLogo.style.display = "none";
+    }
 
     // Aircraft (best effort)
     const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
@@ -750,8 +677,7 @@ const depInfo = {
 };
 
 depInfo.gateChanged = opsChanged('gate_dep', depInfo.gate);
-
-// Note: belt is an arrival-only field, so we do not track it for departures.
+depInfo.beltChanged = opsChanged('belt_dep', depInfo.belt);
 
 
 const arrInfo = {
@@ -1217,7 +1143,7 @@ if (els.arrKv) {
       gateEl.textContent = gate || "—";
 
       // Default: yellow. If gate changes (sticky), turn red.
-      const changed = opsChangedStickyHero("hero_gate", gate);
+      const changed = opsChangedSticky("hero_gate", gate);
       gateEl.classList.toggle("is-changed", changed);
     }
 
