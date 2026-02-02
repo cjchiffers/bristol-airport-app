@@ -190,6 +190,8 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     // Airline / aircraft
     airlineLogo: document.getElementById("airlineLogo"),
     airlineName: document.getElementById("airlineName"),
+    airlineInitials: document.getElementById("airlineInitials"),
+    heroAirline: document.getElementById("heroAirline"),
     airlineCodeLine: document.getElementById("airlineCodeLine"),
     aircraftType: document.getElementById("aircraftType"),
     aircraftReg: document.getElementById("aircraftReg"),
@@ -709,6 +711,26 @@ function opsChanged(suffix, nextVal) {
 }
 
 
+
+
+function getAirlineInitials(airlineName, airlineIata, flightNo) {
+  const iata = (airlineIata || "").trim();
+  if (iata) return iata.toUpperCase();
+
+  const fn = (flightNo || "").trim();
+  const prefix = fn.slice(0, 2);
+  if (/^[A-Za-z0-9]{2}$/.test(prefix)) return prefix.toUpperCase();
+
+  const name = (airlineName || "").trim();
+  if (!name) return "";
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(w => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 function opsChangedSticky(suffix, nextVal) {
   const key = getOpsKey(suffix);

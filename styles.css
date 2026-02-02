@@ -44,13 +44,6 @@ html, body{ height:100%; }
   }
 }
 
-/*
-  Background continuity fix
-  -------------------------
-  Some mobile browsers can "restart" or abruptly clip multi-layer gradients on <body>
-  during scroll. We render the decorative gradients on a fixed pseudo-element so the
-  background stays visually continuous while the page content scrolls above it.
-*/
 body{
   margin:0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
@@ -59,17 +52,6 @@ body{
   position: relative;
 }
 
-body::before{
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(1000px 600px at 12% 0%, rgba(98,178,255,.22), transparent 55%),
-    radial-gradient(900px 600px at 95% 10%, rgba(56,211,159,.12), transparent 55%),
-    var(--bg);
-}
 
 h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
 .small{ font-size: 12px; color: var(--muted); }
@@ -527,3 +509,17 @@ h1, h2, h3, h4 {
 
 .star-btn{border:none;background:transparent;font-size:18px;cursor:pointer;opacity:.7}
 .star-btn.is-on{opacity:1}
+
+/* Fixed decorative background layer.
+   Prevents the radial gradients from "resetting" during scroll on some mobile browsers. */
+body::before{
+  content:"";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1000px 600px at 12% 0%, rgba(98,178,255,.22), transparent 55%),
+    radial-gradient(900px 600px at 95% 10%, rgba(56,211,159,.12), transparent 55%),
+    var(--bg);
+}
