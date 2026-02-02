@@ -8,7 +8,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
 
   "use strict";
 
-  
 console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 // --- Airport code -> city name (for geocoding). Add as needed.
   const airportCodeToCityName = {
@@ -272,6 +271,39 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   function safeSetLocal(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
   function safeGetSession(key) { try { return sessionStorage.getItem(key); } catch { return null; } }
   function safeSetSession(key, value) { try { sessionStorage.setItem(key, value); return true; } catch { return false; } }
+
+  // ---------- Ops-change helpers ----------
+  // We use sessionStorage (per-tab) to detect when operational fields change
+  // between refreshes (e.g. gate changes). Keyed per-flight via state.storageKey.
+  function getOpsKey(suffix) {
+    const k = state && state.storageKey ? state.storageKey : "unknown";
+    return `fd_${k}_${suffix}`;
+  }
+
+  // "Changed" only when a previous non-empty value existed and differs.
+  function opsChanged(suffix, nextVal) {
+    const key = getOpsKey(suffix);
+    const prev = safeGetSession(key);
+    const next = (nextVal == null) ? "" : String(nextVal).trim();
+    const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
+    safeSetSession(key, next);
+    return changed;
+  }
+
+  // Like opsChanged, but does *not* overwrite the stored value with empty.
+  // This avoids "forgetting" the last known gate when some API responses omit it.
+  function opsChangedSticky(suffix, nextVal) {
+    const key = getOpsKey(suffix);
+    const prev = safeGetSession(key) || "";
+    const next = (nextVal == null) ? "" : String(nextVal).trim();
+
+    // If next is empty, keep previous value and report "no change".
+    if (!next) return false;
+
+    const changed = (prev !== "" && prev !== next);
+    safeSetSession(key, next);
+    return changed;
+  }
 
   // ---------- Utilities ----------
   function escapeHtml(s) {
@@ -677,7 +709,7 @@ const depInfo = {
 };
 
 depInfo.gateChanged = opsChanged('gate_dep', depInfo.gate);
-depInfo.beltChanged = opsChanged('belt_dep', depInfo.belt);
+// NOTE: departures do not have a belt; keep ops-change tracking for arrival belt only.
 
 
 const arrInfo = {
@@ -691,38 +723,6 @@ const arrInfo = {
 
 arrInfo.gateChanged = opsChanged('gate_arr', arrInfo.gate);
 arrInfo.beltChanged = opsChanged('belt_arr', arrInfo.belt);
-
-
-// Track per-flight operational fields so we can highlight changes (e.g. gate change)
-function getOpsKey(suffix) {
-  const k = state?.storageKey || "unknown";
-  return `fd_${k}_${suffix}`;
-}
-function opsChanged(suffix, nextVal) {
-  const key = getOpsKey(suffix);
-  const prev = sessionStorage.getItem(key);
-  const next = (nextVal == null) ? "" : String(nextVal);
-  // Only count as "changed" if we had a previous non-empty value and it differs.
-  const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
-  sessionStorage.setItem(key, next);
-  return changed;
-}
-
-
-
-function opsChangedSticky(suffix, nextVal) {
-  const key = getOpsKey(suffix);
-  const prev = sessionStorage.getItem(key) || "";
-  const next = (nextVal == null) ? "" : String(nextVal).trim();
-
-  // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
-  if (!next) return false;
-
-  const changed = (prev !== "" && prev !== next);
-  sessionStorage.setItem(key, next);
-  return changed;
-}
-
 
 
 function kvLine(label, val) {
