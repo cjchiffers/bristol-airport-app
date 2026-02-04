@@ -635,7 +635,6 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     els.heroAirlineInitials.textContent = initials || "—";
     els.heroAirlineInitials.style.display = "";
   }
-}
 
 
   function deriveIdentity(f) {

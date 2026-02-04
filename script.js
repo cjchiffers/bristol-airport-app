@@ -83,7 +83,7 @@ async function ensureAirportCached(iata, name){
   saveAirportGeoCache(cache);
 }
 
-function pickAny(obj, paths){
+function pickAnyPath(obj, paths){
   for(const p of paths){
     const parts = p.split(".");
     let v = obj;
@@ -102,10 +102,10 @@ async function prefetchAirportsFromFlights(depList, arrList){
   const jobs = [];
   for(const f of flights){
     const flat = flattenObject(f || {});
-    const depIata = pickAny(flat, ["departure.iataCode","departure.iata","departure.airport.iataCode","departure.airport.iata","depIata","dep.iataCode"]);
-    const depName = pickAny(flat, ["departure.airport.name","departure.airportName","departure.airport","departure.name","departure.city","departure.cityName"]);
-    const arrIata = pickAny(flat, ["arrival.iataCode","arrival.iata","arrival.airport.iataCode","arrival.airport.iata","arrIata","arr.iataCode"]);
-    const arrName = pickAny(flat, ["arrival.airport.name","arrival.airportName","arrival.airport","arrival.name","arrival.city","arrival.cityName"]);
+    const depIata = pickAnyPath(flat, ["departure.iataCode","departure.iata","departure.airport.iataCode","departure.airport.iata","depIata","dep.iataCode"]);
+    const depName = pickAnyPath(flat, ["departure.airport.name","departure.airportName","departure.airport","departure.name","departure.city","departure.cityName"]);
+    const arrIata = pickAnyPath(flat, ["arrival.iataCode","arrival.iata","arrival.airport.iataCode","arrival.airport.iata","arrIata","arr.iataCode"]);
+    const arrName = pickAnyPath(flat, ["arrival.airport.name","arrival.airportName","arrival.airport","arrival.name","arrival.city","arrival.cityName"]);
 
     const pairs = [[depIata, depName],[arrIata, arrName]];
     for(const [iata, name] of pairs){
@@ -173,18 +173,87 @@ function toDate(value){
 }
 
 // =======================
-// City name mapping (fallback to code)
+// Airport name lookup (offline-first)
 // =======================
-const airportCodeToCityName = {
-  "ABZ":"Aberdeen","AGP":"Malaga","ADA":"Izmir","ALC":"Alicante","AMS":"Amsterdam","ATA":"Antalya","AYT":"Dalaman",
-  "BCN":"Barcelona","BLQ":"Bologna","BHD":"Belfast City","BFS":"Belfast International","CDG":"Paris Charles de Gaulle",
-  "CFU":"Corfu","CUN":"Cancun","DAA":"Sharm el Sheikh","DLM":"Dalaman","EDI":"Edinburgh","FAO":"Faro","FCO":"Rome",
-  "FNC":"Madeira","GLA":"Glasgow","HRG":"Hurghada","INV":"Inverness","IOM":"Isle of Man","JER":"Jersey","KRK":"Krakow",
-  "LIN":"Milan","LIS":"Lisbon","LPA":"Gran Canaria","MAN":"Manchester","MME":"Teesside","MUC":"Munich","NAP":"Naples",
-  "NCL":"Newcastle","OLB":"Olbia","ORY":"Paris Orly","PMI":"Palma de Mallorca","PSA":"Pisa","RHO":"Rhodes","SKG":"Thessaloniki",
-  "SSH":"Sharm el Sheikh","TFS":"Tenerife South","VIE":"Vienna","ZRH":"Zurich"
-};
-function getCityName(code){ return airportCodeToCityName[code] || code || "—"; }
+// Airport index file is shipped with the app shell and cached by the service worker.
+// Shape: { "BRS": { iata, name, city, country, lat, lon }, ... }
+const AIRPORT_INDEX_URL = "./airports.min.json";
+const AIRPORT_INDEX_CACHE_KEY = "brs_airport_index_v1";
+const AIRPORT_INDEX_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
+let airportIndex = null;
+
+function safeJsonParse(s){ try { return JSON.parse(s); } catch { return null; } }
+
+function loadAirportIndexFromStorage(){
+  try{
+    const raw = localStorage.getItem(AIRPORT_INDEX_CACHE_KEY);
+    const parsed = raw ? safeJsonParse(raw) : null;
+    if(!parsed || typeof parsed !== "object") return null;
+
+    const ts = Number(parsed.ts) || 0;
+    const data = (parsed.data && typeof parsed.data === "object") ? parsed.data : null;
+    if(!data) return null;
+
+    const fresh = (Date.now() - ts) < AIRPORT_INDEX_TTL_MS;
+    return fresh ? data : null;
+  }catch{ return null; }
+}
+
+function saveAirportIndexToStorage(data){
+  try{
+    localStorage.setItem(AIRPORT_INDEX_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+  }catch{}
+}
+
+async function loadAirportIndexBestEffort(){
+  if(airportIndex && typeof airportIndex === "object") return airportIndex;
+
+  const cached = loadAirportIndexFromStorage();
+  if(cached){
+    airportIndex = cached;
+    return airportIndex;
+  }
+
+  try{
+    const res = await fetch(AIRPORT_INDEX_URL, { cache: "no-store" });
+    if(!res.ok) throw new Error(`airport index HTTP ${res.status}`);
+    const data = await res.json();
+    if(data && typeof data === "object"){
+      airportIndex = data;
+      saveAirportIndexToStorage(data);
+      return airportIndex;
+    }
+  }catch(e){
+    console.warn("[BRS Flights] airport index load failed:", e);
+  }
+
+  airportIndex = null;
+  return null;
+}
+
+function getAirportRecord(iata){
+  const code = normIata(iata);
+  if(!code) return null;
+  const rec = airportIndex && airportIndex[code] ? airportIndex[code] : null;
+  return rec || null;
+}
+
+function getAirportDisplayName(iata, prefer = "city"){
+  // prefer: "city" | "airport"
+  const code = normIata(iata);
+  if(!code) return "—";
+  const rec = getAirportRecord(code);
+  if(!rec) return code; // fallback to IATA code (never hide flights)
+
+  if(prefer === "airport") return rec.name || rec.city || rec.iata || code;
+  return rec.city || rec.name || rec.iata || code;
+}
+
+// Backwards-compatible helper used throughout script.js
+function getCityName(code){
+  return getAirportDisplayName(code, "city");
+}
 
 // =======================
 // Time helpers (London)
@@ -311,11 +380,11 @@ function setSavedFlights(list){
 
 function deriveIdentity(f){
   const flat = flattenObject(f || {});
-  const flightNo = pickAny(flat, ["flight.iataNumber","flight_iata","flightNumber","flight.iata","flight.number"]) || "";
-  const dep = pickAny(flat, ["departure.iataCode","departure.iata","dep_iata","origin","from"]) || "";
-  const arr = pickAny(flat, ["arrival.iataCode","arrival.iata","arr_iata","destination","to"]) || "";
-  const schedDep = pickAny(flat, ["departure.scheduledTime","departure.scheduled","scheduled_departure","departure_time"]) || "";
-  const schedArr = pickAny(flat, ["arrival.scheduledTime","arrival.scheduled","scheduled_arrival","arrival_time"]) || "";
+  const flightNo = pickAnyPath(flat, ["flight.iataNumber","flight_iata","flightNumber","flight.iata","flight.number"]) || "";
+  const dep = pickAnyPath(flat, ["departure.iataCode","departure.iata","dep_iata","origin","from"]) || "";
+  const arr = pickAnyPath(flat, ["arrival.iataCode","arrival.iata","arr_iata","destination","to"]) || "";
+  const schedDep = pickAnyPath(flat, ["departure.scheduledTime","departure.scheduled","scheduled_departure","departure_time"]) || "";
+  const schedArr = pickAnyPath(flat, ["arrival.scheduledTime","arrival.scheduled","scheduled_arrival","arrival_time"]) || "";
   return { flightNo, dep, arr, schedDep, schedArr };
 }
 
@@ -350,7 +419,7 @@ function saveFlight(flight, context){
       id,
       updatedAt: Date.now(),
       context: context || null,
-      airline: pickAny(flat, ["airline.name","airlineName","airline"]) || "",
+      airline: pickAnyPath(flat, ["airline.name","airlineName","airline"]) || "",
       flight
     });
     if (cur.length > 200) cur.length = 200;
@@ -821,6 +890,8 @@ function initSecurityUI(){
 // Init
 // =======================
 (function init(){
+  // Load airport index in the background (non-blocking). Once loaded, re-render so missing IATA names fill in.
+  loadAirportIndexBestEffort().then(()=>{ try{ renderList(currentTab); }catch{} }).catch(()=>{});
   // iOS Safari viewport fix
   function updateVH() {
     const vh = window.innerHeight * 0.01;
