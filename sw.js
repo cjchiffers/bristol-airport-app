@@ -12,7 +12,9 @@ const APP_SHELL = [
   "./manifest.json",
   "./assets/bristol-logo.png",
   "./assets/icon-192.png",
-  "./assets/icon-512.png"
+  "./assets/icon-512.png",
+  "./shared/airports.js",
+  "./shared/airlines.js"
 ];
 
 self.addEventListener("install", (event) => {

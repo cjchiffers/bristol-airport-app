@@ -11,10 +11,8 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
   
 console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 // --- Airport code -> city name (for geocoding). Add as needed.
-   const airportCodeToCityName = {
+  const airportCodeToCityName = {
     "ABZ": "Aberdeen",
-    "ACE": "Lanzarote",
-    "AGA": "Agadir",
     "AGP": "Malaga",
     "ADA": "Izmir",
     "ALC": "Alicante",
@@ -31,14 +29,12 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     "CUN": "Cancun",
     "DAA": "Sharm el Sheikh",
     "DLM": "Dalaman",
-    "DUB": "Dublin",
     "EDI": "Edinburgh",
     "FAO": "Faro",
     "FCO": "Rome",
     "FNC": "Madeira",
     "FUE": "Fuerteventura",
     "GLA": "Glasgow",
-    "GVA": "Geneva",
     "HRG": "Hurghada",
     "INV": "Inverness",
     "IOM": "Isle of Man",
@@ -53,92 +49,28 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     "NAP": "Naples",
     "NCL": "Newcastle",
     "OLB": "Olbia",
-    "ORK": "Cork",
     "ORY": "Paris Orly",
     "PMI": "Palma de Mallorca",
     "PSA": "Pisa",
     "RHO": "Rhodes",
-    "RVN": "Rovaniemi",
     "SKG": "Thessaloniki",
-    "SOF": "Sofia",
     "SSH": "Sharm el Sheikh",
     "TFS": "Tenerife South",
-    "TLS": "Toulouse",
-    "VCE": "Venice",
     "VIE": "Vienna",
     "ZRH": "Zurich",
   };
+// ---------- Airport name lookup (shared) ----------
+// See shared/airports.js. This page calls it non-blocking during init().
+async function loadAirportIndexBestEffort(){
+  return window.BrsAirports ? window.BrsAirports.loadAirportIndexBestEffort() : null;
+}
+function getAirportRecord(iata){
+  return window.BrsAirports ? window.BrsAirports.getAirportRecord(iata) : null;
+}
+function getAirportDisplayName(iata, prefer){
+  return window.BrsAirports ? window.BrsAirports.getAirportDisplayName(iata, prefer) : (normIata(iata)||"");
+}
 
-  // ---------- Airport name lookup (offline-first) ----------
-  // Strategy:
-  // 1) Load a local, cached airport index (airports.min.json) for instant offline lookups.
-  // 2) If a code isn't found, fall back to our built-in seed map (airportCodeToCityName).
-  // 3) Optional: if still missing and we're online, call our Worker endpoint (/api/airport?iata=XXX)
-  //    and cache the result in localStorage for future offline use.
-  //
-  // Notes:
-  // - This keeps the app "glanceable" and resilient: no blocking renders, no hard failures.
-  // - The shipped airports.min.json can be swapped later with a fuller dataset (e.g. OurAirports-derived).
-  const AIRPORT_INDEX_URL = "airports.min.json";
-  const AIRPORT_INDEX_CACHE_KEY = "brs_airport_index_v1";
-  const AIRPORT_INDEX_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
-
-  // In-memory index (fast path). Shape: { [IATA]: { iata, name, city, country, lat, lon } }
-  let airportIndex = null;
-
-  function safeJsonParse(s) { try { return JSON.parse(s); } catch { return null; } }
-
-  function loadAirportIndexFromStorage() {
-    try {
-      const raw = localStorage.getItem(AIRPORT_INDEX_CACHE_KEY);
-      const parsed = raw ? safeJsonParse(raw) : null;
-      if (!parsed || typeof parsed !== "object") return null;
-
-      const ts = Number(parsed.ts) || 0;
-      const data = parsed.data && typeof parsed.data === "object" ? parsed.data : null;
-      if (!data) return null;
-
-      const fresh = (Date.now() - ts) < AIRPORT_INDEX_TTL_MS;
-      return fresh ? data : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function saveAirportIndexToStorage(data) {
-    try {
-      localStorage.setItem(AIRPORT_INDEX_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
-    } catch {}
-  }
-
-  async function loadAirportIndexBestEffort() {
-    // Fast path: memory
-    if (airportIndex && typeof airportIndex === "object") return airportIndex;
-
-    // Next: cached storage
-    const cached = loadAirportIndexFromStorage();
-    if (cached) {
-      airportIndex = cached;
-      return airportIndex;
-    }
-
-    // Finally: fetch the bundled JSON (offline shell caches this file via SW when you add it)
-    try {
-      const res = await fetch(AIRPORT_INDEX_URL, { cache: "no-store" });
-      if (!res.ok) throw new Error(`airport index HTTP ${res.status}`);
-      const data = await res.json();
-      if (data && typeof data === "object") {
-        airportIndex = data;
-        saveAirportIndexToStorage(data);
-        return airportIndex;
-      }
-    } catch (e) {
-      console.warn("[BRS Flights] airport index load failed:", e);
-    }
-
-    airportIndex = null;
-    return null;
-  }
 
   function getAirportRecord(iata) {
     const code = normIata(iata);
@@ -521,39 +453,21 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
 // ---------- Hero airline (logo + initials fallback) ----------
 // Some airlines have IATA codes like "U2" (letter+digit). Also, flight numbers often start with that.
-function likelyAirlineCode(airlineIata, flightNo) {
-  const raw = String(airlineIata || "").trim().toUpperCase();
-  // Accept common 2/3 char airline codes (incl. letter+digit like U2)
-  if (raw && /^[A-Z0-9]{2,3}$/.test(raw)) return raw;
-
-  const f = String(flightNo || "").trim().toUpperCase();
-  // First two chars can be airline code (e.g. FR4753 -> FR, U22832 -> U2)
-  if (f.length >= 2) {
-    const first2 = f.slice(0, 2);
-    if (/^[A-Z0-9]{2}$/.test(first2)) return first2;
-  }
-  // Fallback: first 3 letters if present (rare)
-  const m = f.match(/^[A-Z]{2,3}/);
-  return m ? m[0].slice(0, 3) : "";
+function likelyAirlineCode(airlineIata, flightNo){
+  return window.BrsAirlines ? window.BrsAirlines.likelyAirlineCode(airlineIata, flightNo) : (String(airlineIata||"").trim().toUpperCase());
+}
+function airlineInitialsFrom(code, flightNo){
+  return window.BrsAirlines ? window.BrsAirlines.airlineInitialsFrom(code, flightNo) : "—";
 }
 
-function airlineInitialsFrom(airlineCode, flightNo) {
-  const c = String(airlineCode || "").trim().toUpperCase();
-  if (c && /^[A-Z0-9]{2,3}$/.test(c)) return c.slice(0, 3);
-
-  const f = String(flightNo || "").trim().toUpperCase();
-  if (f.length >= 2) {
-    const first2 = f.slice(0, 2);
-    if (/^[A-Z0-9]{2}$/.test(first2)) return first2;
-  }
   return "—";
-}
+
 
 function setHeroAirline(airlineName, airlineIata, flightNo) {
   if (!els.heroAirline) return;
 
   const name = String(airlineName || "").trim();
-  const code = likelyAirlineCode(airlineIata, flightNo);
+  const code = likelyAirlineCode(airlineIata, flightNo); // e.g. "FR", "U2"
   const initials = airlineInitialsFrom(code, flightNo);
 
   // Always show the row if we have at least a name or initials.
@@ -561,6 +475,73 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     els.heroAirline.style.display = "none";
     return;
   }
+  els.heroAirline.style.display = "";
+
+  if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
+
+  // Reset visibility
+  if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "none";
+  if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
+
+  // While loading (or when logo missing), show initials so the header doesn’t look empty.
+  if (els.heroAirlineInitials) {
+    els.heroAirlineInitials.textContent = initials || "—";
+    els.heroAirlineInitials.style.display = "";
+  }
+
+  // Prefer logo when we have an airline code.
+  if (els.heroAirlineLogo && code) {
+    const img = els.heroAirlineLogo;
+    img.alt = name ? `${name} logo` : "Airline logo";
+
+    // Try multiple logo CDNs (some carriers are missing from one source).
+    // NOTE: Your main index page likely uses the Kiwi CDN, so we try that first.
+    const logoUrls = (window.BrsAirlines ? window.BrsAirlines.getLogoUrls(code) : []);
+// Load with fallback across multiple providers.
+if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
+  window.BrsAirlines.setImgWithFallback(img, logoUrls, () => {
+    img.style.display = "";
+    if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
+  });
+  return;
+}
+
+
+    // Avoid infinite loops if render() calls this repeatedly.
+    let idx = 0;
+
+    const showLogo = () => {
+      img.style.display = "";
+      if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
+    };
+
+    const tryNext = () => {
+      idx += 1;
+      if (idx >= logoUrls.length) {
+        img.style.display = "none"; // initials stay visible
+        return;
+      }
+      attachAndSetSrc(logoUrls[idx]);
+    };
+
+    const attachAndSetSrc = (src) => {
+      // IMPORTANT: attach handlers *before* setting src (cached images may fire immediately).
+      img.onload = () => showLogo();
+      img.onerror = () => tryNext();
+
+      // Setting the same src repeatedly may not fire onload; force a change if needed.
+      if (img.src !== src) img.src = src;
+
+      // If the image is already cached and complete, show immediately.
+      if (img.complete && img.naturalWidth > 0) {
+        showLogo();
+      }
+    };
+
+    attachAndSetSrc(logoUrls[idx]);
+    return;
+  }
+}
   els.heroAirline.style.display = "";
 
   if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
@@ -594,7 +575,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     img.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(code)}.png`;
     return;
   }
-}
+
   els.heroAirline.style.display = "";
 
   if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
@@ -635,6 +616,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     els.heroAirlineInitials.textContent = initials || "—";
     els.heroAirlineInitials.style.display = "";
   }
+
 
 
   function deriveIdentity(f) {
@@ -1983,7 +1965,7 @@ if (els.arrKv) {
     return el;
   }
 
-  function normIata(code) { return String(code || "").trim().toUpperCase(); }
+  function normIata(code){ return (window.BrsAirports && window.BrsAirports.normIata) ? window.BrsAirports.normIata(code) : String(code||"").trim().toUpperCase(); }
 
   function resolvePlaceQuery(flat, kind, iata) {
     const paths = (kind === "dep")

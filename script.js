@@ -12,7 +12,7 @@ const API_BASE = "https://flightapp-workers.chiffers.com/api";
 const AIRPORT_GEO_CACHE_KEY = "brs_airport_geo_cache_v1";
 const AIRPORT_GEO_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
-function normIata(code){ return String(code||"").trim().toUpperCase(); }
+function normIata(code){ return (window.BrsAirports && window.BrsAirports.normIata) ? window.BrsAirports.normIata(code) : String(code||"").trim().toUpperCase(); }
 
 function loadAirportGeoCache(){
   try{
@@ -177,80 +177,15 @@ function toDate(value){
 // =======================
 // Airport index file is shipped with the app shell and cached by the service worker.
 // Shape: { "BRS": { iata, name, city, country, lat, lon }, ... }
-const AIRPORT_INDEX_URL = "./airports.min.json";
-const AIRPORT_INDEX_CACHE_KEY = "brs_airport_index_v1";
-const AIRPORT_INDEX_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
-
-let airportIndex = null;
-
-function safeJsonParse(s){ try { return JSON.parse(s); } catch { return null; } }
-
-function loadAirportIndexFromStorage(){
-  try{
-    const raw = localStorage.getItem(AIRPORT_INDEX_CACHE_KEY);
-    const parsed = raw ? safeJsonParse(raw) : null;
-    if(!parsed || typeof parsed !== "object") return null;
-
-    const ts = Number(parsed.ts) || 0;
-    const data = (parsed.data && typeof parsed.data === "object") ? parsed.data : null;
-    if(!data) return null;
-
-    const fresh = (Date.now() - ts) < AIRPORT_INDEX_TTL_MS;
-    return fresh ? data : null;
-  }catch{ return null; }
-}
-
-function saveAirportIndexToStorage(data){
-  try{
-    localStorage.setItem(AIRPORT_INDEX_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
-  }catch{}
-}
-
+// Airport lookups are shared across pages (see shared/airports.js)
 async function loadAirportIndexBestEffort(){
-  if(airportIndex && typeof airportIndex === "object") return airportIndex;
-
-  const cached = loadAirportIndexFromStorage();
-  if(cached){
-    airportIndex = cached;
-    return airportIndex;
-  }
-
-  try{
-    const res = await fetch(AIRPORT_INDEX_URL, { cache: "no-store" });
-    if(!res.ok) throw new Error(`airport index HTTP ${res.status}`);
-    const data = await res.json();
-    if(data && typeof data === "object"){
-      airportIndex = data;
-      saveAirportIndexToStorage(data);
-      return airportIndex;
-    }
-  }catch(e){
-    console.warn("[BRS Flights] airport index load failed:", e);
-  }
-
-  airportIndex = null;
-  return null;
+  return window.BrsAirports ? window.BrsAirports.loadAirportIndexBestEffort() : null;
 }
-
-function getAirportRecord(iata){
+function getAirportDisplayName(iata, prefer){
+  if(window.BrsAirports) return window.BrsAirports.getAirportDisplayName(iata, prefer);
   const code = normIata(iata);
-  if(!code) return null;
-  const rec = airportIndex && airportIndex[code] ? airportIndex[code] : null;
-  return rec || null;
+  return code || "—";
 }
-
-function getAirportDisplayName(iata, prefer = "city"){
-  // prefer: "city" | "airport"
-  const code = normIata(iata);
-  if(!code) return "—";
-  const rec = getAirportRecord(code);
-  if(!rec) return code; // fallback to IATA code (never hide flights)
-
-  if(prefer === "airport") return rec.name || rec.city || rec.iata || code;
-  return rec.city || rec.name || rec.iata || code;
-}
-
-// Backwards-compatible helper used throughout script.js
 function getCityName(code){
   return getAirportDisplayName(code, "city");
 }
