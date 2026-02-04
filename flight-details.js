@@ -461,7 +461,7 @@ function airlineInitialsFrom(code, flightNo){
 }
 
   return "—";
-}
+
 
 function setHeroAirline(airlineName, airlineIata, flightNo) {
   if (!els.heroAirline) return;
@@ -575,7 +575,7 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
     img.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(code)}.png`;
 // return removed (illegal at top-level)
   }
-}
+
   els.heroAirline.style.display = "";
 
   if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
@@ -616,7 +616,7 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
     els.heroAirlineInitials.textContent = initials || "—";
     els.heroAirlineInitials.style.display = "";
   }
-}
+
 
 
   function deriveIdentity(f) {
