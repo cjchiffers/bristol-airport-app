@@ -59,117 +59,105 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     "VIE": "Vienna",
     "ZRH": "Zurich",
   };
-// ---------- Airport name lookup (shared + safe fallbacks) ----------
-// This page prefers the shared airport index from shared/airports.js.
-// If it isn't loaded yet (or fails), we fall back to a small seed map (airportCodeToCityName) so the UI never blanks.
-async function loadAirportIndexBestEffort() {
-  try {
-    return window.BrsAirports ? await window.BrsAirports.loadAirportIndexBestEffort() : null;
-  } catch {
-    return null;
-  }
+// ---------- Airport name lookup (shared) ----------
+// See shared/airports.js. This page calls it non-blocking during init().
+async function loadAirportIndexBestEffort(){
+  return window.BrsAirports ? window.BrsAirports.loadAirportIndexBestEffort() : null;
+}
+function getAirportRecord(iata){
+  return window.BrsAirports ? window.BrsAirports.getAirportRecord(iata) : null;
+}
+function getAirportDisplayName(iata, prefer){
+  return window.BrsAirports ? window.BrsAirports.getAirportDisplayName(iata, prefer) : (normIata(iata)||"");
 }
 
-function normIata(code) {
-  return (window.BrsAirports && window.BrsAirports.normIata)
-    ? window.BrsAirports.normIata(code)
-    : String(code || "").trim().toUpperCase();
-}
 
-function getAirportRecord(iata) {
-  const code = normIata(iata);
-  if (!code) return null;
-
-  // Prefer the shared index if present.
-  try {
-    const fromIndex = window.BrsAirports ? window.BrsAirports.getAirportRecord(code) : null;
-    if (fromIndex) return fromIndex;
-  } catch {}
-
-  // Seed fallback (keeps UI stable even if index fails)
-  const seedCity = airportCodeToCityName[code];
-  if (seedCity) {
-    return {
-      iata: code,
-      city: seedCity,
-      name: /airport/i.test(seedCity) ? seedCity : `${seedCity} Airport`,
-    };
-  }
-
-  return null;
-}
-
-function getAirportDisplayName(iata, prefer = "city") {
-  // prefer: "city" | "airport"
-  const rec = getAirportRecord(iata);
-  if (!rec) return normIata(iata) || "";
-  if (prefer === "airport") return rec.name || rec.city || rec.iata || "";
-  return rec.city || rec.name || rec.iata || "";
-}
-
-// Keep the existing helper name (lots of code uses it): now backed by the index.
-function getCityName(code) {
-  return getAirportDisplayName(code, "city");
-}
-
-// Optional Worker fallback (only used when truly missing).
-// This is non-blocking: callers can trigger it and re-render later if they want.
-const AIRPORT_LOOKUP_CACHE_PREFIX = "brs_airport_lookup_"; // per-IATA cache in localStorage
-
-function safeJsonParse(s) { try { return JSON.parse(s); } catch { return null; } }
-
-function readAirportLookupCache(iata) {
-  try {
+  function getAirportRecord(iata) {
     const code = normIata(iata);
     if (!code) return null;
-    const raw = localStorage.getItem(AIRPORT_LOOKUP_CACHE_PREFIX + code);
-    const obj = raw ? safeJsonParse(raw) : null;
-    if (!obj || typeof obj !== "object") return null;
-    // Keep these lookups for 90 days.
-    const ts = Number(obj.ts) || 0;
-    if ((Date.now() - ts) > (1000 * 60 * 60 * 24 * 90)) return null;
-    return obj.data || null;
-  } catch {
+
+    // If the index isn't loaded yet, we still fall back instantly to the seed map.
+    const fromIndex = airportIndex && airportIndex[code] ? airportIndex[code] : null;
+    if (fromIndex) return fromIndex;
+
+    // Seed fallback (keeps UI stable even if index fails)
+    const seedCity = airportCodeToCityName[code];
+    if (seedCity) return { iata: code, city: seedCity, name: /airport/i.test(seedCity) ? seedCity : `${seedCity} Airport` };
+
     return null;
   }
-}
 
-function writeAirportLookupCache(iata, data) {
-  try {
-    const code = normIata(iata);
-    if (!code || !data) return;
-    localStorage.setItem(AIRPORT_LOOKUP_CACHE_PREFIX + code, JSON.stringify({ ts: Date.now(), data }));
-  } catch {}
-}
-
-async function fetchAirportFromWorker(iata) {
-  const code = normIata(iata);
-  if (!code) return null;
-
-  // Cache hit
-  const cached = readAirportLookupCache(code);
-  if (cached) return cached;
-
-  // Don’t spam network in offline mode
-  if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) return null;
-
-  try {
-    const url = `/api/airport?iata=${encodeURIComponent(code)}`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data && typeof data === "object") {
-      writeAirportLookupCache(code, data);
-      return data;
-    }
-  } catch (e) {
-    console.warn("[BRS Flights] airport Worker lookup failed:", e);
+  function getAirportDisplayName(iata, prefer = "city") {
+    // prefer: "city" | "airport"
+    const rec = getAirportRecord(iata);
+    if (!rec) return normIata(iata) || "";
+    if (prefer === "airport") return rec.name || rec.city || rec.iata || "";
+    return rec.city || rec.name || rec.iata || "";
   }
-  return null;
-}
 
-// Optional: airport coordinates lookup (IATA -> {lat, lon}).
-// If you have a full table, you can set window.airportCoords = {...} before this script.
+  // Keep the existing helper name (lots of code uses it): now backed by the index.
+  function getCityName(code) {
+    return getAirportDisplayName(code, "city");
+  }
+
+  // Optional Worker fallback (only used when truly missing).
+  // This is non-blocking: callers can trigger it and re-render later if they want.
+  const AIRPORT_LOOKUP_CACHE_PREFIX = "brs_airport_lookup_"; // per-IATA cache in localStorage
+
+  function readAirportLookupCache(iata) {
+    try {
+      const code = normIata(iata);
+      if (!code) return null;
+      const raw = localStorage.getItem(AIRPORT_LOOKUP_CACHE_PREFIX + code);
+      const obj = raw ? safeJsonParse(raw) : null;
+      if (!obj || typeof obj !== "object") return null;
+      // Keep these lookups for 90 days.
+      const ts = Number(obj.ts) || 0;
+      if ((Date.now() - ts) > (1000 * 60 * 60 * 24 * 90)) return null;
+      return obj.data || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeAirportLookupCache(iata, data) {
+    try {
+      const code = normIata(iata);
+      if (!code || !data) return;
+      localStorage.setItem(AIRPORT_LOOKUP_CACHE_PREFIX + code, JSON.stringify({ ts: Date.now(), data }));
+    } catch {}
+  }
+
+  async function fetchAirportFromWorker(iata) {
+    const code = normIata(iata);
+    if (!code) return null;
+
+    // Cache hit
+    const cached = readAirportLookupCache(code);
+    if (cached) return cached;
+
+    // Don’t spam network in offline mode
+    if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) return null;
+
+    try {
+      const url = `/api/airport?iata=${encodeURIComponent(code)}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && typeof data === "object") {
+        writeAirportLookupCache(code, data);
+        return data;
+      }
+    } catch (e) {
+      console.warn("[BRS Flights] airport Worker lookup failed:", e);
+    }
+    return null;
+  }
+
+
+
+  // Optional: airport coordinates lookup (IATA -> {lat, lon}).
+  // If you have a full table, you can set window.airportCoords = {...} before this script.
   const airportCoords = (typeof window !== "undefined" && window.airportCoords && typeof window.airportCoords === "object")
     ? window.airportCoords
     : {};
@@ -464,17 +452,12 @@ async function fetchAirportFromWorker(iata) {
   function setText(el, text) { if (el) el.textContent = text; }
 
 // ---------- Hero airline (logo + initials fallback) ----------
-// Delegates to shared/airlines.js when present.
-function likelyAirlineCode(airlineIata, flightNo) {
-  return (window.BrsAirlines && window.BrsAirlines.likelyAirlineCode)
-    ? window.BrsAirlines.likelyAirlineCode(airlineIata, flightNo)
-    : String(airlineIata || "").trim().toUpperCase();
+// Some airlines have IATA codes like "U2" (letter+digit). Also, flight numbers often start with that.
+function likelyAirlineCode(airlineIata, flightNo){
+  return window.BrsAirlines ? window.BrsAirlines.likelyAirlineCode(airlineIata, flightNo) : (String(airlineIata||"").trim().toUpperCase());
 }
-
-function airlineInitialsFrom(code, flightNo) {
-  return (window.BrsAirlines && window.BrsAirlines.airlineInitialsFrom)
-    ? window.BrsAirlines.airlineInitialsFrom(code, flightNo)
-    : "—";
+function airlineInitialsFrom(code, flightNo){
+  return window.BrsAirlines ? window.BrsAirlines.airlineInitialsFrom(code, flightNo) : "—";
 }
 
 function setHeroAirline(airlineName, airlineIata, flightNo) {
@@ -484,45 +467,156 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
   const code = likelyAirlineCode(airlineIata, flightNo); // e.g. "FR", "U2"
   const initials = airlineInitialsFrom(code, flightNo);
 
-  // Hide the whole row only if we truly have nothing to show.
+  // Always show the row if we have at least a name or initials.
   if (!name && (!initials || initials === "—")) {
     els.heroAirline.style.display = "none";
-    return;
+// return removed (illegal at top-level)
   }
   els.heroAirline.style.display = "";
 
   if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
 
   // Reset visibility
-  if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "none";
-  if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
+  if (els.heroAirlineLogo) els.heroAirlineLogo.style.opacity = "0";
+  if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
 
   // While loading (or when logo missing), show initials so the header doesn’t look empty.
   if (els.heroAirlineInitials) {
     els.heroAirlineInitials.textContent = initials || "—";
-    els.heroAirlineInitials.style.display = "";
+    els.heroAirlineInitials.style.opacity = "1";
   }
 
-  // Prefer logo when we have an airline code and the shared helper exists.
-  if (els.heroAirlineLogo && code && window.BrsAirlines && window.BrsAirlines.getLogoUrls) {
+  // Prefer logo when we have an airline code.
+  if (els.heroAirlineLogo && code) {
     const img = els.heroAirlineLogo;
     img.alt = name ? `${name} logo` : "Airline logo";
 
-    const logoUrls = window.BrsAirlines.getLogoUrls(code) || [];
-
-    if (window.BrsAirlines.setImgWithFallback && Array.isArray(logoUrls) && logoUrls.length) {
-      window.BrsAirlines.setImgWithFallback(img, logoUrls, () => {
-        img.style.display = "";
-        if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
-      });
-      return;
-    }
-  }
-
-  // Final fallback: keep initials visible (already set above).
+    // Try multiple logo CDNs (some carriers are missing from one source).
+    // NOTE: Your main index page likely uses the Kiwi CDN, so we try that first.
+    const logoUrls = (window.BrsAirlines ? window.BrsAirlines.getLogoUrls(code) : []);
+// Load with fallback across multiple providers.
+if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
+  window.BrsAirlines.setImgWithFallback(img, logoUrls, () => {
+    img.style.opacity = "1";
+    if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+  });
+// return removed (illegal at top-level)
 }
 
-function deriveIdentity(f) {
+
+    // Avoid infinite loops if render() calls this repeatedly.
+    let idx = 0;
+
+    const showLogo = () => {
+      img.style.opacity = "1";
+      if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+    };
+
+    const tryNext = () => {
+      idx += 1;
+      if (idx >= logoUrls.length) {
+        img.style.opacity = "0"; // initials stay visible
+// return removed (illegal at top-level)
+      }
+      attachAndSetSrc(logoUrls[idx]);
+    };
+
+    const attachAndSetSrc = (src) => {
+      // IMPORTANT: attach handlers *before* setting src (cached images may fire immediately).
+      img.onload = () => showLogo();
+      img.onerror = () => tryNext();
+
+      // Setting the same src repeatedly may not fire onload; force a change if needed.
+      if (img.src !== src) img.src = src;
+
+      // If the image is already cached and complete, show immediately.
+      if (img.complete && img.naturalWidth > 0) {
+        showLogo();
+      }
+    };
+
+    attachAndSetSrc(logoUrls[idx]);
+// return removed (illegal at top-level)
+  }
+}
+  els.heroAirline.style.display = "";
+
+  if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
+
+  // Reset visibility
+  if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "none";
+  if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+
+  // While loading (or when logo missing), show initials so the header doesn’t look empty.
+  if (els.heroAirlineInitials) {
+    els.heroAirlineInitials.textContent = initials || "—";
+    els.heroAirlineInitials.style.opacity = "1";
+  }
+
+  // Prefer logo when we have an airline code.
+  if (els.heroAirlineLogo && code) {
+    const img = els.heroAirlineLogo;
+    img.alt = name ? `${name} logo` : "Airline logo";
+
+    // IMPORTANT: attach handlers *before* setting src (cached images may fire immediately).
+    img.onload = () => {
+      img.style.opacity = "1";
+      if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+    };
+    img.onerror = () => {
+      img.style.opacity = "0";
+      // initials already visible
+    };
+
+    // Try Google’s airline logo CDN first (works for many IATA codes)
+    img.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(code)}.png`;
+// return removed (illegal at top-level)
+  }
+
+  els.heroAirline.style.display = "";
+
+  if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
+
+  // Reset visibility
+  if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "none";
+  if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+
+  // Prefer logo when we have an airline code.
+  if (els.heroAirlineLogo && iata) {
+    const img = els.heroAirlineLogo;
+    img.alt = name ? `${name} logo` : "Airline logo";
+    img.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(iata)}.png`;
+
+    // Show logo on load; otherwise show initials tile.
+    img.onload = () => {
+      img.style.opacity = "1";
+      if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+    };
+    img.onerror = () => {
+      img.style.opacity = "0";
+      if (els.heroAirlineInitials) {
+        els.heroAirlineInitials.textContent = initials || "—";
+        els.heroAirlineInitials.style.opacity = "1";
+      }
+    };
+
+    // While loading, show initials so the header doesn’t look empty.
+    if (els.heroAirlineInitials) {
+      els.heroAirlineInitials.textContent = initials || "—";
+      els.heroAirlineInitials.style.opacity = "1";
+    }
+// return removed (illegal at top-level)
+  }
+
+  // No IATA code -> initials only
+  if (els.heroAirlineInitials) {
+    els.heroAirlineInitials.textContent = initials || "—";
+    els.heroAirlineInitials.style.opacity = "1";
+  }
+
+
+
+  function deriveIdentity(f) {
     const flat = flattenObject(f || {});
     const flightNo =
       pickAny(flat, [
@@ -621,7 +715,7 @@ function deriveIdentity(f) {
       if (els.statusBadge) { els.statusBadge.className = "badge neutral"; els.statusBadge.textContent = "Unavailable"; }
       setText(els.sourceLine, "No stored flight context");
       stopAuto();
-      return;
+// return removed (illegal at top-level)
     }
 
     state.context = payload.context || null;
@@ -677,7 +771,7 @@ function deriveIdentity(f) {
     if (!isError) {
       els.netBanner.style.display = "none";
       els.netBanner.textContent = "";
-      return;
+// return removed (illegal at top-level)
     }
     els.netBanner.style.display = "";
     els.netBanner.textContent = "Connection issue — showing last known data.";
@@ -896,6 +990,37 @@ arrInfo.gateChanged = opsChanged('gate_arr', arrInfo.gate);
 arrInfo.beltChanged = opsChanged('belt_arr', arrInfo.belt);
 
 
+// Track per-flight operational fields so we can highlight changes (e.g. gate change)
+function getOpsKey(suffix) {
+  const k = state?.storageKey || "unknown";
+  return `fd_${k}_${suffix}`;
+}
+function opsChanged(suffix, nextVal) {
+  const key = getOpsKey(suffix);
+  const prev = sessionStorage.getItem(key);
+  const next = (nextVal == null) ? "" : String(nextVal);
+  // Only count as "changed" if we had a previous non-empty value and it differs.
+  const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
+  sessionStorage.setItem(key, next);
+  return changed;
+}
+
+
+
+function opsChangedSticky(suffix, nextVal) {
+  const key = getOpsKey(suffix);
+  const prev = sessionStorage.getItem(key) || "";
+  const next = (nextVal == null) ? "" : String(nextVal).trim();
+
+  // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
+  if (!next) return false;
+
+  const changed = (prev !== "" && prev !== next);
+  sessionStorage.setItem(key, next);
+  return changed;
+}
+
+
 
 function kvLine(label, val) {
   if (!val) return "";
@@ -986,7 +1111,7 @@ if (els.arrKv) {
     if (!gate && !terminal && !baggage) {
       els.opsBar.style.display = "none";
       els.opsBar.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     const fmt = (v) => (v === null || v === undefined || String(v).trim() === "" ? "—" : String(v));
@@ -1113,7 +1238,7 @@ if (els.arrKv) {
       el.textContent = "";
       el.classList.remove("fh-delay-good");
       el.classList.add("fh-delay-warn");
-      return;
+// return removed (illegal at top-level)
     }
 
     // Aviation Edge delay is often in minutes; negative can indicate early.
@@ -1122,7 +1247,7 @@ if (els.arrKv) {
       el.classList.remove("fh-delay-good");
       el.classList.add("fh-delay-warn");
       el.hidden = false;
-      return;
+// return removed (illegal at top-level)
     }
     el.textContent = `${Math.abs(Math.round(n))}m early`;
     el.classList.remove("fh-delay-warn");
@@ -1698,13 +1823,13 @@ if (els.arrKv) {
     const cached = cachedRaw ? safeParseJson(cachedRaw) : null;
     if (cached && cached.fetchedAt && (Date.now() - cached.fetchedAt) < WX_CACHE_TTL_MS && cached.payload) {
       paintWeather(cached.payload, placeLabel);
-      return;
+// return removed (illegal at top-level)
     }
 
     if (!destCode && !placeLabel) {
       if (els.wxHint) els.wxHint.textContent = "Destination not found.";
       els.weatherBox.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     // Coords: airportCoords first, else geocode by name
@@ -1720,7 +1845,7 @@ if (els.arrKv) {
     if (!(Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) {
       if (els.wxHint) els.wxHint.textContent = "Weather: destination coordinates unavailable.";
       els.weatherBox.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     try {
@@ -1749,7 +1874,7 @@ if (els.arrKv) {
     if (!payload || !payload.daily) {
       if (els.wxHint) els.wxHint.textContent = "Weather unavailable.";
       els.weatherBox.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     const tz = payload.timezone || "UTC";
@@ -1773,7 +1898,7 @@ if (els.arrKv) {
     const n = Math.min(5, (times || []).length, (tmax || []).length, (tmin || []).length, (wcode || []).length);
     if (n <= 0) {
       els.weatherBox.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     // One card containing 5-day rows
@@ -2097,11 +2222,11 @@ if (els.arrKv) {
       if (routeKey && routeKey === state.lastRouteKey && state.routeLine) {
         // still make sure bounds are sane on resize
         setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 0);
-        return;
+// return removed (illegal at top-level)
       }
       state.lastRouteKey = routeKey;
       await renderLeafletRoute(flat, depCode, arrCode);
-      return;
+// return removed (illegal at top-level)
     }
 
     // --- SVG fallback (your original behaviour) ---
@@ -2115,7 +2240,7 @@ if (els.arrKv) {
       els.routeSvg.append(
         svgEl("text", { x: ROUTE_SVG_W/2, y: ROUTE_SVG_H/2, "text-anchor":"middle", "dominant-baseline":"middle", opacity:"0.7", "font-size":"18" }, "Route unavailable")
       );
-      return;
+// return removed (illegal at top-level)
     }
 
     const [depGeo, arrGeo] = await Promise.all([
@@ -2127,7 +2252,7 @@ if (els.arrKv) {
       els.routeSvg.append(
         svgEl("text", { x: ROUTE_SVG_W/2, y: ROUTE_SVG_H/2, "text-anchor":"middle", "dominant-baseline":"middle", opacity:"0.7", "font-size":"18" }, "Route unavailable")
       );
-      return;
+// return removed (illegal at top-level)
     }
 
     
