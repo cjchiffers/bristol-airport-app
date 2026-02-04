@@ -16,10 +16,10 @@
   box-shadow: var(--shadow);
 }
 
-.hero-card-header {
+.hero-card-header{
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content:flex-start;
   margin-bottom: 20px;
 }
 
@@ -1135,4 +1135,20 @@ body.leaflet-on #routeSvg{ display:none; }
 /* Hide legacy airline card (airline now lives in hero) */
 .airline-row {
   display: none !important;
+}
+
+
+/* Hero header layout: airline (logo+name) above flight number */
+.hero-header-left{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
+  min-width:0;
+}
+
+/* Flight number sits under airline */
+.hero-flight-number{
+  margin-top:0;
+  line-height:1;
 }
