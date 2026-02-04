@@ -170,8 +170,6 @@ async function fetchAirportFromWorker(iata) {
 
 // Optional: airport coordinates lookup (IATA -> {lat, lon}).
 // If you have a full table, you can set window.airportCoords = {...} before this script.
- (IATA -> {lat, lon}).
-  // If you have a full table, you can set window.airportCoords = {...} before this script.
   const airportCoords = (typeof window !== "undefined" && window.airportCoords && typeof window.airportCoords === "object")
     ? window.airportCoords
     : {};
