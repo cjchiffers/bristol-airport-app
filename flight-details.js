@@ -60,6 +60,161 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     "ZRH": "Zurich",
   };
 
+  // ---------- Airport name lookup (offline-first) ----------
+  // Strategy:
+  // 1) Load a local, cached airport index (airports.min.json) for instant offline lookups.
+  // 2) If a code isn't found, fall back to our built-in seed map (airportCodeToCityName).
+  // 3) Optional: if still missing and we're online, call our Worker endpoint (/api/airport?iata=XXX)
+  //    and cache the result in localStorage for future offline use.
+  //
+  // Notes:
+  // - This keeps the app "glanceable" and resilient: no blocking renders, no hard failures.
+  // - The shipped airports.min.json can be swapped later with a fuller dataset (e.g. OurAirports-derived).
+  const AIRPORT_INDEX_URL = "airports.min.json";
+  const AIRPORT_INDEX_CACHE_KEY = "brs_airport_index_v1";
+  const AIRPORT_INDEX_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
+  // In-memory index (fast path). Shape: { [IATA]: { iata, name, city, country, lat, lon } }
+  let airportIndex = null;
+
+  function safeJsonParse(s) { try { return JSON.parse(s); } catch { return null; } }
+
+  function loadAirportIndexFromStorage() {
+    try {
+      const raw = localStorage.getItem(AIRPORT_INDEX_CACHE_KEY);
+      const parsed = raw ? safeJsonParse(raw) : null;
+      if (!parsed || typeof parsed !== "object") return null;
+
+      const ts = Number(parsed.ts) || 0;
+      const data = parsed.data && typeof parsed.data === "object" ? parsed.data : null;
+      if (!data) return null;
+
+      const fresh = (Date.now() - ts) < AIRPORT_INDEX_TTL_MS;
+      return fresh ? data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveAirportIndexToStorage(data) {
+    try {
+      localStorage.setItem(AIRPORT_INDEX_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+    } catch {}
+  }
+
+  async function loadAirportIndexBestEffort() {
+    // Fast path: memory
+    if (airportIndex && typeof airportIndex === "object") return airportIndex;
+
+    // Next: cached storage
+    const cached = loadAirportIndexFromStorage();
+    if (cached) {
+      airportIndex = cached;
+      return airportIndex;
+    }
+
+    // Finally: fetch the bundled JSON (offline shell caches this file via SW when you add it)
+    try {
+      const res = await fetch(AIRPORT_INDEX_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error(`airport index HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && typeof data === "object") {
+        airportIndex = data;
+        saveAirportIndexToStorage(data);
+        return airportIndex;
+      }
+    } catch (e) {
+      console.warn("[BRS Flights] airport index load failed:", e);
+    }
+
+    airportIndex = null;
+    return null;
+  }
+
+  function getAirportRecord(iata) {
+    const code = normIata(iata);
+    if (!code) return null;
+
+    // If the index isn't loaded yet, we still fall back instantly to the seed map.
+    const fromIndex = airportIndex && airportIndex[code] ? airportIndex[code] : null;
+    if (fromIndex) return fromIndex;
+
+    // Seed fallback (keeps UI stable even if index fails)
+    const seedCity = airportCodeToCityName[code];
+    if (seedCity) return { iata: code, city: seedCity, name: /airport/i.test(seedCity) ? seedCity : `${seedCity} Airport` };
+
+    return null;
+  }
+
+  function getAirportDisplayName(iata, prefer = "city") {
+    // prefer: "city" | "airport"
+    const rec = getAirportRecord(iata);
+    if (!rec) return normIata(iata) || "";
+    if (prefer === "airport") return rec.name || rec.city || rec.iata || "";
+    return rec.city || rec.name || rec.iata || "";
+  }
+
+  // Keep the existing helper name (lots of code uses it): now backed by the index.
+  function getCityName(code) {
+    return getAirportDisplayName(code, "city");
+  }
+
+  // Optional Worker fallback (only used when truly missing).
+  // This is non-blocking: callers can trigger it and re-render later if they want.
+  const AIRPORT_LOOKUP_CACHE_PREFIX = "brs_airport_lookup_"; // per-IATA cache in localStorage
+
+  function readAirportLookupCache(iata) {
+    try {
+      const code = normIata(iata);
+      if (!code) return null;
+      const raw = localStorage.getItem(AIRPORT_LOOKUP_CACHE_PREFIX + code);
+      const obj = raw ? safeJsonParse(raw) : null;
+      if (!obj || typeof obj !== "object") return null;
+      // Keep these lookups for 90 days.
+      const ts = Number(obj.ts) || 0;
+      if ((Date.now() - ts) > (1000 * 60 * 60 * 24 * 90)) return null;
+      return obj.data || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeAirportLookupCache(iata, data) {
+    try {
+      const code = normIata(iata);
+      if (!code || !data) return;
+      localStorage.setItem(AIRPORT_LOOKUP_CACHE_PREFIX + code, JSON.stringify({ ts: Date.now(), data }));
+    } catch {}
+  }
+
+  async function fetchAirportFromWorker(iata) {
+    const code = normIata(iata);
+    if (!code) return null;
+
+    // Cache hit
+    const cached = readAirportLookupCache(code);
+    if (cached) return cached;
+
+    // Don’t spam network in offline mode
+    if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) return null;
+
+    try {
+      const url = `/api/airport?iata=${encodeURIComponent(code)}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && typeof data === "object") {
+        writeAirportLookupCache(code, data);
+        return data;
+      }
+    } catch (e) {
+      console.warn("[BRS Flights] airport Worker lookup failed:", e);
+    }
+    return null;
+  }
+
+
+
   // Optional: airport coordinates lookup (IATA -> {lat, lon}).
   // If you have a full table, you can set window.airportCoords = {...} before this script.
   const airportCoords = (typeof window !== "undefined" && window.airportCoords && typeof window.airportCoords === "object")
@@ -156,13 +311,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
     return entry;
   }
-
-
-  function getCityName(code) {
-    const c = (code || "").toUpperCase().trim();
-    return airportCodeToCityName[c] || (code || "");
-  }
-
   // ---------- DOM ----------
   const els = {
     headline: document.getElementById("headline"),
@@ -436,6 +584,9 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   init();
 
   function init() {
+    // Load airport index in the background (non-blocking). UI will still render using seed fallbacks.
+    loadAirportIndexBestEffort();
+
     const params = new URLSearchParams(window.location.search);
     state.storageKey = params.get("key");
 
