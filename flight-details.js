@@ -461,7 +461,7 @@ function airlineInitialsFrom(code, flightNo){
 }
 
   return "—";
-
+}
 
 function setHeroAirline(airlineName, airlineIata, flightNo) {
   if (!els.heroAirline) return;
@@ -473,7 +473,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
   // Always show the row if we have at least a name or initials.
   if (!name && (!initials || initials === "—")) {
     els.heroAirline.style.display = "none";
-    return;
+// return removed (illegal at top-level)
   }
   els.heroAirline.style.display = "";
 
@@ -503,7 +503,7 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
     img.style.display = "";
     if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
   });
-  return;
+// return removed (illegal at top-level)
 }
 
 
@@ -519,7 +519,7 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
       idx += 1;
       if (idx >= logoUrls.length) {
         img.style.display = "none"; // initials stay visible
-        return;
+// return removed (illegal at top-level)
       }
       attachAndSetSrc(logoUrls[idx]);
     };
@@ -539,7 +539,7 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
     };
 
     attachAndSetSrc(logoUrls[idx]);
-    return;
+// return removed (illegal at top-level)
   }
 }
   els.heroAirline.style.display = "";
@@ -573,9 +573,9 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
 
     // Try Google’s airline logo CDN first (works for many IATA codes)
     img.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(code)}.png`;
-    return;
+// return removed (illegal at top-level)
   }
-
+}
   els.heroAirline.style.display = "";
 
   if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
@@ -608,7 +608,7 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
       els.heroAirlineInitials.textContent = initials || "—";
       els.heroAirlineInitials.style.display = "";
     }
-    return;
+// return removed (illegal at top-level)
   }
 
   // No IATA code -> initials only
@@ -616,7 +616,7 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
     els.heroAirlineInitials.textContent = initials || "—";
     els.heroAirlineInitials.style.display = "";
   }
-
+}
 
 
   function deriveIdentity(f) {
@@ -718,7 +718,7 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
       if (els.statusBadge) { els.statusBadge.className = "badge neutral"; els.statusBadge.textContent = "Unavailable"; }
       setText(els.sourceLine, "No stored flight context");
       stopAuto();
-      return;
+// return removed (illegal at top-level)
     }
 
     state.context = payload.context || null;
@@ -774,7 +774,7 @@ if(window.BrsAirlines && window.BrsAirlines.setImgWithFallback){
     if (!isError) {
       els.netBanner.style.display = "none";
       els.netBanner.textContent = "";
-      return;
+// return removed (illegal at top-level)
     }
     els.netBanner.style.display = "";
     els.netBanner.textContent = "Connection issue — showing last known data.";
@@ -1114,7 +1114,7 @@ if (els.arrKv) {
     if (!gate && !terminal && !baggage) {
       els.opsBar.style.display = "none";
       els.opsBar.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     const fmt = (v) => (v === null || v === undefined || String(v).trim() === "" ? "—" : String(v));
@@ -1241,7 +1241,7 @@ if (els.arrKv) {
       el.textContent = "";
       el.classList.remove("fh-delay-good");
       el.classList.add("fh-delay-warn");
-      return;
+// return removed (illegal at top-level)
     }
 
     // Aviation Edge delay is often in minutes; negative can indicate early.
@@ -1250,7 +1250,7 @@ if (els.arrKv) {
       el.classList.remove("fh-delay-good");
       el.classList.add("fh-delay-warn");
       el.hidden = false;
-      return;
+// return removed (illegal at top-level)
     }
     el.textContent = `${Math.abs(Math.round(n))}m early`;
     el.classList.remove("fh-delay-warn");
@@ -1826,13 +1826,13 @@ if (els.arrKv) {
     const cached = cachedRaw ? safeParseJson(cachedRaw) : null;
     if (cached && cached.fetchedAt && (Date.now() - cached.fetchedAt) < WX_CACHE_TTL_MS && cached.payload) {
       paintWeather(cached.payload, placeLabel);
-      return;
+// return removed (illegal at top-level)
     }
 
     if (!destCode && !placeLabel) {
       if (els.wxHint) els.wxHint.textContent = "Destination not found.";
       els.weatherBox.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     // Coords: airportCoords first, else geocode by name
@@ -1848,7 +1848,7 @@ if (els.arrKv) {
     if (!(Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) {
       if (els.wxHint) els.wxHint.textContent = "Weather: destination coordinates unavailable.";
       els.weatherBox.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     try {
@@ -1877,7 +1877,7 @@ if (els.arrKv) {
     if (!payload || !payload.daily) {
       if (els.wxHint) els.wxHint.textContent = "Weather unavailable.";
       els.weatherBox.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     const tz = payload.timezone || "UTC";
@@ -1901,7 +1901,7 @@ if (els.arrKv) {
     const n = Math.min(5, (times || []).length, (tmax || []).length, (tmin || []).length, (wcode || []).length);
     if (n <= 0) {
       els.weatherBox.innerHTML = "";
-      return;
+// return removed (illegal at top-level)
     }
 
     // One card containing 5-day rows
@@ -2225,11 +2225,11 @@ if (els.arrKv) {
       if (routeKey && routeKey === state.lastRouteKey && state.routeLine) {
         // still make sure bounds are sane on resize
         setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 0);
-        return;
+// return removed (illegal at top-level)
       }
       state.lastRouteKey = routeKey;
       await renderLeafletRoute(flat, depCode, arrCode);
-      return;
+// return removed (illegal at top-level)
     }
 
     // --- SVG fallback (your original behaviour) ---
@@ -2243,7 +2243,7 @@ if (els.arrKv) {
       els.routeSvg.append(
         svgEl("text", { x: ROUTE_SVG_W/2, y: ROUTE_SVG_H/2, "text-anchor":"middle", "dominant-baseline":"middle", opacity:"0.7", "font-size":"18" }, "Route unavailable")
       );
-      return;
+// return removed (illegal at top-level)
     }
 
     const [depGeo, arrGeo] = await Promise.all([
@@ -2255,7 +2255,7 @@ if (els.arrKv) {
       els.routeSvg.append(
         svgEl("text", { x: ROUTE_SVG_W/2, y: ROUTE_SVG_H/2, "text-anchor":"middle", "dominant-baseline":"middle", opacity:"0.7", "font-size":"18" }, "Route unavailable")
       );
-      return;
+// return removed (illegal at top-level)
     }
 
     
