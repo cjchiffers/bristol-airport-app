@@ -1095,16 +1095,16 @@ body.leaflet-on #routeSvg{ display:none; }
 .hero-airline{
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:10px;
   margin-bottom:6px; /* Keeps hierarchy: airline -> flight number */
-  min-height:28px;   /* Avoid layout jump while logo loads */
+  min-height:36px;   /* Avoid layout jump while logo loads */
 }
 
 /* Slightly larger hero logo (still subtle) */
 .airline-logo--hero{
-  width:28px;
-  height:28px;
-  border-radius:8px;
+  width:34px;
+  height:34px;
+  border-radius:10px;
   object-fit:contain;
   background:#fff;
   display:none; /* JS toggles on load */
@@ -1112,14 +1112,14 @@ body.leaflet-on #routeSvg{ display:none; }
 
 /* Initials fallback occupies the same footprint as the logo */
 .airline-initials--hero{
-  width:28px;
-  height:28px;
-  border-radius:8px;
+  width:34px;
+  height:34px;
+  border-radius:10px;
   background:#e5e7eb;
   color:#374151;
   font-weight:900;
-  font-size:12px;
-  line-height:28px;
+  font-size:13px;
+  line-height:34px;
   text-align:center;
   display:none; /* JS toggles when logo missing/fails */
 }
@@ -1127,7 +1127,7 @@ body.leaflet-on #routeSvg{ display:none; }
 /* Airline name next to the logo/initials */
 .airline-name--hero{
   font-weight:800;
-  font-size:14px;
+  font-size:15px;
   opacity:0.9;
   white-space:nowrap;
 }
