@@ -460,9 +460,6 @@ function airlineInitialsFrom(code, flightNo){
   return window.BrsAirlines ? window.BrsAirlines.airlineInitialsFrom(code, flightNo) : "—";
 }
 
-  return "—";
-
-
 function setHeroAirline(airlineName, airlineIata, flightNo) {
   if (!els.heroAirline) return;
 
