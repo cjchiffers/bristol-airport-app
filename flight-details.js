@@ -385,6 +385,12 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     heroBaggage: document.getElementById("heroBaggage"),
     heroCountdown: document.getElementById("heroCountdown"),
     heroCountdownText: document.getElementById("heroCountdownText"),
+
+    // Hero airline (logo + name next to flight number)
+    heroAirline: document.getElementById("heroAirline"),
+    heroAirlineLogo: document.getElementById("heroAirlineLogo"),
+    heroAirlineInitials: document.getElementById("heroAirlineInitials"),
+    heroAirlineName: document.getElementById("heroAirlineName"),
   };
 
   // ---------- State ----------
@@ -503,6 +509,71 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   }
 
   function setText(el, text) { if (el) el.textContent = text; }
+
+// ---------- Hero airline (logo + initials fallback) ----------
+function airlineInitialsFrom(iata, flightNo) {
+  const a = String(iata || "").trim().toUpperCase();
+  if (a && /^[A-Z0-9]{2,3}$/.test(a)) return a.slice(0, 3);
+  const f = String(flightNo || "").trim().toUpperCase();
+  // Common flight numbers start with airline letters (e.g. FR4753 -> FR)
+  const m = f.match(/^[A-Z]{2,3}/);
+  return m ? m[0].slice(0, 3) : "—";
+}
+
+function setHeroAirline(airlineName, airlineIata, flightNo) {
+  if (!els.heroAirline) return;
+
+  const name = String(airlineName || "").trim();
+  const iata = String(airlineIata || "").trim().toUpperCase();
+  const initials = airlineInitialsFrom(iata, flightNo);
+
+  // Always show the row if we have at least a name or initials.
+  if (!name && (!initials || initials === "—")) {
+    els.heroAirline.style.display = "none";
+    return;
+  }
+  els.heroAirline.style.display = "";
+
+  if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
+
+  // Reset visibility
+  if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "none";
+  if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
+
+  // Prefer logo when we have an airline code.
+  if (els.heroAirlineLogo && iata) {
+    const img = els.heroAirlineLogo;
+    img.alt = name ? `${name} logo` : "Airline logo";
+    img.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(iata)}.png`;
+
+    // Show logo on load; otherwise show initials tile.
+    img.onload = () => {
+      img.style.display = "";
+      if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
+    };
+    img.onerror = () => {
+      img.style.display = "none";
+      if (els.heroAirlineInitials) {
+        els.heroAirlineInitials.textContent = initials || "—";
+        els.heroAirlineInitials.style.display = "";
+      }
+    };
+
+    // While loading, show initials so the header doesn’t look empty.
+    if (els.heroAirlineInitials) {
+      els.heroAirlineInitials.textContent = initials || "—";
+      els.heroAirlineInitials.style.display = "";
+    }
+    return;
+  }
+
+  // No IATA code -> initials only
+  if (els.heroAirlineInitials) {
+    els.heroAirlineInitials.textContent = initials || "—";
+    els.heroAirlineInitials.style.display = "";
+  }
+}
+
 
   function deriveIdentity(f) {
     const flat = flattenObject(f || {});
@@ -798,6 +869,9 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     const airlineIata = pickAny(flat, ["airline.iata", "airline.iataCode", "flight.airline.code.iata", "airline_iata", "airlineCode"]) || "";
     if (els.airlineName) els.airlineName.textContent = airlineNameVal;
     if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
+
+    // Hero header airline (single source of truth for airline display)
+    setHeroAirline(airlineNameVal, airlineIata, displayNo);
 
     // Logo (best effort)
     const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
