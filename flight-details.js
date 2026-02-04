@@ -520,27 +520,81 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   function setText(el, text) { if (el) el.textContent = text; }
 
 // ---------- Hero airline (logo + initials fallback) ----------
-function airlineInitialsFrom(iata, flightNo) {
-  const a = String(iata || "").trim().toUpperCase();
-  if (a && /^[A-Z0-9]{2,3}$/.test(a)) return a.slice(0, 3);
+// Some airlines have IATA codes like "U2" (letter+digit). Also, flight numbers often start with that.
+function likelyAirlineCode(airlineIata, flightNo) {
+  const raw = String(airlineIata || "").trim().toUpperCase();
+  // Accept common 2/3 char airline codes (incl. letter+digit like U2)
+  if (raw && /^[A-Z0-9]{2,3}$/.test(raw)) return raw;
+
   const f = String(flightNo || "").trim().toUpperCase();
-  // Common flight numbers start with airline letters (e.g. FR4753 -> FR)
+  // First two chars can be airline code (e.g. FR4753 -> FR, U22832 -> U2)
+  if (f.length >= 2) {
+    const first2 = f.slice(0, 2);
+    if (/^[A-Z0-9]{2}$/.test(first2)) return first2;
+  }
+  // Fallback: first 3 letters if present (rare)
   const m = f.match(/^[A-Z]{2,3}/);
-  return m ? m[0].slice(0, 3) : "—";
+  return m ? m[0].slice(0, 3) : "";
+}
+
+function airlineInitialsFrom(airlineCode, flightNo) {
+  const c = String(airlineCode || "").trim().toUpperCase();
+  if (c && /^[A-Z0-9]{2,3}$/.test(c)) return c.slice(0, 3);
+
+  const f = String(flightNo || "").trim().toUpperCase();
+  if (f.length >= 2) {
+    const first2 = f.slice(0, 2);
+    if (/^[A-Z0-9]{2}$/.test(first2)) return first2;
+  }
+  return "—";
 }
 
 function setHeroAirline(airlineName, airlineIata, flightNo) {
   if (!els.heroAirline) return;
 
   const name = String(airlineName || "").trim();
-  const iata = String(airlineIata || "").trim().toUpperCase();
-  const initials = airlineInitialsFrom(iata, flightNo);
+  const code = likelyAirlineCode(airlineIata, flightNo);
+  const initials = airlineInitialsFrom(code, flightNo);
 
   // Always show the row if we have at least a name or initials.
   if (!name && (!initials || initials === "—")) {
     els.heroAirline.style.display = "none";
     return;
   }
+  els.heroAirline.style.display = "";
+
+  if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
+
+  // Reset visibility
+  if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "none";
+  if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
+
+  // While loading (or when logo missing), show initials so the header doesn’t look empty.
+  if (els.heroAirlineInitials) {
+    els.heroAirlineInitials.textContent = initials || "—";
+    els.heroAirlineInitials.style.display = "";
+  }
+
+  // Prefer logo when we have an airline code.
+  if (els.heroAirlineLogo && code) {
+    const img = els.heroAirlineLogo;
+    img.alt = name ? `${name} logo` : "Airline logo";
+
+    // IMPORTANT: attach handlers *before* setting src (cached images may fire immediately).
+    img.onload = () => {
+      img.style.display = "";
+      if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
+    };
+    img.onerror = () => {
+      img.style.display = "none";
+      // initials already visible
+    };
+
+    // Try Google’s airline logo CDN first (works for many IATA codes)
+    img.src = `https://www.gstatic.com/flights/airline_logos/70px/${encodeURIComponent(code)}.png`;
+    return;
+  }
+}
   els.heroAirline.style.display = "";
 
   if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
