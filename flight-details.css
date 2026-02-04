@@ -1131,3 +1131,8 @@ body.leaflet-on #routeSvg{ display:none; }
   opacity:0.9;
   white-space:nowrap;
 }
+
+/* Hide legacy airline card (airline now lives in hero) */
+.airline-row {
+  display: none !important;
+}
