@@ -16,11 +16,10 @@
   box-shadow: var(--shadow);
 }
 
-.hero-card-header{
-  align-items:flex-start;
+.hero-card-header {
   display: flex;
   align-items: center;
-  justify-content:flex-start;
+  justify-content: space-between;
   margin-bottom: 20px;
 }
 
@@ -1096,9 +1095,9 @@ body.leaflet-on #routeSvg{ display:none; }
 .hero-airline{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:8px;
   margin-bottom:6px; /* Keeps hierarchy: airline -> flight number */
-  min-height:36px;   /* Avoid layout jump while logo loads */
+  min-height:28px;   /* Avoid layout jump while logo loads */
 }
 
 /* Slightly larger hero logo (still subtle) */
@@ -1108,11 +1107,10 @@ body.leaflet-on #routeSvg{ display:none; }
   border-radius:10px;
   object-fit:contain;
   background:#fff;
-  opacity:0;           /* JS flips to 1 when loaded */
-  transition: opacity 120ms ease;
   display:block;
+  opacity:0;
+  transition: opacity 120ms ease;
 }
-
 
 /* Initials fallback occupies the same footprint as the logo */
 .airline-initials--hero{
@@ -1125,37 +1123,15 @@ body.leaflet-on #routeSvg{ display:none; }
   font-size:13px;
   line-height:34px;
   text-align:center;
-  opacity:0;           /* JS flips to 1 when shown */
-  transition: opacity 120ms ease;
   display:block;
+  opacity:0;
+  transition: opacity 120ms ease;
 }
-
 
 /* Airline name next to the logo/initials */
 .airline-name--hero{
   font-weight:800;
-  font-size:15px;
+  font-size:14px;
   opacity:0.9;
   white-space:nowrap;
-}
-
-/* Hide legacy airline card (airline now lives in hero) */
-.airline-row {
-  display: none !important;
-}
-
-
-/* Hero header layout: airline (logo+name) above flight number */
-.hero-header-left{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:6px;
-  min-width:0;
-}
-
-/* Flight number sits under airline */
-.hero-flight-number{
-  margin-top:0;
-  line-height:1;
 }
