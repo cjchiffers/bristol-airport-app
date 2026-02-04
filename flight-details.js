@@ -191,12 +191,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     airlineLogo: document.getElementById("airlineLogo"),
     airlineName: document.getElementById("airlineName"),
     airlineCodeLine: document.getElementById("airlineCodeLine"),
-
-    // Hero airline (above the flight number)
-    heroAirlineWrap: document.getElementById("heroAirline"),
-    heroAirlineLogo: document.getElementById("heroAirlineLogo"),
-    heroAirlineInitials: document.getElementById("heroAirlineInitials"),
-    heroAirlineName: document.getElementById("heroAirlineName"),
     aircraftType: document.getElementById("aircraftType"),
     aircraftReg: document.getElementById("aircraftReg"),
     aircraftImageWrap: document.getElementById("aircraftImageWrap"),
@@ -278,6 +272,37 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   function safeSetLocal(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
   function safeGetSession(key) { try { return sessionStorage.getItem(key); } catch { return null; } }
   function safeSetSession(key, value) { try { sessionStorage.setItem(key, value); return true; } catch { return false; } }
+
+
+  // OPS_HELPERS_TOP_LEVEL
+  // Track per-flight operational fields so we can highlight changes (e.g. gate change)
+  function getOpsKey(suffix) {
+    const k = state?.storageKey || "unknown";
+    return `fd_${k}_${suffix}`;
+  }
+  function opsChanged(suffix, nextVal) {
+    const key = getOpsKey(suffix);
+    const prev = sessionStorage.getItem(key);
+    const next = (nextVal == null) ? "" : String(nextVal);
+    // Only count as "changed" if we had a previous non-empty value and it differs.
+    const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
+    sessionStorage.setItem(key, next);
+    return changed;
+  }
+
+  function opsChangedSticky(suffix, nextVal) {
+    const key = getOpsKey(suffix);
+    const prev = sessionStorage.getItem(key) || "";
+    const next = (nextVal == null) ? "" : String(nextVal).trim();
+
+    // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
+    if (!next) return false;
+
+    const changed = (prev !== "" && prev !== next);
+    sessionStorage.setItem(key, next);
+    return changed;
+  }
+
 
   // ---------- Utilities ----------
   function escapeHtml(s) {
@@ -618,59 +643,10 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     renderOpsBar(flight, flat);
 
     // Airline basics
-    // NOTE: Aviation Edge fields are inconsistent. Always pick best-effort and never assume presence.
     const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
     const airlineIata = pickAny(flat, ["airline.iata", "airline.iataCode", "flight.airline.code.iata", "airline_iata", "airlineCode"]) || "";
-    const airlineIcao = pickAny(flat, ["airline.icao", "airline.icaoCode", "flight.airline.code.icao", "airline_icao"]) || "";
     if (els.airlineName) els.airlineName.textContent = airlineNameVal;
     if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
-
-    // Hero airline (logo/name) — shown above flight number for quick recognition.
-    // We show initials immediately to avoid flicker, then swap to logo once it loads.
-    if (els.heroAirlineWrap) {
-      // Hide the entire row if we have no name and no usable code.
-      var hasAnyAirline = (airlineNameVal && airlineNameVal !== "—") || !!airlineIata;
-      els.heroAirlineWrap.style.display = hasAnyAirline ? "" : "none";
-    }
-
-    if (els.heroAirlineName) {
-      els.heroAirlineName.textContent = (airlineNameVal && airlineNameVal !== "—") ? airlineNameVal : "";
-      els.heroAirlineName.style.display = (els.heroAirlineName.textContent ? "" : "none");
-    }
-
-    // Pick a code for logos. Google-hosted logos typically use IATA.
-    var heroLogoCode = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
-    var heroInitials = getAirlineInitials(airlineIata, airlineIcao, airlineNameVal);
-
-    // Initials fallback (shown immediately; replaced by logo on successful load)
-    if (els.heroAirlineInitials) {
-      els.heroAirlineInitials.textContent = heroInitials || "";
-      els.heroAirlineInitials.style.display = heroInitials ? "" : "none";
-    }
-
-    if (els.heroAirlineLogo) {
-      // Default to hidden until we know it loaded.
-      els.heroAirlineLogo.style.display = "none";
-
-      if (heroLogoCode) {
-        els.heroAirlineLogo.alt = airlineNameVal && airlineNameVal !== "—" ? (airlineNameVal + " logo") : "Airline logo";
-        els.heroAirlineLogo.src = "https://www.gstatic.com/flights/airline_logos/70px/" + encodeURIComponent(heroLogoCode) + ".png";
-
-        els.heroAirlineLogo.onload = function () {
-          // Swap: show logo, hide initials
-          if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "";
-          if (els.heroAirlineInitials) els.heroAirlineInitials.style.display = "none";
-        };
-
-        els.heroAirlineLogo.onerror = function () {
-          // Keep initials (already shown)
-          if (els.heroAirlineLogo) els.heroAirlineLogo.style.display = "none";
-          if (els.heroAirlineInitials) {
-            els.heroAirlineInitials.style.display = heroInitials ? "" : "none";
-          }
-        };
-      }
-    }
 
     // Logo (best effort)
     const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
@@ -696,30 +672,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     ? `Tail Number: ${reg}`
     : "Tail Number: —";
 }
-
-// Build a short airline marker for fallback UI.
-// Preference order:
-//  1) IATA (e.g. "U2")
-//  2) ICAO (e.g. "EZY")
-//  3) Name initials (e.g. "EJ")
-function getAirlineInitials(iata, icao, name) {
-  var a = (iata || "").trim();
-  if (a) return a.toUpperCase().slice(0, 3);
-
-  var b = (icao || "").trim();
-  if (b) return b.toUpperCase().slice(0, 3);
-
-  var n = (name || "").trim();
-  if (!n) return "";
-  var parts = n.split(/\s+/);
-  var out = "";
-  for (var i = 0; i < parts.length; i++) {
-    if (parts[i]) out += parts[i].charAt(0);
-    if (out.length >= 2) break;
-  }
-  return out.toUpperCase();
-}
-
 
     // Aircraft image (if exists)
     const imgSrc = pickAny(flat, [
