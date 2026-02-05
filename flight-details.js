@@ -218,6 +218,10 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
     // New Hero Card elements
     heroCard: document.getElementById("heroCard"),
+    heroAirline: document.getElementById("heroAirline"),
+    heroAirlineLogo: document.getElementById("heroAirlineLogo"),
+    heroAirlineInitials: document.getElementById("heroAirlineInitials"),
+    heroAirlineName: document.getElementById("heroAirlineName"),
     heroFlightNumber: document.getElementById("heroFlightNumber"),
     heroDepDate: document.getElementById("heroDepDate"),
     heroDepCity: document.getElementById("heroDepCity"),
@@ -357,81 +361,75 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   function setText(el, text) { if (el) el.textContent = text; }
 
 
-// ---------- Aircraft type (friendly names) ----------
-// Converts common ICAO aircraft codes (e.g. A320, B38M) into user-friendly names.
-// Falls back safely when unknown.
-function getFriendlyAircraftType(code, textHint) {
+// ---------- Hero airline (logo + initials fallback) ----------
+function likelyAirlineCode(airlineIata, flightNo) {
+  const raw = String(airlineIata || "").trim().toUpperCase();
+  if (/^[A-Z0-9]{2}$/.test(raw)) return raw;
+
+  const f = String(flightNo || "").trim().toUpperCase();
+  const m = f.match(/^([A-Z0-9]{2})\d+/);
+  if (m) return m[1];
+
+  return "";
+}
+
+function airlineInitialsFrom(code, flightNo) {
   const c = String(code || "").trim().toUpperCase();
-  const hint = String(textHint || "").trim();
+  if (/^[A-Z0-9]{2,3}$/.test(c)) return c.slice(0, 3);
 
-  const map = {
-    // Airbus
-    "A318": "Airbus A318",
-    "A319": "Airbus A319",
-    "A320": "Airbus A320",
-    "A321": "Airbus A321",
-    "A19N": "Airbus A319neo",
-    "A20N": "Airbus A320neo",
-    "A21N": "Airbus A321neo",
-    "A332": "Airbus A330-200",
-    "A333": "Airbus A330-300",
-    "A339": "Airbus A330-900neo",
-    "A359": "Airbus A350-900",
-    "A35K": "Airbus A350-1000",
-    "A388": "Airbus A380",
+  const f = String(flightNo || "").trim().toUpperCase();
+  if (f.length >= 2) return f.slice(0, 2);
+  return "—";
+}
 
-    // Boeing
-    "B712": "Boeing 717",
-    "B733": "Boeing 737-300",
-    "B734": "Boeing 737-400",
-    "B735": "Boeing 737-500",
-    "B736": "Boeing 737-600",
-    "B737": "Boeing 737-700",
-    "B738": "Boeing 737-800",
-    "B739": "Boeing 737-900",
-    "B37M": "Boeing 737 MAX 7",
-    "B38M": "Boeing 737 MAX 8",
-    "B39M": "Boeing 737 MAX 9",
-    "B3XM": "Boeing 737 MAX 10",
-    "B752": "Boeing 757-200",
-    "B763": "Boeing 767-300",
-    "B772": "Boeing 777-200",
-    "B773": "Boeing 777-300",
-    "B77L": "Boeing 777-200LR",
-    "B77W": "Boeing 777-300ER",
-    "B788": "Boeing 787-8 Dreamliner",
-    "B789": "Boeing 787-9 Dreamliner",
-    "B78X": "Boeing 787-10 Dreamliner",
+function setHeroAirline(airlineName, airlineIata, flightNo) {
+  if (!els.heroAirline) return;
 
-    // Embraer
-    "E170": "Embraer E170",
-    "E175": "Embraer E175",
-    "E190": "Embraer E190",
-    "E195": "Embraer E195",
-    "E290": "Embraer E190-E2",
-    "E295": "Embraer E195-E2",
+  const name = String(airlineName || "").trim();
+  const code = likelyAirlineCode(airlineIata, flightNo);
+  const initials = airlineInitialsFrom(code, flightNo);
 
-    // ATR / Dash
-    "AT4": "ATR 42",
-    "AT7": "ATR 72",
-    "DH8D": "De Havilland Dash 8-400",
+  if (!name && (!initials || initials === "—")) {
+    els.heroAirline.style.display = "none";
+    return;
+  }
+  els.heroAirline.style.display = "";
 
-    // Regional jets
-    "CRJ7": "Bombardier CRJ700",
-    "CRJ9": "Bombardier CRJ900",
-  };
+  if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
 
-  if (c && map[c]) return map[c];
+  // Reset reveal state
+  if (els.heroAirlineLogo) els.heroAirlineLogo.style.opacity = "0";
+  if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
 
-  // If API already gave a decent text description, prefer it.
-  if (hint) {
-    // Normalise a couple of common patterns
-    if (/a321\s*neo/i.test(hint)) return "Airbus A321neo";
-    if (/a320\s*neo/i.test(hint)) return "Airbus A320neo";
-    return hint;
+  // Show initials immediately while logo loads
+  if (els.heroAirlineInitials) {
+    els.heroAirlineInitials.textContent = initials || "—";
+    els.heroAirlineInitials.style.opacity = "1";
   }
 
-  return c ? `Aircraft ${c}` : "Aircraft —";
+  if (!els.heroAirlineLogo || !code) return;
+
+  const img = els.heroAirlineLogo;
+  img.alt = name ? `${name} logo` : "Airline logo";
+
+  // Use shared logo helper if available; otherwise best-effort single URL.
+  if (window.BrsAirlines && window.BrsAirlines.getLogoUrls && window.BrsAirlines.setImgWithFallback) {
+    const urls = window.BrsAirlines.getLogoUrls(code);
+    window.BrsAirlines.setImgWithFallback(img, urls, () => {
+      img.style.opacity = "1";
+      if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+    });
+    return;
+  }
+
+  // Fallback single-source (Kiwi)
+  img.onload = () => {
+    img.style.opacity = "1";
+    if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+  };
+  img.onerror = () => { /* initials remain */ };
+  img.src = `https://images.kiwi.com/airlines/64/${encodeURIComponent(code)}.png`;
+  if (img.complete && img.naturalWidth > 0) img.onload();
 }
 
 
@@ -727,6 +725,9 @@ function getFriendlyAircraftType(code, textHint) {
     if (els.airlineName) els.airlineName.textContent = airlineNameVal;
     if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
 
+    // Hero airline (logo + name above flight number)
+    setHeroAirline(airlineNameVal, airlineIata, displayNo);
+
     // Logo (best effort)
     const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
     if (els.airlineLogo) {
@@ -739,11 +740,11 @@ function getFriendlyAircraftType(code, textHint) {
     }
 
     // Aircraft (best effort)
-const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
-const acText = pickAny(flat, ["aircraft.model.text", "flight.aircraft.model.text", "aircraftType", "aircraft.text", "aircraft.model"]) || "";
-if (els.aircraftType) {
-  els.aircraftType.textContent = getFriendlyAircraftType(acCode, acText);
-}
+    const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
+    const acText = pickAny(flat, ["aircraft.model.text", "flight.aircraft.model.text", "aircraftType", "aircraft.text", "aircraft.model"]) || "";
+    if (els.aircraftType) {
+      els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
+    }
     const reg = pickAny(flat, ["aircraft.regNumber", "flight.aircraft.registration", "aircraft.registration", "registration"]) || "";
     const icao24 = pickAny(flat, ["aircraft.icao24", "icao24"]) || "";
     if (els.aircraftReg) {
@@ -1267,72 +1268,22 @@ if (els.arrKv) {
       beltEl.textContent = belt || "—";
     }
 
-    // Countdown + in-flight progress
-if (els.heroCountdownText) {
-  const now = Date.now();
+    // Countdown
+    if (els.heroCountdownText) {
+      const times = pickPrimaryTimes(flight, isDeparture);
+      const now = Date.now();
+      const targetMs = times.target ? times.target.getTime() : null;
+      const minsTo = targetMs ? Math.round((targetMs - now) / 60000) : null;
 
-  // For "Departures" view, once we've departed we switch to "until arrival" and show progress.
-  const depTimes = pickPrimaryTimes(flight, true);
-  const arrTimes = pickPrimaryTimes(flight, false);
-
-  const depMs = depTimes.target ? depTimes.target.getTime() : null;
-  const arrMs = arrTimes.target ? arrTimes.target.getTime() : null;
-
-  // Ensure we have a progress bar container (created once, no HTML change required).
-  let progressWrap = document.getElementById("heroProgress");
-  let progressBar = document.getElementById("heroProgressBar");
-  if (!progressWrap && els.heroCountdown) {
-    progressWrap = document.createElement("div");
-    progressWrap.id = "heroProgress";
-    progressWrap.className = "hero-progress";
-    progressWrap.setAttribute("aria-hidden", "true");
-
-    progressBar = document.createElement("div");
-    progressBar.id = "heroProgressBar";
-    progressBar.className = "hero-progress-bar";
-
-    progressWrap.appendChild(progressBar);
-    els.heroCountdown.appendChild(progressWrap);
-  }
-  if (!progressBar && progressWrap) {
-    progressBar = progressWrap.querySelector(".hero-progress-bar");
-  }
-
-  const showProgress = (pct) => {
-    if (!progressWrap || !progressBar) return;
-    const clamped = Math.max(0, Math.min(1, Number(pct) || 0));
-    progressWrap.style.display = "";
-    progressBar.style.width = `${Math.round(clamped * 100)}%`;
-  };
-  const hideProgress = () => {
-    if (!progressWrap) return;
-    progressWrap.style.display = "none";
-  };
-
-  // In-flight logic only makes sense when we have dep+arr times and we're viewing a departure.
-  if (isDeparture && depMs && arrMs && arrMs > depMs && now >= depMs && now < arrMs) {
-    const minsUntilArr = Math.max(0, Math.round((arrMs - now) / 60000));
-    els.heroCountdownText.textContent = `On its way • ${fmtRelative(minsUntilArr)} until arrival`;
-    showProgress((now - depMs) / (arrMs - depMs));
-  } else {
-    // Default countdown: time to the "target" for the current mode (dep for departures, arr for arrivals).
-    const times = pickPrimaryTimes(flight, isDeparture);
-    const targetMs = times.target ? times.target.getTime() : null;
-    const minsTo = targetMs ? Math.round((targetMs - now) / 60000) : null;
-
-    const depArrWord = isDeparture ? "departure" : "arrival";
-    if (minsTo === null) {
-      els.heroCountdownText.textContent = "—";
-    } else if (minsTo > 0) {
-      els.heroCountdownText.textContent = `${fmtRelative(minsTo)} before ${depArrWord}`;
-    } else {
-      els.heroCountdownText.textContent = `${fmtRelative(Math.abs(minsTo))} after ${depArrWord}`;
+      const depArrWord = isDeparture ? "departure" : "arrival";
+      if (minsTo === null) {
+        els.heroCountdownText.textContent = "—";
+      } else if (minsTo > 0) {
+        els.heroCountdownText.textContent = `${fmtRelative(minsTo)} before ${depArrWord}`;
+      } else {
+        els.heroCountdownText.textContent = `${fmtRelative(Math.abs(minsTo))} after ${depArrWord}`;
+      }
     }
-
-    // Only show a bar when in-flight; otherwise hide it.
-    hideProgress();
-  }
-}
   }
 
   function renderStatusBadge(flat) {
