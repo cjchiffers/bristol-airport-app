@@ -218,6 +218,10 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
     // New Hero Card elements
     heroCard: document.getElementById("heroCard"),
+    heroAirline: document.getElementById("heroAirline"),
+    heroAirlineLogo: document.getElementById("heroAirlineLogo"),
+    heroAirlineInitials: document.getElementById("heroAirlineInitials"),
+    heroAirlineName: document.getElementById("heroAirlineName"),
     heroFlightNumber: document.getElementById("heroFlightNumber"),
     heroDepDate: document.getElementById("heroDepDate"),
     heroDepCity: document.getElementById("heroDepCity"),
@@ -355,6 +359,79 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   }
 
   function setText(el, text) { if (el) el.textContent = text; }
+
+
+// ---------- Hero airline (logo + initials fallback) ----------
+function likelyAirlineCode(airlineIata, flightNo) {
+  const raw = String(airlineIata || "").trim().toUpperCase();
+  if (/^[A-Z0-9]{2}$/.test(raw)) return raw;
+
+  const f = String(flightNo || "").trim().toUpperCase();
+  const m = f.match(/^([A-Z0-9]{2})\d+/);
+  if (m) return m[1];
+
+  return "";
+}
+
+function airlineInitialsFrom(code, flightNo) {
+  const c = String(code || "").trim().toUpperCase();
+  if (/^[A-Z0-9]{2,3}$/.test(c)) return c.slice(0, 3);
+
+  const f = String(flightNo || "").trim().toUpperCase();
+  if (f.length >= 2) return f.slice(0, 2);
+  return "—";
+}
+
+function setHeroAirline(airlineName, airlineIata, flightNo) {
+  if (!els.heroAirline) return;
+
+  const name = String(airlineName || "").trim();
+  const code = likelyAirlineCode(airlineIata, flightNo);
+  const initials = airlineInitialsFrom(code, flightNo);
+
+  if (!name && (!initials || initials === "—")) {
+    els.heroAirline.style.display = "none";
+    return;
+  }
+  els.heroAirline.style.display = "";
+
+  if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
+
+  // Reset reveal state
+  if (els.heroAirlineLogo) els.heroAirlineLogo.style.opacity = "0";
+  if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+
+  // Show initials immediately while logo loads
+  if (els.heroAirlineInitials) {
+    els.heroAirlineInitials.textContent = initials || "—";
+    els.heroAirlineInitials.style.opacity = "1";
+  }
+
+  if (!els.heroAirlineLogo || !code) return;
+
+  const img = els.heroAirlineLogo;
+  img.alt = name ? `${name} logo` : "Airline logo";
+
+  // Use shared logo helper if available; otherwise best-effort single URL.
+  if (window.BrsAirlines && window.BrsAirlines.getLogoUrls && window.BrsAirlines.setImgWithFallback) {
+    const urls = window.BrsAirlines.getLogoUrls(code);
+    window.BrsAirlines.setImgWithFallback(img, urls, () => {
+      img.style.opacity = "1";
+      if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+    });
+    return;
+  }
+
+  // Fallback single-source (Kiwi)
+  img.onload = () => {
+    img.style.opacity = "1";
+    if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
+  };
+  img.onerror = () => { /* initials remain */ };
+  img.src = `https://images.kiwi.com/airlines/64/${encodeURIComponent(code)}.png`;
+  if (img.complete && img.naturalWidth > 0) img.onload();
+}
+
 
   function deriveIdentity(f) {
     const flat = flattenObject(f || {});

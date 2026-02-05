@@ -1135,3 +1135,23 @@ body.leaflet-on #routeSvg{ display:none; }
   opacity:0.9;
   white-space:nowrap;
 }
+
+
+/* Hero header: airline above flight number (single source of truth) */
+.hero-card-header{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
+}
+
+/* Remove unused 3-dots menu button on hero */
+#heroMenuBtn{ display:none !important; }
+
+/* Hide legacy airline card (airline now lives in hero header) */
+.airline-row{ display:none !important; }
+
+
+/* Hero airline visuals: allow JS to reveal via opacity */
+.airline-logo--hero{ display:block; opacity:0; }
+.airline-initials--hero{ display:block; opacity:0; }
