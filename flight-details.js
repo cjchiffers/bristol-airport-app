@@ -725,6 +725,9 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     if (els.airlineName) els.airlineName.textContent = airlineNameVal;
     if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
 
+    // Hero airline (logo + name above flight number)
+    setHeroAirline(airlineNameVal, airlineIata, displayNo);
+
     // Logo (best effort)
     const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
     if (els.airlineLogo) {
