@@ -218,10 +218,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
     // New Hero Card elements
     heroCard: document.getElementById("heroCard"),
-    heroAirline: document.getElementById("heroAirline"),
-    heroAirlineLogo: document.getElementById("heroAirlineLogo"),
-    heroAirlineInitials: document.getElementById("heroAirlineInitials"),
-    heroAirlineName: document.getElementById("heroAirlineName"),
     heroFlightNumber: document.getElementById("heroFlightNumber"),
     heroDepDate: document.getElementById("heroDepDate"),
     heroDepCity: document.getElementById("heroDepCity"),
@@ -359,79 +355,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   }
 
   function setText(el, text) { if (el) el.textContent = text; }
-
-
-// ---------- Hero airline (logo + initials fallback) ----------
-function likelyAirlineCode(airlineIata, flightNo) {
-  const raw = String(airlineIata || "").trim().toUpperCase();
-  if (/^[A-Z0-9]{2}$/.test(raw)) return raw;
-
-  const f = String(flightNo || "").trim().toUpperCase();
-  const m = f.match(/^([A-Z0-9]{2})\d+/);
-  if (m) return m[1];
-
-  return "";
-}
-
-function airlineInitialsFrom(code, flightNo) {
-  const c = String(code || "").trim().toUpperCase();
-  if (/^[A-Z0-9]{2,3}$/.test(c)) return c.slice(0, 3);
-
-  const f = String(flightNo || "").trim().toUpperCase();
-  if (f.length >= 2) return f.slice(0, 2);
-  return "—";
-}
-
-function setHeroAirline(airlineName, airlineIata, flightNo) {
-  if (!els.heroAirline) return;
-
-  const name = String(airlineName || "").trim();
-  const code = likelyAirlineCode(airlineIata, flightNo);
-  const initials = airlineInitialsFrom(code, flightNo);
-
-  if (!name && (!initials || initials === "—")) {
-    els.heroAirline.style.display = "none";
-    return;
-  }
-  els.heroAirline.style.display = "";
-
-  if (els.heroAirlineName) els.heroAirlineName.textContent = name || "—";
-
-  // Reset reveal state
-  if (els.heroAirlineLogo) els.heroAirlineLogo.style.opacity = "0";
-  if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
-
-  // Show initials immediately while logo loads
-  if (els.heroAirlineInitials) {
-    els.heroAirlineInitials.textContent = initials || "—";
-    els.heroAirlineInitials.style.opacity = "1";
-  }
-
-  if (!els.heroAirlineLogo || !code) return;
-
-  const img = els.heroAirlineLogo;
-  img.alt = name ? `${name} logo` : "Airline logo";
-
-  // Use shared logo helper if available; otherwise best-effort single URL.
-  if (window.BrsAirlines && window.BrsAirlines.getLogoUrls && window.BrsAirlines.setImgWithFallback) {
-    const urls = window.BrsAirlines.getLogoUrls(code);
-    window.BrsAirlines.setImgWithFallback(img, urls, () => {
-      img.style.opacity = "1";
-      if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
-    });
-    return;
-  }
-
-  // Fallback single-source (Kiwi)
-  img.onload = () => {
-    img.style.opacity = "1";
-    if (els.heroAirlineInitials) els.heroAirlineInitials.style.opacity = "0";
-  };
-  img.onerror = () => { /* initials remain */ };
-  img.src = `https://images.kiwi.com/airlines/64/${encodeURIComponent(code)}.png`;
-  if (img.complete && img.naturalWidth > 0) img.onload();
-}
-
 
   function deriveIdentity(f) {
     const flat = flattenObject(f || {});
@@ -724,9 +647,6 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     const airlineIata = pickAny(flat, ["airline.iata", "airline.iataCode", "flight.airline.code.iata", "airline_iata", "airlineCode"]) || "";
     if (els.airlineName) els.airlineName.textContent = airlineNameVal;
     if (els.airlineCodeLine) els.airlineCodeLine.textContent = airlineIata ? `Airline code: ${airlineIata}` : "Airline code: —";
-
-    // Hero airline (logo + name above flight number)
-    setHeroAirline(airlineNameVal, airlineIata, displayNo);
 
     // Logo (best effort)
     const logoIata = airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "");
@@ -1251,13 +1171,10 @@ if (els.arrKv) {
     const gate = String(gateRaw || "").trim();
 
     if (gateEl) {
-      const hasGate = !!gate;
-      gateEl.textContent = hasGate ? gate : "Check screens";
-      gateEl.classList.toggle("is-placeholder", !hasGate);
+      gateEl.textContent = gate || "—";
 
       // Default: yellow. If gate changes (sticky), turn red.
-      // Important: don't "learn" a blank gate, or we'll lose the previous value.
-      const changed = hasGate ? opsChangedSticky("hero_gate", gate) : false;
+      const changed = opsChangedSticky("hero_gate", gate);
       gateEl.classList.toggle("is-changed", changed);
     }
 
@@ -1268,26 +1185,76 @@ if (els.arrKv) {
     const belt = String(beltRaw || "").trim();
 
     if (beltEl) {
-      const hasBelt = !!belt;
-      beltEl.textContent = hasBelt ? belt : "Check screens";
-      beltEl.classList.toggle("is-placeholder", !hasBelt);
+      beltEl.textContent = belt || "—";
     }
 
-    // Countdown
-    if (els.heroCountdownText) {
-      const times = pickPrimaryTimes(flight, isDeparture);
-      const now = Date.now();
-      const targetMs = times.target ? times.target.getTime() : null;
-      const minsTo = targetMs ? Math.round((targetMs - now) / 60000) : null;
+    // Countdown + in-flight progress
+if (els.heroCountdownText) {
+  const now = Date.now();
 
-      const depArrWord = isDeparture ? "departure" : "arrival";
-      if (minsTo === null) {
-        els.heroCountdownText.textContent = "—";
-      } else if (minsTo > 0) {
-        els.heroCountdownText.textContent = `${fmtRelative(minsTo)} before ${depArrWord}`;
-      } else {
-        els.heroCountdownText.textContent = `${fmtRelative(Math.abs(minsTo))} after ${depArrWord}`;
-      }
+  // For "Departures" view, once we've departed we switch to "until arrival" and show progress.
+  const depTimes = pickPrimaryTimes(flight, true);
+  const arrTimes = pickPrimaryTimes(flight, false);
+
+  const depMs = depTimes.target ? depTimes.target.getTime() : null;
+  const arrMs = arrTimes.target ? arrTimes.target.getTime() : null;
+
+  // Ensure we have a progress bar container (created once, no HTML change required).
+  let progressWrap = document.getElementById("heroProgress");
+  let progressBar = document.getElementById("heroProgressBar");
+  if (!progressWrap && els.heroCountdown) {
+    progressWrap = document.createElement("div");
+    progressWrap.id = "heroProgress";
+    progressWrap.className = "hero-progress";
+    progressWrap.setAttribute("aria-hidden", "true");
+
+    progressBar = document.createElement("div");
+    progressBar.id = "heroProgressBar";
+    progressBar.className = "hero-progress-bar";
+
+    progressWrap.appendChild(progressBar);
+    els.heroCountdown.appendChild(progressWrap);
+  }
+  if (!progressBar && progressWrap) {
+    progressBar = progressWrap.querySelector(".hero-progress-bar");
+  }
+
+  const showProgress = (pct) => {
+    if (!progressWrap || !progressBar) return;
+    const clamped = Math.max(0, Math.min(1, Number(pct) || 0));
+    progressWrap.style.display = "";
+    progressBar.style.width = `${Math.round(clamped * 100)}%`;
+  };
+  const hideProgress = () => {
+    if (!progressWrap) return;
+    progressWrap.style.display = "none";
+  };
+
+  // In-flight logic only makes sense when we have dep+arr times and we're viewing a departure.
+  if (isDeparture && depMs && arrMs && arrMs > depMs && now >= depMs && now < arrMs) {
+    const minsUntilArr = Math.max(0, Math.round((arrMs - now) / 60000));
+    els.heroCountdownText.textContent = `On its way • ${fmtRelative(minsUntilArr)} until arrival`;
+    showProgress((now - depMs) / (arrMs - depMs));
+  } else {
+    // Default countdown: time to the "target" for the current mode (dep for departures, arr for arrivals).
+    const times = pickPrimaryTimes(flight, isDeparture);
+    const targetMs = times.target ? times.target.getTime() : null;
+    const minsTo = targetMs ? Math.round((targetMs - now) / 60000) : null;
+
+    const depArrWord = isDeparture ? "departure" : "arrival";
+    if (minsTo === null) {
+      els.heroCountdownText.textContent = "—";
+    } else if (minsTo > 0) {
+      els.heroCountdownText.textContent = `${fmtRelative(minsTo)} before ${depArrWord}`;
+    } else {
+      els.heroCountdownText.textContent = `${fmtRelative(Math.abs(minsTo))} after ${depArrWord}`;
+    }
+
+    // Only show a bar when in-flight; otherwise hide it.
+    hideProgress();
+  }
+}
+
     }
   }
 

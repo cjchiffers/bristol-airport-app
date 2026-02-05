@@ -154,12 +154,11 @@
   gap: 4px;
 }
 
-/* Right column (arrival): keep it in column 2, but align contents to the left
-   so the Belt pill sits under the arrival airport/time (not hugging the card edge). */
+/* Right column (arrival) should align to the arrival time block */
 .hero-info-item:nth-child(2){
-  justify-self: start;
-  align-items: flex-start;
-  text-align: left;
+  justify-self: end;
+  align-items: flex-end;
+  text-align: right;
 }
 
 .hero-info-label {
@@ -190,16 +189,6 @@
 .hero-info-value.pill-belt{
   width: fit-content;
   min-width: calc(3ch + 20px);
-}
-
-/* When gate/belt is missing we show "Check screens" — allow a wider pill + smaller type */
-.hero-info-value.is-placeholder{
-  font-size: 12px;
-  font-weight: 800;
-  font-family: inherit;
-  letter-spacing: 0;
-  padding: 8px 12px;
-  min-width: 120px;
 }
 
 /* Gate pill: yellow by default, red when the gate changes */
@@ -1113,30 +1102,26 @@ body.leaflet-on #routeSvg{ display:none; }
 
 /* Slightly larger hero logo (still subtle) */
 .airline-logo--hero{
-  width:34px;
-  height:34px;
-  border-radius:10px;
+  width:28px;
+  height:28px;
+  border-radius:8px;
   object-fit:contain;
   background:#fff;
-  display:block;
-  opacity:0;
-  transition: opacity 120ms ease;
+  display:none; /* JS toggles on load */
 }
 
 /* Initials fallback occupies the same footprint as the logo */
 .airline-initials--hero{
-  width:34px;
-  height:34px;
-  border-radius:10px;
+  width:28px;
+  height:28px;
+  border-radius:8px;
   background:#e5e7eb;
   color:#374151;
   font-weight:900;
-  font-size:13px;
-  line-height:34px;
+  font-size:12px;
+  line-height:28px;
   text-align:center;
-  display:block;
-  opacity:0;
-  transition: opacity 120ms ease;
+  display:none; /* JS toggles when logo missing/fails */
 }
 
 /* Airline name next to the logo/initials */
@@ -1148,21 +1133,20 @@ body.leaflet-on #routeSvg{ display:none; }
 }
 
 
-/* Hero header: airline above flight number (single source of truth) */
-.hero-card-header{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:6px;
+/* In-flight progress bar (shown inside the countdown card) */
+.hero-progress{
+  margin-top: 10px;
+  height: 8px;
+  width: 100%;
+  background: rgba(0,0,0,0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  display: none; /* JS shows only when in-flight */
 }
-
-/* Remove unused 3-dots menu button on hero */
-#heroMenuBtn{ display:none !important; }
-
-/* Hide legacy airline card (airline now lives in hero header) */
-.airline-row{ display:none !important; }
-
-
-/* Hero airline visuals: allow JS to reveal via opacity */
-.airline-logo--hero{ display:block; opacity:0; }
-.airline-initials--hero{ display:block; opacity:0; }
+.hero-progress-bar{
+  height: 100%;
+  width: 0%;
+  background: rgba(0,0,0,0.35);
+  border-radius: 999px;
+  transition: width 400ms ease;
+}
