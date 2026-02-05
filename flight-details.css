@@ -154,11 +154,12 @@
   gap: 4px;
 }
 
-/* Right column (arrival) should align to the arrival time block */
+/* Right column (arrival): keep it in column 2, but align contents to the left
+   so the Belt pill sits under the arrival airport/time (not hugging the card edge). */
 .hero-info-item:nth-child(2){
-  justify-self: end;
-  align-items: flex-end;
-  text-align: right;
+  justify-self: start;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .hero-info-label {
