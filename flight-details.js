@@ -356,6 +356,85 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 
   function setText(el, text) { if (el) el.textContent = text; }
 
+
+// ---------- Aircraft type (friendly names) ----------
+// Converts common ICAO aircraft codes (e.g. A320, B38M) into user-friendly names.
+// Falls back safely when unknown.
+function getFriendlyAircraftType(code, textHint) {
+  const c = String(code || "").trim().toUpperCase();
+  const hint = String(textHint || "").trim();
+
+  const map = {
+    // Airbus
+    "A318": "Airbus A318",
+    "A319": "Airbus A319",
+    "A320": "Airbus A320",
+    "A321": "Airbus A321",
+    "A19N": "Airbus A319neo",
+    "A20N": "Airbus A320neo",
+    "A21N": "Airbus A321neo",
+    "A332": "Airbus A330-200",
+    "A333": "Airbus A330-300",
+    "A339": "Airbus A330-900neo",
+    "A359": "Airbus A350-900",
+    "A35K": "Airbus A350-1000",
+    "A388": "Airbus A380",
+
+    // Boeing
+    "B712": "Boeing 717",
+    "B733": "Boeing 737-300",
+    "B734": "Boeing 737-400",
+    "B735": "Boeing 737-500",
+    "B736": "Boeing 737-600",
+    "B737": "Boeing 737-700",
+    "B738": "Boeing 737-800",
+    "B739": "Boeing 737-900",
+    "B37M": "Boeing 737 MAX 7",
+    "B38M": "Boeing 737 MAX 8",
+    "B39M": "Boeing 737 MAX 9",
+    "B3XM": "Boeing 737 MAX 10",
+    "B752": "Boeing 757-200",
+    "B763": "Boeing 767-300",
+    "B772": "Boeing 777-200",
+    "B773": "Boeing 777-300",
+    "B77L": "Boeing 777-200LR",
+    "B77W": "Boeing 777-300ER",
+    "B788": "Boeing 787-8 Dreamliner",
+    "B789": "Boeing 787-9 Dreamliner",
+    "B78X": "Boeing 787-10 Dreamliner",
+
+    // Embraer
+    "E170": "Embraer E170",
+    "E175": "Embraer E175",
+    "E190": "Embraer E190",
+    "E195": "Embraer E195",
+    "E290": "Embraer E190-E2",
+    "E295": "Embraer E195-E2",
+
+    // ATR / Dash
+    "AT4": "ATR 42",
+    "AT7": "ATR 72",
+    "DH8D": "De Havilland Dash 8-400",
+
+    // Regional jets
+    "CRJ7": "Bombardier CRJ700",
+    "CRJ9": "Bombardier CRJ900",
+  };
+
+  if (c && map[c]) return map[c];
+
+  // If API already gave a decent text description, prefer it.
+  if (hint) {
+    // Normalise a couple of common patterns
+    if (/a321\s*neo/i.test(hint)) return "Airbus A321neo";
+    if (/a320\s*neo/i.test(hint)) return "Airbus A320neo";
+    return hint;
+  }
+
+  return c ? `Aircraft ${c}` : "Aircraft —";
+}
+
+
   function deriveIdentity(f) {
     const flat = flattenObject(f || {});
     const flightNo =
@@ -660,11 +739,11 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     }
 
     // Aircraft (best effort)
-    const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
-    const acText = pickAny(flat, ["aircraft.model.text", "flight.aircraft.model.text", "aircraftType", "aircraft.text", "aircraft.model"]) || "";
-    if (els.aircraftType) {
-      els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
-    }
+const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
+const acText = pickAny(flat, ["aircraft.model.text", "flight.aircraft.model.text", "aircraftType", "aircraft.text", "aircraft.model"]) || "";
+if (els.aircraftType) {
+  els.aircraftType.textContent = getFriendlyAircraftType(acCode, acText);
+}
     const reg = pickAny(flat, ["aircraft.regNumber", "flight.aircraft.registration", "aircraft.registration", "registration"]) || "";
     const icao24 = pickAny(flat, ["aircraft.icao24", "icao24"]) || "";
     if (els.aircraftReg) {
@@ -1254,8 +1333,6 @@ if (els.heroCountdownText) {
     hideProgress();
   }
 }
-
-    }
   }
 
   function renderStatusBadge(flat) {
