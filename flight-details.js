@@ -1251,10 +1251,13 @@ if (els.arrKv) {
     const gate = String(gateRaw || "").trim();
 
     if (gateEl) {
-      gateEl.textContent = gate || "—";
+      const hasGate = !!gate;
+      gateEl.textContent = hasGate ? gate : "Check screens";
+      gateEl.classList.toggle("is-placeholder", !hasGate);
 
       // Default: yellow. If gate changes (sticky), turn red.
-      const changed = opsChangedSticky("hero_gate", gate);
+      // Important: don't "learn" a blank gate, or we'll lose the previous value.
+      const changed = hasGate ? opsChangedSticky("hero_gate", gate) : false;
       gateEl.classList.toggle("is-changed", changed);
     }
 
@@ -1265,7 +1268,9 @@ if (els.arrKv) {
     const belt = String(beltRaw || "").trim();
 
     if (beltEl) {
-      beltEl.textContent = belt || "—";
+      const hasBelt = !!belt;
+      beltEl.textContent = hasBelt ? belt : "Check screens";
+      beltEl.classList.toggle("is-placeholder", !hasBelt);
     }
 
     // Countdown

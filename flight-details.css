@@ -154,14 +154,12 @@
   gap: 4px;
 }
 
-/* Right column (arrival): keep it in column 2, but align content to the left
-   so the Belt pill sits under the arrival airport/time rather than hugging the card edge. */
+/* Right column (arrival) should align to the arrival time block */
 .hero-info-item:nth-child(2){
-  justify-self: start;
-  align-items: flex-start;
-  text-align: left;
+  justify-self: end;
+  align-items: flex-end;
+  text-align: right;
 }
-
 
 .hero-info-label {
   font-size: 11px;
@@ -191,6 +189,16 @@
 .hero-info-value.pill-belt{
   width: fit-content;
   min-width: calc(3ch + 20px);
+}
+
+/* When gate/belt is missing we show "Check screens" — allow a wider pill + smaller type */
+.hero-info-value.is-placeholder{
+  font-size: 12px;
+  font-weight: 800;
+  font-family: inherit;
+  letter-spacing: 0;
+  padding: 8px 12px;
+  min-width: 120px;
 }
 
 /* Gate pill: yellow by default, red when the gate changes */
