@@ -534,13 +534,13 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
   function stopAuto() { if (state.timer) clearInterval(state.timer); state.timer = null; }
 
   // ---------- Refresh (best-effort) ----------
-  const apiKey = "26071f-14ef94"; // Aviation Edge key
+  const PROXY_BASE = "https://flat-dust-a68a.cjchiffers.workers.dev";
 
   async function refreshNow(forceFeedback) {
     if (!state.context || !state.current) return;
     setFetching(true);
     try {
-      const updated = await fetchBestEffortUpdate(apiKey, state.context, state.current);
+      const updated = await fetchBestEffortUpdate(state.context, state.current);
       if (!updated) return;
 
       const prev = state.current;
@@ -609,49 +609,86 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     return Math.abs(a.getTime() - b.getTime()) / 60000;
   }
 
-  async function fetchBestEffortUpdate(apiKey_, context, current) {
-    // UI uses plural ("departures"/"arrivals"), but Aviation Edge timetable expects singular ("departure"/"arrival").
-    const normalizeMode = (m) => {
-      const x = String(m || "").trim().toLowerCase();
-      if (x === "departures") return "departure";
-      if (x === "arrivals") return "arrival";
-      if (x === "departure" || x === "arrival") return x;
-      return "departure";
-    };
-
-    const mode = normalizeMode(context.mode);
+  async function fetchBestEffortUpdate(context, current) {
+    const isDep = !String(context.mode || "").toLowerCase().includes("arr");
     const airport = context.airport || "BRS";
-
     const curId = deriveIdentity(current);
     const flightNo = curId.flightNo || "";
 
-    const url = new URL("https://aviation-edge.com/v2/public/timetable");
-    url.searchParams.set("key", apiKey_ || "");
-    url.searchParams.set("type", mode);
-    if (flightNo) url.searchParams.set("flight_Iata", flightNo);
-    url.searchParams.set("iataCode", airport);
+    const url = new URL(`${PROXY_BASE}/api/flights`);
+    if (flightNo) url.searchParams.set("flight_iata", flightNo);
+    if (isDep) {
+      url.searchParams.set("dep_iata", airport);
+    } else {
+      url.searchParams.set("arr_iata", airport);
+    }
 
-    console.log("[BRS Flights] timetable request", { mode, url: url.toString(), contextMode: context && context.mode });
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) return null;
 
     const data = await res.json();
     const list =
-      (Array.isArray(data) && data) ||
       (data && Array.isArray(data.data) && data.data) ||
-      (data && Array.isArray(data.result) && data.result) ||
+      (Array.isArray(data) && data) ||
       null;
     if (!list) return null;
 
     let best = null;
     let bestScore = -1;
     for (const f of list) {
-      const candId = deriveIdentity(f);
+      const normalized = normalizeAviationStack(f);
+      const candId = deriveIdentity(normalized);
       const score = scoreMatch(curId, candId);
-      if (score > bestScore) { bestScore = score; best = f; }
+      if (score > bestScore) { bestScore = score; best = normalized; }
     }
     if (bestScore < 3) return null;
     return best;
+  }
+
+  // Maps AviationStack response fields to the shape the rest of the code expects.
+  function normalizeAviationStack(f) {
+    if (!f || typeof f !== "object") return f;
+    const dep = f.departure || {};
+    const arr = f.arrival || {};
+    const fl = f.flight || {};
+    return {
+      type: f.flight_status && f.departure && f.departure.iata ? "departure" : (f.type || ""),
+      status: f.flight_status || f.status || "",
+      flight_status: f.flight_status || f.status || "",
+      departure: {
+        iataCode: dep.iata || dep.iataCode || "",
+        scheduledTime: dep.scheduled || dep.scheduledTime || "",
+        estimatedTime: dep.estimated || dep.estimatedTime || "",
+        actualTime: dep.actual || dep.actualTime || "",
+        delay: dep.delay != null ? dep.delay : "",
+        terminal: dep.terminal || "",
+        gate: dep.gate || "",
+        baggage: dep.baggage || arr.baggage || "",
+      },
+      arrival: {
+        iataCode: arr.iata || arr.iataCode || "",
+        scheduledTime: arr.scheduled || arr.scheduledTime || "",
+        estimatedTime: arr.estimated || arr.estimatedTime || "",
+        actualTime: arr.actual || arr.actualTime || "",
+        delay: arr.delay != null ? arr.delay : "",
+        terminal: arr.terminal || "",
+        gate: arr.gate || "",
+        baggage: arr.baggage || "",
+      },
+      airline: {
+        iataCode: (f.airline && (f.airline.iata || f.airline.iataCode)) || "",
+        icaoCode: (f.airline && (f.airline.icao || f.airline.icaoCode)) || "",
+        name: (f.airline && f.airline.name) || "",
+      },
+      flight: {
+        iataNumber: fl.iata || fl.iataNumber || "",
+        icaoNumber: fl.icao || fl.icaoNumber || "",
+        number: fl.number || "",
+      },
+      codeshared: f.codeshared || null,
+      // preserve originals for flattenObject / pickAny
+      _raw: f,
+    };
   }
 
   // ---------- Render ----------
@@ -903,7 +940,7 @@ if (els.arrKv) {
 
   function renderStatusBanner(flight, flat, id) {
     if (!els.statusBanner) return;
-    const stRaw = pickAny(flat, ["status"]) || "Unknown";
+    const stRaw = pickAny(flat, ["flight_status", "status"]) || "Unknown";
     const st = String(stRaw).toLowerCase();
 
     const isDeparture = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase().includes("depart");
@@ -1174,13 +1211,13 @@ if (els.arrKv) {
     }
     
     // Get flight status
-    const flightStatus = flight.status || "";
+    const flightStatus = flight.flight_status || flight.status || "";
     
     paintHeroStatus(els.heroDepDelay, dep, flightStatus, dep.delay);
     paintHeroStatus(els.heroArrDelay, arr, flightStatus, arr.delay);
 
     // Info grid - Aviation Edge provides these fields directly in departure/arrival objects
-    const isDeparture = String(flight.type || "").toLowerCase() === "departure";
+    const isDeparture = String(flight.type || (state.context && state.context.mode) || "").toLowerCase().includes("depart");
     
     // Gate + Belt pills (always shown)
     const gateEl = els.heroGate;
