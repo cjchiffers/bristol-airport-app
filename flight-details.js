@@ -1240,7 +1240,7 @@ if (els.arrKv) {
     const gate = String(gateRaw || "").trim();
 
     if (gateEl) {
-      gateEl.textContent = gate || "—";
+      gateEl.textContent = gate || "See screens";
 
       // Default: yellow. If gate changes (sticky), turn red.
       const changed = opsChangedSticky("hero_gate", gate);
@@ -1254,7 +1254,7 @@ if (els.arrKv) {
     const belt = String(beltRaw || "").trim();
 
     if (beltEl) {
-      beltEl.textContent = belt || "—";
+      beltEl.textContent = belt || "See screens";
     }
 
     // Countdown
