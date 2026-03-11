@@ -651,6 +651,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     const dep = f.departure || {};
     const arr = f.arrival || {};
     const fl = f.flight || {};
+    const ac = f.aircraft || {};
     return {
       type: f.flight_status && f.departure && f.departure.iata ? "departure" : (f.type || ""),
       status: f.flight_status || f.status || "",
@@ -684,6 +685,15 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
         iataNumber: fl.iata || fl.iataNumber || "",
         icaoNumber: fl.icao || fl.icaoNumber || "",
         number: fl.number || "",
+      },
+      aircraft: {
+        iataCode: ac.iata || "",
+        icaoCode: ac.icao || ac.iata || "",
+        regNumber: ac.registration || "",
+        model: {
+          text: "",
+          code: ac.icao || ac.iata || "",
+        },
       },
       codeshared: f.codeshared || null,
       // preserve originals for flattenObject / pickAny
