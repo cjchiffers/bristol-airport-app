@@ -163,13 +163,8 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
   const els = {
     headline: document.getElementById("headline"),
     subhead: document.getElementById("subhead"),
-    lastUpdated: document.getElementById("lastUpdated"),
-    sourceLine: document.getElementById("sourceLine"),
-    statusBadge: document.getElementById("statusBadge"),
     statusBanner: document.getElementById("statusBanner"),
-    opsBar: document.getElementById("opsBar"),
     netBanner: document.getElementById("netBanner"),
-    refreshSpin: document.getElementById("refreshSpin"),
 
     depKv: document.getElementById("depKv"),
     arrKv: document.getElementById("arrKv"),
@@ -495,7 +490,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
   if (els.autoBtn) {
     els.autoBtn.addEventListener("click", () => {
       state.auto = !state.auto;
-      els.autoBtn.setAttribute("aria-pressed", state.auto ? "true" : "false");
+      els.autoBtn.setAttribute("aria-checked", state.auto ? "true" : "false");
       els.autoBtn.textContent = `Auto-refresh: ${state.auto ? "On" : "Off"}`;
       if (state.auto) startAuto(); else stopAuto();
     });
@@ -738,7 +733,6 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
       els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
     }
     const reg = pickAny(flat, ["aircraft.regNumber", "flight.aircraft.registration", "aircraft.registration", "registration"]) || "";
-    const icao24 = pickAny(flat, ["aircraft.icao24", "icao24"]) || "";
     if (els.aircraftReg) {
   els.aircraftReg.textContent = reg
     ? `Tail Number: ${reg}`
@@ -780,7 +774,6 @@ const depInfo = {
 };
 
 depInfo.gateChanged = opsChanged('gate_dep', depInfo.gate);
-depInfo.beltChanged = opsChanged('belt_dep', depInfo.belt);
 
 
 const arrInfo = {
@@ -796,41 +789,11 @@ arrInfo.gateChanged = opsChanged('gate_arr', arrInfo.gate);
 arrInfo.beltChanged = opsChanged('belt_arr', arrInfo.belt);
 
 
-// Track per-flight operational fields so we can highlight changes (e.g. gate change)
-function getOpsKey(suffix) {
-  const k = state?.storageKey || "unknown";
-  return `fd_${k}_${suffix}`;
-}
-function opsChanged(suffix, nextVal) {
-  const key = getOpsKey(suffix);
-  const prev = sessionStorage.getItem(key);
-  const next = (nextVal == null) ? "" : String(nextVal);
-  // Only count as "changed" if we had a previous non-empty value and it differs.
-  const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
-  sessionStorage.setItem(key, next);
-  return changed;
-}
-
-
-
-function opsChangedSticky(suffix, nextVal) {
-  const key = getOpsKey(suffix);
-  const prev = sessionStorage.getItem(key) || "";
-  const next = (nextVal == null) ? "" : String(nextVal).trim();
-
-  // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
-  if (!next) return false;
-
-  const changed = (prev !== "" && prev !== next);
-  sessionStorage.setItem(key, next);
-  return changed;
-}
-
-
-
-function kvLine(label, val) {
-  if (!val) return "";
-  return `<div class="kv-line"><span class="kv-k">${escapeHtml(label)}</span><span class="kv-v">${escapeHtml(val)}</span></div>`;
+function kvLine(label, val, showEmpty, cls) {
+  if (!val && !showEmpty) return "";
+  const v = val || "—";
+  const divCls = cls ? `kv-line kv-line--${escapeHtml(cls)}` : "kv-line";
+  return `<div class="${divCls}"><span class="kv-k">${escapeHtml(label)}</span><span class="kv-v">${escapeHtml(v)}</span></div>`;
 }
 
 if (els.depKv) {
@@ -1043,7 +1006,7 @@ if (els.arrKv) {
       el.hidden = true;
       el.textContent = "";
       el.classList.remove("fh-delay-good");
-      el.classList.add("fh-delay-warn");
+      el.classList.remove("fh-delay-warn");
       return;
     }
 
@@ -1090,9 +1053,6 @@ if (els.arrKv) {
   // ---------- New Hero Card Renderer ----------
   function renderHeroCard(flight, flat, id) {
     if (!flight || !flat || !els.heroCard) return;
-
-    // Debug: log the data to help diagnose issues (can be removed later)
-    console.log('[Hero Card] Flight data:', flight);
 
     const dep = flight.departure || {};
     const arr = flight.arrival || {};
@@ -1163,14 +1123,6 @@ if (els.arrKv) {
       const delay = Number(delayVal);
       const hasDelay = Number.isFinite(delay) && delay !== 0;
       
-      // Debug logging
-      console.log('[Hero Status]', {
-        element: el.id,
-        status: flightStatus,
-        delay: delay,
-        hasDelay: hasDelay
-      });
-      
       // Reset classes
       el.classList.remove("hero-delay-good", "hero-delay-warn", "hero-delay-bad", "hero-delay-neutral");
       
@@ -1216,10 +1168,8 @@ if (els.arrKv) {
         el.textContent = text;
         el.classList.add(className);
         el.hidden = false;
-        console.log('[Hero Status] Showing:', text, className);
       } else {
         el.hidden = true;
-        console.log('[Hero Status] Hidden - no status to show');
       }
     }
     
@@ -1372,10 +1322,6 @@ if (els.arrKv) {
       "actualDeparture",
       "departure.actualTimeLocal",
       "departure.actual_time",
-      "departure.estimatedTime",
-      "departure.estimated",
-      "estimated_departure",
-      "estimatedDeparture",
     ]);
 
     const actualArr = getTimeValue(flat, [
@@ -1386,10 +1332,6 @@ if (els.arrKv) {
       "actualArrival",
       "arrival.actualTimeLocal",
       "arrival.actual_time",
-      "arrival.estimatedTime",
-      "arrival.estimated",
-      "estimated_arrival",
-      "estimatedArrival",
     ]);
 
     const depDelay = minutesBetween(schedDep, actualDep);
@@ -1972,6 +1914,7 @@ if (els.arrKv) {
         if (state.mapTheme === "dark") state.map.removeLayer(state.tileDark);
       } catch {}
       state.tileDark = tileDarkFallback;
+      state.mapTheme = null; // reset so applyTheme doesn't short-circuit
       applyTheme("dark");
     });
 
