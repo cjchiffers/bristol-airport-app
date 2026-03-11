@@ -533,6 +533,40 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
   }
   function stopAuto() { if (state.timer) clearInterval(state.timer); state.timer = null; }
 
+  // ---------- Registration fallback (OpenSky → hexdb.io) ----------
+
+  async function fetchRegistrationFallback(flight) {
+    const icaoNo = flight?.flight?.icaoNumber || "";
+    const iataNo = flight?.flight?.iataNumber || "";
+    const callsigns = [icaoNo, iataNo].filter(Boolean).map(s => s.toUpperCase());
+    if (!callsigns.length) return null;
+
+    let icao24 = null;
+    for (const callsign of callsigns) {
+      try {
+        const url = `https://opensky-network.org/api/states/all?callsign=${encodeURIComponent(callsign)}`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const states = data?.states;
+        if (!Array.isArray(states) || !states.length) continue;
+        const match = states.find(s => s[1] && s[1].trim().toUpperCase() === callsign);
+        if (match?.[0]) { icao24 = match[0]; break; }
+      } catch { /* try next */ }
+    }
+
+    if (!icao24) return null;
+
+    try {
+      const res = await fetch(`https://hexdb.io/api/v1/aircraft/${icao24}`, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const registration = data?.Registration || "";
+      const type = data?.Type || "";
+      return registration ? { registration, type } : null;
+    } catch { return null; }
+  }
+
   // ---------- Refresh (best-effort) ----------
   const PROXY_BASE = "https://flat-dust-a68a.cjchiffers.workers.dev";
 
@@ -540,8 +574,25 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     if (!state.context || !state.current) return;
     setFetching(true);
     try {
-      const updated = await fetchBestEffortUpdate(state.context, state.current);
+      let updated = await fetchBestEffortUpdate(state.context, state.current);
       if (!updated) return;
+
+      if (!updated.aircraft?.regNumber) {
+        const regData = await fetchRegistrationFallback(updated);
+        if (regData) {
+          updated = {
+            ...updated,
+            aircraft: {
+              ...updated.aircraft,
+              regNumber: regData.registration,
+              model: {
+                ...updated.aircraft?.model,
+                text: updated.aircraft?.model?.text || regData.type,
+              },
+            },
+          };
+        }
+      }
 
       const prev = state.current;
       state.current = updated;
