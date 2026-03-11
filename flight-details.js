@@ -1,4 +1,4 @@
-console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
+"use strict";
 /* flight-details.js
    Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
    Notes:
@@ -6,9 +6,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260104_TOP5 loaded");
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
-  "use strict";
-
-  
 console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 // --- Airport code -> city name (for geocoding). Add as needed.
   const airportCodeToCityName = {
@@ -18,7 +15,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     "ALC": "Alicante",
     "AMS": "Amsterdam",
     "ATA": "Antalya",
-    "AYT": "Dalaman",
+    "AYT": "Antalya",
     "BCN": "Barcelona",
     "BLQ": "Bologna",
     "BHD": "Belfast City",
@@ -27,7 +24,6 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     "CDG": "Paris Charles de Gaulle",
     "CFU": "Corfu",
     "CUN": "Cancun",
-    "DAA": "Sharm el Sheikh",
     "DLM": "Dalaman",
     "EDI": "Edinburgh",
     "FAO": "Faro",
@@ -233,11 +229,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     heroArrTime: document.getElementById("heroArrTime"),
     heroArrTimeOld: document.getElementById("heroArrTimeOld"),
     heroArrDelay: document.getElementById("heroArrDelay"),
-    heroTerminalDep: document.getElementById("heroTerminalDep"),
-    heroTerminalArr: document.getElementById("heroTerminalArr"),
-    heroCheckIn: document.getElementById("heroCheckIn"),
     heroGate: document.getElementById("heroGate"),
-    heroGateArr: document.getElementById("heroGateArr"),
     heroBaggage: document.getElementById("heroBaggage"),
     heroCountdown: document.getElementById("heroCountdown"),
     heroCountdownText: document.getElementById("heroCountdownText"),

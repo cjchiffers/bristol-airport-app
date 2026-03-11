@@ -32,7 +32,7 @@
 
     <div class="menu" id="detailsMenu" role="menu" aria-label="Flight actions">
       <button class="menu-item" id="refreshBtn" role="menuitem">Refresh</button>
-      <button class="menu-item" id="autoBtn" role="menuitemcheckbox" aria-checked="true" aria-pressed="true">Auto-refresh: On</button>
+      <button class="menu-item" id="autoBtn" role="menuitemcheckbox" aria-checked="true">Auto-refresh: On</button>
       <button class="menu-item" id="compactBtn" role="menuitem">Focus mode</button>
       <button class="menu-item" id="groupBtn" role="menuitem">Group mode</button>
       <div class="menu-sep" role="separator"></div>
@@ -52,15 +52,12 @@
   <div class="hero-header-left">
     <div class="hero-airline" id="heroAirline" aria-label="Airline">
       <img class="airline-logo airline-logo--hero" id="heroAirlineLogo" alt="" loading="lazy" />
+      <span class="airline-initials airline-initials--hero" id="heroAirlineInitials" aria-hidden="true"></span>
       <span class="airline-name airline-name--hero" id="heroAirlineName"></span>
     </div>
 
     <div class="hero-flight-number" id="heroFlightNumber">—</div>
   </div>
-</div>
-  </div>
-</div>
-        </div>
 </div>
 
       <div class="hero-times-grid">
@@ -104,7 +101,6 @@
         <span id="heroCountdownText">—</span>
       </div>
     </section>
-      </div>
 <!-- Flight time hero (original - kept for compatibility) -->
     <section class="flight-hero" id="flightHero" aria-label="Departure and arrival times" style="display:none">
       <div class="flight-hero-col">
