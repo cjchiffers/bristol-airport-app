@@ -689,10 +689,10 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
       aircraft: {
         iataCode: ac.iata || "",
         icaoCode: ac.icao || ac.iata || "",
-        regNumber: ac.registration || "",
+        regNumber: ac.registration || ac.regNumber || "",
         model: {
-          text: "",
-          code: ac.icao || ac.iata || "",
+          text: ac.modelText || ac.model?.text || "",
+          code: ac.modelCode || ac.icao || ac.iata || "",
         },
       },
       codeshared: f.codeshared || null,
@@ -774,8 +774,8 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     }
 
     // Aircraft (best effort)
-    const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
-    const acText = pickAny(flat, ["aircraft.model.text", "flight.aircraft.model.text", "aircraftType", "aircraft.text", "aircraft.model"]) || "";
+    const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "aircraft.modelCode", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
+    const acText = pickAny(flat, ["aircraft.model.text", "aircraft.modelText", "flight.aircraft.model.text", "aircraftType", "aircraft.text", "aircraft.model"]) || "";
     if (els.aircraftType) {
       els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
     }
