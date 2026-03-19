@@ -707,7 +707,11 @@ async function refreshAll({force=false} = {}){
 
   try{
     hideError();
-    const [dep, arr] = await Promise.all([fetchTimetable("departure"), fetchTimetable("arrival")]);
+    // Fetch sequentially — AeroDataBox has a 1 req/sec rate limit and the worker
+    // needs to make 2 calls per request (AM + PM windows). Fetching in parallel
+    // would fire 4 simultaneous upstream calls and hit 429s.
+    const dep = await fetchTimetable("departure");
+    const arr = await fetchTimetable("arrival");
     const depList = Array.isArray(dep) ? dep : [];
     const arrList = Array.isArray(arr) ? arr : [];
 
