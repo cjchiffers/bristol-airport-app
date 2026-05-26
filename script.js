@@ -277,6 +277,31 @@ function statusTone(statusText){
   return "neutral";
 }
 
+function renderLoadingList(mode){
+  const isDep = mode === "departures";
+  const listEl = document.getElementById(isDep ? "departureList" : "arrivalList");
+  const emptyEl = document.getElementById(isDep ? "depEmpty" : "arrEmpty");
+  if (!listEl || !emptyEl) return;
+
+  emptyEl.style.display = "none";
+  listEl.innerHTML = Array.from({ length: 5 }, () => `
+    <article class="flight-card skeleton" aria-hidden="true">
+      <div class="fc-top">
+        <div class="skeleton-line short" style="width:92px"></div>
+        <div class="skeleton-line short" style="width:56px"></div>
+      </div>
+      <div class="skeleton-line" style="width:70%"></div>
+      <div class="fc-bottom">
+        <div class="airline">
+          <div class="skeleton-circle"></div>
+          <div class="skeleton-line short" style="width:130px"></div>
+        </div>
+        <div class="skeleton-line short" style="width:78px"></div>
+      </div>
+    </article>
+  `).join("");
+}
+
 // =======================
 // UI state
 // =======================
@@ -707,6 +732,7 @@ async function refreshAll({force=false} = {}){
 
   try{
     hideError();
+    if (!renderedFromCache) renderLoadingList(currentTab);
     // Fetch sequentially — AeroDataBox has a 1 req/sec rate limit and the worker
     // needs to make 2 calls per request (AM + PM windows). Fetching in parallel
     // would fire 4 simultaneous upstream calls and hit 429s.

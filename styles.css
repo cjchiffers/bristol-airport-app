@@ -327,6 +327,9 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   justify-content:space-between;
   gap: 10px;
 }
+.fc-bottom > div:last-child{
+  flex-shrink: 0;
+}
 .airline{
   display:flex;
   align-items:center;
@@ -510,3 +513,22 @@ h1, h2, h3, h4 {
 
 .star-btn{border:none;background:transparent;font-size:18px;cursor:pointer;opacity:.7}
 .star-btn.is-on{opacity:1}
+
+@media (max-width: 420px){
+  .flight-card{
+    padding: 11px;
+  }
+  .fc-bottom{
+    align-items:flex-start;
+  }
+  .status{
+    max-width: 112px;
+    overflow:hidden;
+    text-overflow: ellipsis;
+  }
+  .save-btn{
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+}

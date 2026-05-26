@@ -6,7 +6,6 @@
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
-console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
 // --- Airport code -> city name (for geocoding). Add as needed.
   const airportCodeToCityName = {
     "ABZ": "Aberdeen",
@@ -169,6 +168,7 @@ console.log("[BRS Flights] flight-details.js BUILD_20260108_fixA loaded");
     depKv: document.getElementById("depKv"),
     arrKv: document.getElementById("arrKv"),
     kpis: document.getElementById("kpis"),
+    opsBar: document.getElementById("opsBar"),
     rawJson: document.getElementById("rawJson"),
 
     backBtn: document.getElementById("backBtn"),
