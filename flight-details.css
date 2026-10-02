@@ -733,7 +733,7 @@ body.leaflet-on #routeSvg{ display:none; }
 
 /* ---- Key/Value stacks in Dep/Arr cards ---- */
 .kv-stack{ display:flex; flex-direction: column; gap: 6px; }
-.kv-line{ display:flex; justify-content: space-between; gap: 10px; }
+.kv-line{ display:flex; justify-content: space-between; align-items:center; gap: 10px; }
 .kv-k{ opacity:.7; font-size: 12px; }
 .kv-v{ font-weight: 650; font-size: 12px; }
 
@@ -756,19 +756,25 @@ body.leaflet-on #routeSvg{ display:none; }
   display: inline-block;
 }
 
-.kv-line--gate .kv-v{
-  background: #FFECB3; /* yellow */
-  border: 1px solid #F6C453;
-}
-
-.kv-line--newgate .kv-v{
-  background: #FDE2E2; /* red-ish */
-  border: 1px solid #F3A3A3;
-}
-
+/* Tints (not fixed light fills) so the text stays readable in both light and dark mode,
+   matching the Gate / Belt pills in the hero card. */
+.kv-line--gate .kv-v,
+.kv-line--newgate .kv-v,
 .kv-line--belt .kv-v{
-  background: #E9EEF6;
-  border: 1px solid #CFD9EA;
+  color: var(--text);
+  font-weight: 800;
+}
+.kv-line--gate .kv-v{
+  background: color-mix(in srgb, var(--warn) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--stroke));
+}
+.kv-line--newgate .kv-v{
+  background: color-mix(in srgb, var(--bad) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bad) 55%, var(--stroke));
+}
+.kv-line--belt .kv-v{
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--stroke));
 }
 
 /* Flash when ops values change */
