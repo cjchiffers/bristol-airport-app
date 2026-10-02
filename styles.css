@@ -33,7 +33,7 @@
 }
 
 *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
-html, body{ height:100%; }
+html{ height:100%; }
 
 @supports (-webkit-touch-callout: none) {
   body {
@@ -44,11 +44,22 @@ html, body{ height:100%; }
 body{
   margin:0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100%;
   color: var(--text);
+  background: var(--bg);
+}
+
+/* The soft glow lives on a fixed layer behind the page, so it never tiles or scrolls away
+   (a gradient on the body repeats every screen-height once the page is taller than the screen). */
+body::before{
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background:
     radial-gradient(1000px 600px at 12% 0%, rgba(98,178,255,.22), transparent 55%),
-    radial-gradient(900px 600px at 95% 10%, rgba(56,211,159,.12), transparent 55%),
-    var(--bg);
+    radial-gradient(900px 600px at 95% 10%, rgba(56,211,159,.12), transparent 55%);
 }
 
 h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
