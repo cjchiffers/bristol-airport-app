@@ -881,23 +881,6 @@ if (els.arrKv) {
       </div>`).join("");
   }
 
-  function pickPrimaryTimes(flight, isDeparture) {
-    const seg = isDeparture ? (flight && flight.departure) : (flight && flight.arrival);
-    const sched = toDate(seg?.scheduledTime || null);
-    const est = toDate(seg?.estimatedTime || null);
-    const act = toDate(seg?.actualTime || null);
-    const target = act || est || sched;
-    return { sched, est, act, target };
-  }
-
-  function fmtRelative(mins) {
-    const m = Math.abs(Math.round(mins));
-    if (m < 60) return `${m}m`;
-    const h = Math.floor(m / 60);
-    const mm = m % 60;
-    return mm ? `${h}h ${String(mm).padStart(2, "0")}m` : `${h}h`;
-  }
-
   // ---------- Hero card ----------
   function setShown(el, shown) {
     if (!el) return;

@@ -30,31 +30,6 @@
   font-family: var(--mono);
 }
 
-.icon-btn-mini {
-  appearance: none;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-}
-
-.icon-btn-mini:hover {
-  background: var(--surface);
-  color: var(--text);
-}
-
-.icon-btn-mini svg {
-  width: 20px;
-  height: 20px;
-}
-
 .hero-times-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -153,7 +128,6 @@
   flex-direction: column;
   gap: 4px;
 }
-
 
 .hero-info-label {
   font-size: 11px;
@@ -290,18 +264,6 @@
   text-overflow: ellipsis;
 }
 
-/* Meta row below topbar */
-.details-meta{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding: 10px 2px 12px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.details-meta .dot{ opacity:.65; }
-.details-meta .spacer{ flex:1; }
-
 /* Network/offline banner */
 .net-banner{
   border: 1px solid var(--stroke);
@@ -313,25 +275,6 @@
   font-size: 12px;
   margin-bottom: 10px;
 }
-
-/* Big status banner */
-.status-banner{
-  border-radius: 16px;
-  padding: 12px 14px;
-  border: 1px solid var(--stroke);
-  margin-bottom: 10px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap: 10px;
-}
-.status-banner .sb-left{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-.status-banner .sb-title{ font-weight: 950; letter-spacing: .2px; }
-.status-banner .sb-sub{ color: var(--muted); font-size: 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.status-banner.good{ background: rgba(46, 204, 113, .10); }
-.status-banner.warn{ background: rgba(255, 193, 7, .14); }
-.status-banner.bad{ background: rgba(231, 76, 60, .12); }
-.status-banner.neutral{ background: var(--surface); }
 
 /* Gate/terminal/baggage bar */
 .ops-bar{
@@ -350,69 +293,7 @@
 .ops-item{ flex:1; min-width:0; }
 .ops-k{ font-size: 11px; color: var(--muted); display:flex; align-items:center; gap:6px; }
 .ops-v{ font-weight: 950; font-size: 14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
-/* Departure/arrival time hero (KLM-style) */
-.flight-hero{
-  display:grid;
-  grid-template-columns:1fr auto 1fr;
-  gap:14px;
-  padding:16px 16px;
-  border-radius:18px;
-  border:1px solid var(--stroke);
-  background: rgba(0,0,0,.14);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  margin: 12px 0 10px;
-}
-.flight-hero-col{ display:flex; flex-direction:column; gap:6px; min-width:0; }
-.flight-hero-arrow{ display:flex; align-items:center; justify-content:center; font-size:20px; opacity:.65; }
-.fh-date{ font-size: 12px; color: var(--muted); }
-.fh-airport{ font-weight: 950; letter-spacing:.4px; }
-.fh-time{ display:flex; align-items:baseline; gap:10px; }
-.fh-time-main{ font-size: 38px; font-weight: 1000; letter-spacing: 0; }
-.fh-time-old{ font-size: 14px; color: var(--muted); text-decoration: line-through; }
-
-.fh-delay{
-  align-self:flex-start;
-  font-size: 13px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-weight: 900;
-  letter-spacing: .2px;
-}
-.fh-delay-warn{ background: rgba(231, 76, 60, .16); color: #ff6b6b; }
-.fh-delay-good{ background: rgba(46, 204, 113, .14); color: #7dffb3; }
-
-/* Refresh spinner */
-.refresh-spin{
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  border: 2px solid rgba(255,255,255,.20);
-  border-top-color: rgba(255,255,255,.75);
-  display:none;
-}
-.refresh-spin.on{
-  display:inline-block;
-  animation: spin 1s linear infinite;
-}
 @keyframes spin{ to { transform: rotate(360deg);} }
-
-/* Status chip */
-.status-chip{
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: var(--surface2);
-  border: 1px solid var(--stroke);
-  color: var(--text);
-  font-weight: 700;
-  font-size: 12px;
-}
-
-/* Cards */
-.details-hero{
-  padding: 14px;
-}
 .details-card{
   padding: 14px;
   margin-top: 12px;
@@ -515,18 +396,6 @@
   color: var(--text);
   font-weight: 900;
 }
-
-/* Leave card (JS fills) */
-.leave-wrap{ margin-top: 12px; }
-.leave-card{
-  border: 1px solid var(--stroke);
-  background: linear-gradient(180deg, rgba(98,178,255,.14), rgba(255,255,255,.04));
-  border-radius: 18px;
-  padding: 12px;
-}
-.leave-card .title{ font-weight: 900; }
-.leave-card .small{ color: var(--muted); }
-.leave-card .time{ font-weight: 900; font-size: 20px; }
 
 /* Airline + aircraft */
 .airline-row{
@@ -672,7 +541,6 @@ details.raw pre{
 /* Small helpers */
 .small{ font-size: 12px; color: var(--muted); }
 
-
 /* --- Leaflet basemap route (Option 3 polish) --- */
 .route-wrap{
   position: relative;
@@ -811,13 +679,10 @@ body.leaflet-on #routeSvg{ display:none; }
   filter: drop-shadow(0 6px 10px rgba(0,0,0,.35));
 }
 
-
-
 /* --- Leaflet dark fallback (when using OSM tiles) --- */
 .leaflet-tile.tiles-dark-fallback{
   filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.05);
 }
-
 
 /* ---- Weather one-card (5 day) ---- */
 .wx-onecard{
@@ -872,113 +737,13 @@ body.leaflet-on #routeSvg{ display:none; }
 .kv-k{ opacity:.7; font-size: 12px; }
 .kv-v{ font-weight: 650; font-size: 12px; }
 
-
-
 /* Aircraft photo */
 #aircraftImageWrap { margin-top: 10px; }
 #aircraftImage { width: 100%; height: auto; display: block; border-radius: 12px; }
 #aircraftImageCredit { font-size: 0.78rem; opacity: 0.7; margin-top: 6px; }
 
-/* Status card layout (On time / delayed like airline apps) */
-.status-banner .sb-card{display:flex;flex-direction:column;gap:10px;width:100%;}
-.status-banner .sb-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
-.status-banner .sb-route{font-weight:800;letter-spacing:.3px;font-size:13px;opacity:.9;}
-.status-banner .sb-pill{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;font-weight:800;font-size:12px;white-space:nowrap;}
-.status-banner.good .sb-pill{background:rgba(46,204,113,.20); color: rgb(20,110,60);}
-.status-banner.warn .sb-pill{background:rgba(231,76,60,.18); color: rgb(150,30,24);} /* use red for delay */
-.status-banner.bad .sb-pill{background:rgba(231,76,60,.22); color: rgb(150,30,24);}
-.status-banner .sb-times{display:flex;align-items:flex-end;gap:10px;}
-.status-banner .sb-time{font-size:34px;font-weight:950;letter-spacing:.2px;line-height:1;}
-.status-banner .sb-time-old{font-size:14px;color:var(--muted);text-decoration:line-through;align-self:flex-end;padding-bottom:4px;}
-.status-banner .sb-subline{color:var(--muted);font-size:12px;display:flex;flex-wrap:wrap;gap:10px;}
-.status-banner .sb-subline b{color:var(--text);font-weight:800;}
-
-/* Dual departure/arrival status pills + two-column times (airline-app style) */
-.status-banner .sb-pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
-.status-banner .sb-pill.good{background:rgba(46,204,113,.20); color: rgb(20,110,60);}
-.status-banner .sb-pill.warn{background:rgba(231,76,60,.18); color: rgb(150,30,24);} /* red for delays */
-.status-banner .sb-pill.bad{background:rgba(231,76,60,.22); color: rgb(150,30,24);}
-.status-banner .sb-two{display:flex;justify-content:space-between;gap:14px;}
-.status-banner .sb-col{display:flex;flex-direction:column;gap:6px;min-width:0;}
-.status-banner .sb-col.right{align-items:flex-end;text-align:right;}
-.status-banner .sb-place{font-size:12px;letter-spacing:.2px;opacity:.85;font-weight:800;}
-.status-banner .sb-timewrap{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;}
-
-
-/* Hide duplicate route label under header */
-.route-subtitle,
-.flight-route-mini,
-.route-inline {
-  display: none !important;
-}
-
-/* Hide detailed departure/arrival breakdown cards */
-.dep-arr-details,
-.departure-details,
-.arrival-details,
-.timeline-card {
-  display: none !important;
-}
-
-
-/* Remove duplicate route text inside the status banner card */
-.sb-route { display: none !important; }
-
-
-
 /* Hide legacy meta line (last updated/source/status) */
 #metaLine,.meta-line,.flight-meta,.status-line,.source-line{display:none!important;}
-
-/* --- App-like flight status card (dep/arr) --- */
-.sb-card .sb-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:14px;
-  margin-top:10px;
-}
-.sb-card .sb-col{display:flex;flex-direction:column;gap:6px;}
-.sb-card .sb-city{font-weight:700;opacity:.9}
-.sb-card .sb-timewrap{display:flex;align-items:baseline;gap:8px;}
-.sb-card .sb-time{font-size:44px;font-weight:850;line-height:1;}
-.sb-card .sb-sched{font-size:16px;opacity:.55;text-decoration:line-through;}
-.sb-card .sb-delaypill{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:7px 10px;border-radius:999px;
-  font-weight:800;font-size:14px;width:fit-content;
-}
-.sb-card .sb-delaypill.ok{background:rgba(34,197,94,.18);color:#14532d;}
-.sb-card .sb-delaypill.bad{background:rgba(239,68,68,.18);color:#7f1d1d;}
-.sb-card .sb-delaypill.neutral{background:rgba(148,163,184,.22);color:rgba(15,23,42,.85);}
-.sb-card .sb-midrow{
-  display:grid;grid-template-columns:1fr 1fr;gap:14px;
-  margin-top:12px;padding-top:12px;border-top:1px solid rgba(0,0,0,.08);
-}
-.sb-card .sb-kv{display:flex;align-items:center;gap:10px;font-weight:800;}
-.sb-card .sb-kv .label{opacity:.65;font-weight:750;}
-.sb-card .sb-chip{
-  display:inline-flex;align-items:center;justify-content:center;
-  min-width:34px;padding:6px 10px;border-radius:10px;
-  background:rgba(15,23,42,.06);font-weight:900;
-}
-.sb-card .sb-countdown{
-  margin-top:12px;display:flex;align-items:center;gap:10px;
-  font-weight:900;opacity:.9;
-}
-.sb-card .sb-countdown .clock{font-size:18px}
-@media (max-width:420px){
-  .sb-card .sb-time{font-size:40px;}
-}
-
-
-/* Gate chip colouring: default Gate = yellow, New gate = red */
-.sb-card .sb-chip.gate-yellow{
-  background: rgba(250, 204, 21, .45);
-  color: rgba(15,23,42,.95);
-}
-.sb-card .sb-chip.gate-red{
-  background: rgba(239, 68, 68, .55);
-  color: #fff;
-}
 
 /* Gate / belt badges in the Departure/Arrival detail cards */
 .kv-line--gate .kv-v,
@@ -1017,14 +782,6 @@ body.leaflet-on #routeSvg{ display:none; }
 .kv-line--newgate .kv-v{
   animation: opsFlash 900ms ease-in-out 1;
 }
-
-/* Make crossed-out scheduled times red when delayed (status card) */
-.is-delayed .sb-time-old,
-.is-delayed .sb-card .sb-sched{
-  color: #B42318;
-  opacity: 0.9;
-}
-
 
 /* Hero airline (logo + name + initials fallback) */
 /* 
@@ -1077,7 +834,6 @@ body.leaflet-on #routeSvg{ display:none; }
   white-space:nowrap;
 }
 
-
 /* Hero header: airline above flight number (single source of truth) */
 .hero-card-header{
   display:flex;
@@ -1091,7 +847,6 @@ body.leaflet-on #routeSvg{ display:none; }
 
 /* Hide legacy airline card (airline now lives in hero header) */
 .airline-row{ display:none !important; }
-
 
 /* Hero airline visuals: allow JS to reveal via opacity */
 .airline-logo--hero{ display:block; opacity:0; }
@@ -1113,15 +868,6 @@ body.leaflet-on #routeSvg{ display:none; }
   align-items:center;
   gap:12px;
   min-height:40px;
-}
-
-.hero-airline-badge{
-  width:36px;
-  height:36px;
-  border-radius:10px;
-  display:grid;
-  place-items:center;
-  overflow:hidden;
 }
 
 /* Allow JS to reveal via opacity */
@@ -1167,7 +913,6 @@ body.leaflet-on #routeSvg{ display:none; }
   text-align:left;
 }
 
-
 /* ---- Share / reload additions ---- */
 .updated-line{ margin: 0 2px 8px; min-height: 16px; }
 
@@ -1183,7 +928,6 @@ body.is-notfound .details-container > *:not(#notFound):not(#netBanner){ display:
 .hero-countdown{ margin-bottom: 12px; }
 .hero-countdown #heroCountdownText{ font-size: 18px; font-weight: 900; }
 .hero-hint{ margin: -4px 2px 14px; }
-
 
 /* ---- Page frame: padding + width (the container had none), desktop two-column layout ---- */
 body.details-page{ --maxw: 720px; }

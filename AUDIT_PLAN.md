@@ -2,6 +2,18 @@
 
 Implementation brief for an AI coding agent. Work through the phases in order. Each task lists **where**, **what**, and **done when**. Line numbers are from the audit snapshot and will drift once you start editing — locate code by function name.
 
+> ## Status (2 Oct 2026): implemented on branch `audit-fixes` — all four phases
+>
+> Done and verified in a real browser (Chromium via Playwright) plus the worker handler run against a fake AeroDataBox.
+> Notes on where the implementation differs from the plan:
+> - Status helpers live in `shared/flights.js` (not a separate `shared/status.js`); `shared/utils.js`, `shared/config.js`, `shared/time.js` as planned.
+> - `CloudFlare/` is git-ignored by the owner, so worker changes (W0–W8, `wrangler.toml`, `README.md`) are in the working tree but **not committed**.
+> - W6 uses a rolling window (3 h ago → 21 h ahead). AeroDataBox's `dateLocalRole` defaults to `Both`, so share links need no extra parameter.
+> - `airports.min.json` is 0.5 MB (was 1.75 MB), loaded lazily and cached by the service worker rather than precached.
+> - Extra fixes found along the way: saved-flight identity bug (every star looked saved), `init()` running before later `const`s (TDZ), Open-Meteo sunrise/sunset shown in the wrong timezone, `hidden` badges ignored because of `display:inline-flex`, details container had no padding.
+>
+> **Still needs the owner:** revoke the old Aviation Edge key; deploy the worker (`CloudFlare/`, then delete the `AVIATION_EDGE_KEY` secret); real iPhone/Android test; review the uncommitted `index.html` change (see below).
+
 ---
 
 ## 0. Context you need first

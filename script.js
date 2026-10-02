@@ -658,15 +658,6 @@ function startAutoRefresh(){
 (function init(){
   // Load airport index in the background (non-blocking). Once loaded, re-render so missing IATA names fill in.
   loadAirportIndexBestEffort().then(()=>{ try{ renderLists(); renderMyFlights(); }catch{} }).catch(()=>{});
-  // iOS Safari viewport fix
-  function updateVH() {
-    const vh = window.innerHeight * 0.01;
-    document.documentElement.style.setProperty('--vh', `${vh}px`);
-  }
-  updateVH();
-  window.addEventListener('resize', updateVH);
-  window.addEventListener('orientationchange', updateVH);
-
   initOverflowMenu();
   initSearch();
   initSavedUI();
