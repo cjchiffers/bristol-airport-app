@@ -37,7 +37,6 @@
     </button>
 
     <div class="menu" id="overflowMenu" role="menu" aria-label="More menu">
-      <button class="menu-item" id="savedBtn" role="menuitem">Saved flights</button>
       <button class="menu-item" id="refreshBtn" role="menuitem">Refresh</button>
     </div>
   </header>
@@ -69,13 +68,12 @@
       </div>
     </section>
 
-    <section class="panel" id="savedDrawer" style="display:none;">
+    <section class="panel my-flights" id="myFlights" aria-label="My flights" hidden>
       <div class="panel-head">
-        <div class="panel-title">Saved flights</div>
-        <button class="icon-btn" id="savedCloseBtn" aria-label="Close saved">×</button>
+        <div class="panel-title">My flights</div>
+        <div class="small">Saved on this device</div>
       </div>
-      <div class="savedBar" id="savedBar"></div>
-      <div class="panel-hint">Tip: tap a saved flight to open details. Stored on this device.</div>
+      <div class="flight-list" id="myFlightsList"></div>
     </section>
 
     <section class="list-wrap">

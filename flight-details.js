@@ -8,64 +8,23 @@
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
 */
 
-// --- Airport code -> city name (for geocoding). Add as needed.
-  const airportCodeToCityName = {
-    "ABZ": "Aberdeen",
-    "AGP": "Malaga",
-    "ADA": "Izmir",
-    "ALC": "Alicante",
-    "AMS": "Amsterdam",
-    "ATA": "Antalya",
-    "AYT": "Antalya",
-    "BCN": "Barcelona",
-    "BLQ": "Bologna",
-    "BHD": "Belfast City",
-    "BFS": "Belfast International",
-    "BRS": "Bristol",
-    "CDG": "Paris Charles de Gaulle",
-    "CFU": "Corfu",
-    "CUN": "Cancun",
-    "DLM": "Dalaman",
-    "EDI": "Edinburgh",
-    "FAO": "Faro",
-    "FCO": "Rome",
-    "FNC": "Madeira",
-    "FUE": "Fuerteventura",
-    "GLA": "Glasgow",
-    "HRG": "Hurghada",
-    "INV": "Inverness",
-    "IOM": "Isle of Man",
-    "JER": "Jersey",
-    "KRK": "Krakow",
-    "LIN": "Milan",
-    "LIS": "Lisbon",
-    "LPA": "Gran Canaria",
-    "MAN": "Manchester",
-    "MME": "Teesside",
-    "MUC": "Munich",
-    "NAP": "Naples",
-    "NCL": "Newcastle",
-    "OLB": "Olbia",
-    "ORY": "Paris Orly",
-    "PMI": "Palma de Mallorca",
-    "PSA": "Pisa",
-    "RHO": "Rhodes",
-    "SKG": "Thessaloniki",
-    "SSH": "Sharm el Sheikh",
-    "TFS": "Tenerife South",
-    "VIE": "Vienna",
-    "ZRH": "Zurich",
-  };
-
-  // Optional: airport coordinates lookup (IATA -> {lat, lon}).
-  // If you have a full table, you can set window.airportCoords = {...} before this script.
-  const airportCoords = (typeof window !== "undefined" && window.airportCoords && typeof window.airportCoords === "object")
-    ? window.airportCoords
-    : {};
+  // ---------- Airport names + coordinates (shared/airports.js, from airports.min.json) ----------
+  // ~9k airports with city, name, lat/lon — so no network geocoding is needed for known airports.
+  function ensureAirportIndex() {
+    return window.BrsAirports ? window.BrsAirports.loadAirportIndexBestEffort().catch(() => null) : Promise.resolve(null);
+  }
+  function coordsFor(iata) {
+    const A = window.BrsAirports;
+    return A && A.getAirportLatLon ? A.getAirportLatLon(iata) : null;
+  }
+  function airportNameFor(iata) {
+    const A = window.BrsAirports;
+    const rec = A && A.getAirportRecord ? A.getAirportRecord(iata) : null;
+    return rec ? (rec.name || rec.city || "") : "";
+  }
 
   // ---------- Airport geocoding (robust pin placement) ----------
-  // We prefer an explicit lat/lon table when available (window.airportCoords),
-  // otherwise we geocode using Open‑Meteo and *prefer airport features* (feature_code=AIRP).
+  // Only for airports missing from the index: geocode using Open‑Meteo and *prefer airport features* (feature_code=AIRP).
   // Results are cached in localStorage for fast repeat loads.
   const AIRPORT_GEO_CACHE_KEY = "brs_airport_geo_cache_v1";
   const AIRPORT_GEO_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
@@ -156,8 +115,10 @@
 
 
   function getCityName(code) {
-    const c = (code || "").toUpperCase().trim();
-    return airportCodeToCityName[c] || (code || "");
+    const c = normIata(code);
+    const A = window.BrsAirports;
+    const rec = A && A.getAirportRecord ? A.getAirportRecord(c) : null;
+    return (rec && (rec.city || rec.name)) || c;
   }
 
   // ---------- DOM ----------
@@ -599,7 +560,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
 
     // Airport names (offline-first index) — used for city names in the hero and in share text.
     if (window.BrsAirports) {
-      window.BrsAirports.loadAirportIndexBestEffort().then(() => { if (state.current) repaintHero(); }).catch(() => {});
+      ensureAirportIndex().then(() => { if (state.current) repaintHero(); });
     }
 
     // Paint instantly from the last known copy of this flight, then refresh from the network.
@@ -619,7 +580,10 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
 
   function repaintHero() {
     if (!state.current) return;
-    renderHeroCard(state.current, flattenObject(state.current), deriveIdentity(state.current));
+    const flat = flattenObject(state.current);
+    const id = deriveIdentity(state.current);
+    renderHeroCard(state.current, flat, id);
+    renderKpis(flat, id);
   }
 
   function setUpdated(ts, fromCache) {
@@ -943,19 +907,21 @@ if (els.arrKv) {
     return t.includes("dep") ? "departure" : "arrival";
   }
 
-  // Gate / terminal / check-in (departures) or belt / terminal (arrivals): Bristol's values only.
+  // Terminal and check-in desk at Bristol (gate / belt are the hero pills). Hidden when unknown.
   function renderOpsBar(flight) {
     if (!els.opsBar) return;
     const atDeparture = currentMode(flight) === "departure";
     const seg = (atDeparture ? flight.departure : flight.arrival) || {};
-    const tbc = (v) => (v === null || v === undefined || String(v).trim() === "" ? "TBC" : String(v));
 
     const items = [];
-    if (atDeparture) items.push(["🚪 Gate", tbc(seg.gate)]);
     if (seg.terminal) items.push(["🏢 Terminal", String(seg.terminal)]);
-    if (atDeparture && seg.checkInDesk) items.push(["🛄 Check-in", String(seg.checkInDesk)]);
-    if (!atDeparture) items.push(["🧳 Belt", tbc(seg.baggage)]);
+    if (atDeparture && seg.checkInDesk) items.push(["🛄 Check-in desk", String(seg.checkInDesk)]);
 
+    if (!items.length) {
+      els.opsBar.style.display = "none";
+      els.opsBar.innerHTML = "";
+      return;
+    }
     els.opsBar.style.display = "";
     els.opsBar.innerHTML = items.map(([k, v]) => `
       <div class="ops-item">
@@ -996,19 +962,10 @@ if (els.arrKv) {
     return mm ? `${h}h ${String(mm).padStart(2, "0")}m` : `${h}h`;
   }
 
-  // Prefer the airport index (offline-first, ~9k airports) for display names; fall back to the small local map.
-  function displayCity(code) {
-    const c = normIata(code);
-    if (!c) return "";
-    const A = window.BrsAirports;
-    const rec = A && A.getAirportRecord ? A.getAirportRecord(c) : null;
-    return (rec && (rec.city || rec.name)) || getCityName(c) || c;
-  }
-
   function paintHeroSide(seg, code, dateEl, cityEl, timeEl, oldEl) {
     const T = window.BrsTime;
     if (dateEl) dateEl.textContent = T.fmtDay(seg.scheduledTime || seg.estimatedTime) || "—";
-    if (cityEl) cityEl.textContent = displayCity(code) || "—";
+    if (cityEl) cityEl.textContent = getCityName(code) || "—";
 
     const sched = T.fmtTime(seg.scheduledTime);
     const live = T.fmtTime(seg.actualTime || seg.estimatedTime);
@@ -1089,6 +1046,14 @@ if (els.arrKv) {
     if (els.heroBaggage) {
       const belt = String(arr.baggage || "").trim();
       els.heroBaggage.textContent = belt || "TBC";
+    }
+
+    // Pickup tip: passengers need time to get through the terminal after landing.
+    const hint = document.getElementById("heroHint");
+    if (hint) {
+      const show = !atDeparture && info.key !== "cancelled" && info.key !== "diverted";
+      hint.textContent = show ? "Passengers usually reach the arrivals hall 20–30 minutes after landing." : "";
+      setShown(hint, show);
     }
 
     renderCountdown();
@@ -1200,13 +1165,13 @@ if (els.arrKv) {
     // Duration: scheduled (fallback to actual/estimated when needed)
     const dur = minutesBetween(delays.schedDep || delays.actualDep, delays.schedArr || delays.actualArr);
 
-    // Distance: use airportCoords first; else use cached endpoints from state (if Leaflet already resolved)
+    // Distance: from the airport index; else from endpoints the map resolved (geocoded airports)
     const depCode = normIata(id?.dep);
     const arrCode = normIata(id?.arr);
     let km = null;
 
-    const depC = depCode && airportCoords && airportCoords[depCode] ? airportCoords[depCode] : null;
-    const arrC = arrCode && airportCoords && airportCoords[arrCode] ? airportCoords[arrCode] : null;
+    const depC = depCode ? coordsFor(depCode) : null;
+    const arrC = arrCode ? coordsFor(arrCode) : null;
 
     if (depC && arrC) {
       km = haversineKm(depC.lat, depC.lon, arrC.lat, arrC.lon);
@@ -1341,7 +1306,8 @@ if (els.arrKv) {
       "flight.airport.destination.code.iata",
     ]) || "").trim().toUpperCase();
 
-    const placeLabel = airportCodeToCityName[destCode] || destCode || "";
+    await ensureAirportIndex();
+    const placeLabel = getCityName(destCode) || destCode || "";
     const cacheKey = wxCacheKey(destCode, placeLabel);
 
     // cache hit
@@ -1358,11 +1324,12 @@ if (els.arrKv) {
       return;
     }
 
-    // Coords: airportCoords first, else geocode by name
+    // Coords: airport index first, else geocode by name
     let lat = null, lon = null;
-    if (destCode && typeof airportCoords === "object" && airportCoords && airportCoords[destCode]) {
-      lat = airportCoords[destCode].lat;
-      lon = airportCoords[destCode].lon;
+    const known = destCode ? coordsFor(destCode) : null;
+    if (known) {
+      lat = known.lat;
+      lon = known.lon;
     } else if (placeLabel) {
       const geo = await geocodeCityOpenMeteo(placeLabel);
       if (geo) { lat = geo.lat; lon = geo.lon; }
@@ -1404,6 +1371,8 @@ if (els.arrKv) {
     }
 
     const tz = payload.timezone || "UTC";
+    const wxTitle = document.getElementById("wxTitle");
+    if (wxTitle) wxTitle.textContent = `Weather in ${placeLabel || "destination"}`;
     const localNow = formatLocalTimeNow(tz);
     if (els.wxHint) els.wxHint.textContent = `Local time in ${placeLabel || "destination"}: ${localNow}`;
 
@@ -1528,6 +1497,11 @@ if (els.arrKv) {
     if (isValidLatLon(lat, lon)) {
       return { lat, lon, label: normIata(iata) || "—" };
     }
+
+    // Known airport: use the index (no network).
+    await ensureAirportIndex();
+    const known = coordsFor(iata);
+    if (known) return { lat: known.lat, lon: known.lon, label: normIata(iata) || "—", name: airportNameFor(iata) };
 
     // Otherwise geocode a place query (city/airport name).
     let query = resolvePlaceQuery(flat, kind, iata);
@@ -1770,9 +1744,10 @@ if (els.arrKv) {
       return;
     }
 
+    await ensureAirportIndex();
     const [depGeo, arrGeo] = await Promise.all([
-      geocodeCachedQuery(depCity),
-      geocodeCachedQuery(arrCity),
+      Promise.resolve(coordsFor(depCode)).then((c) => c || geocodeCachedQuery(depCity)),
+      Promise.resolve(coordsFor(arrCode)).then((c) => c || geocodeCachedQuery(arrCity)),
     ]);
 
     if (!depGeo || !arrGeo) {

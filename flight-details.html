@@ -75,6 +75,15 @@
   </div>
 </div>
 
+      <div class="hero-countdown" id="heroCountdown">
+        <svg class="hero-countdown-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+          <path d="M12 6v6l4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span id="heroCountdownText">—</span>
+      </div>
+      <div class="hero-hint small" id="heroHint" style="display:none"></div>
+
       <div class="hero-times-grid">
         <div class="hero-time-block">
           <div class="hero-date" id="heroDepDate">—</div>
@@ -106,14 +115,6 @@
           <div class="hero-info-label">Belt</div>
           <div class="hero-info-value pill-belt" id="heroBaggage">—</div>
         </div>
-      </div>
-
-      <div class="hero-countdown" id="heroCountdown">
-        <svg class="hero-countdown-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" opacity="0.3"/>
-          <path d="M12 6v6l4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span id="heroCountdownText">—</span>
       </div>
     </section>
     <section class="card details-card details-summary-card" aria-label="Flight essentials">
@@ -166,7 +167,7 @@
 
     <section class="card details-card">
       <div class="card-h">
-        <div class="h-title">Weather</div>
+        <div class="h-title" id="wxTitle">Weather</div>
         <div class="h-sub small" id="wxHint">—</div>
       </div>
       <div id="weatherBox"></div>

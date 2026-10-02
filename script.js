@@ -9,125 +9,6 @@ const F = window.BrsFlights;
 // =======================
 // Configuration
 // =======================
-// ---------- Airport coordinate prefetch (for accurate map pins on details page) ----------
-const AIRPORT_GEO_CACHE_KEY = "brs_airport_geo_cache_v1";
-const AIRPORT_GEO_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
-
-function normIata(code){ return (window.BrsAirports && window.BrsAirports.normIata) ? window.BrsAirports.normIata(code) : String(code||"").trim().toUpperCase(); }
-
-function loadAirportGeoCache(){
-  try{
-    const raw = localStorage.getItem(AIRPORT_GEO_CACHE_KEY);
-    if(!raw) return { ts:0, data:{} };
-    const parsed = JSON.parse(raw);
-    const ts = Number(parsed && parsed.ts) || 0;
-    const data = (parsed && parsed.data && typeof parsed.data==="object") ? parsed.data : {};
-    return { ts, data };
-  }catch{ return { ts:0, data:{} }; }
-}
-function saveAirportGeoCache(cache){
-  try{ localStorage.setItem(AIRPORT_GEO_CACHE_KEY, JSON.stringify(cache)); }catch{}
-}
-function isValidLatLon(lat, lon){
-  return Number.isFinite(lat) && Number.isFinite(lon) &&
-    Math.abs(lat) <= 90 && Math.abs(lon) <= 180 &&
-    !(Math.abs(lat) < 0.001 && Math.abs(lon) < 0.001);
-}
-
-async function geocodeAirportOpenMeteo(query){
-  const q = String(query||"").trim();
-  if(!q) return null;
-  const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
-  url.searchParams.set("name", q);
-  url.searchParams.set("count", "5");
-  url.searchParams.set("language", "en");
-  url.searchParams.set("format", "json");
-
-  const res = await fetch(url.toString(), { cache:"no-store" });
-  if(!res.ok) return null;
-  const data = await res.json();
-  const results = (data && Array.isArray(data.results)) ? data.results : [];
-  if(!results.length) return null;
-
-  const best = results.find(r => String(r.feature_code||"").toUpperCase()==="AIRP") || results[0];
-  const lat = Number(best.latitude);
-  const lon = Number(best.longitude);
-  if(!isValidLatLon(lat, lon)) return null;
-  return { lat, lon, name: best.name || q };
-}
-
-function airportQueryFromParts(iata, name){
-  const n = String(name||"").trim();
-  if(n){
-    return /airport/i.test(n) ? n : `${n} Airport`;
-  }
-  const c = normIata(iata);
-  return c ? `${c} Airport` : "";
-}
-
-async function ensureAirportCached(iata, name){
-  const code = normIata(iata);
-  if(!code) return;
-  const now = Date.now();
-  const cache = loadAirportGeoCache();
-  const fresh = (now - (cache.ts||0)) < AIRPORT_GEO_TTL_MS;
-  if(fresh && cache.data && cache.data[code]) return;
-
-  const query = airportQueryFromParts(code, name);
-  const geo = await geocodeAirportOpenMeteo(query);
-  if(!geo) return;
-
-  const entry = { lat: geo.lat, lon: geo.lon, name: geo.name, q: query, t: now };
-  cache.ts = now;
-  cache.data = cache.data || {};
-  cache.data[code] = entry;
-  saveAirportGeoCache(cache);
-}
-
-function pickAnyPath(obj, paths){
-  for(const p of paths){
-    const parts = p.split(".");
-    let v = obj;
-    for(const k of parts){
-      if(!v || typeof v !== "object") { v = undefined; break; }
-      v = v[k];
-    }
-    if(v !== undefined && v !== null && String(v).trim() !== "") return v;
-  }
-  return undefined;
-}
-
-async function prefetchAirportsFromFlights(depList, arrList){
-  const flights = [...(depList||[]), ...(arrList||[])];
-  const seen = new Set();
-  const jobs = [];
-  for(const f of flights){
-    const flat = flattenObject(f || {});
-    const depIata = pickAnyPath(flat, ["departure.iataCode","departure.iata","departure.airport.iataCode","departure.airport.iata","depIata","dep.iataCode"]);
-    const depName = pickAnyPath(flat, ["departure.airport.name","departure.airportName","departure.airport","departure.name","departure.city","departure.cityName"]);
-    const arrIata = pickAnyPath(flat, ["arrival.iataCode","arrival.iata","arrival.airport.iataCode","arrival.airport.iata","arrIata","arr.iataCode"]);
-    const arrName = pickAnyPath(flat, ["arrival.airport.name","arrival.airportName","arrival.airport","arrival.name","arrival.city","arrival.cityName"]);
-
-    const pairs = [[depIata, depName],[arrIata, arrName]];
-    for(const [iata, name] of pairs){
-      const code = normIata(iata);
-      if(!code || seen.has(code)) continue;
-      seen.add(code);
-      jobs.push(()=>ensureAirportCached(code, name));
-    }
-  }
-
-  // Concurrency limit (gentle to free API)
-  const limit = 3;
-  let i = 0;
-  const workers = new Array(limit).fill(0).map(async ()=>{
-    while(i < jobs.length){
-      const j = jobs[i++];
-      try{ await j(); }catch{}
-    }
-  });
-  await Promise.all(workers);
-}
 // Airport IATA code (Bristol Airport = BRS)
 const airportIata = window.BrsConfig.AIRPORT;
 
@@ -138,30 +19,6 @@ function safeGetLocal(key){ try { return localStorage.getItem(key);} catch { ret
 function safeSetLocal(key, value){ try { localStorage.setItem(key,value); return true;} catch { return false; } }
 function escapeHtml(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
-function pickAny(obj, keys){
-  for (const k of (keys || [])){
-    if (!k) continue;
-    const v = obj?.[k];
-    if (v !== undefined && v !== null && v !== "") return v;
-  }
-  return null;
-}
-
-/** Flatten nested objects into dot-key map (safe for API heterogeneity). */
-function flattenObject(obj, prefix = ""){
-  const out = {};
-  if (!obj || typeof obj !== "object") return out;
-  for (const [k,v] of Object.entries(obj)){
-    const nk = prefix ? `${prefix}.${k}` : k;
-    if (v && typeof v === "object" && !Array.isArray(v)){
-      Object.assign(out, flattenObject(v, nk));
-    } else {
-      out[nk] = v;
-    }
-  }
-  return out;
-}
-
 // =======================
 // Airport name lookup (offline-first)
 // =======================
@@ -171,6 +28,7 @@ function flattenObject(obj, prefix = ""){
 async function loadAirportIndexBestEffort(){
   return window.BrsAirports ? window.BrsAirports.loadAirportIndexBestEffort() : null;
 }
+function normIata(code){ return String(code || "").trim().toUpperCase(); }
 function getAirportDisplayName(iata, prefer){
   if(window.BrsAirports) return window.BrsAirports.getAirportDisplayName(iata, prefer);
   const code = normIata(iata);
@@ -259,20 +117,30 @@ const STAR_KEY = "starredFlights_v1";
 function getSavedFlights(){
   const raw = safeGetLocal(STAR_KEY);
   if (!raw) return [];
-  try { const x = JSON.parse(raw); return Array.isArray(x) ? x : []; } catch { return []; }
+  let list;
+  try { const x = JSON.parse(raw); list = Array.isArray(x) ? x : []; } catch { return []; }
+
+  // Earlier versions stored an empty identity for every saved flight (so any star looked "saved").
+  // Rebuild it from the stored flight.
+  let fixed = false;
+  for (const item of list){
+    if (item && item.flight && !item.id?.flightNo){ item.id = deriveIdentity(item.flight); fixed = true; }
+  }
+  if (fixed) setSavedFlights(list.filter(it => it && it.flight && it.id?.flightNo));
+  return list.filter(it => it && it.flight && it.id?.flightNo);
 }
 function setSavedFlights(list){
   safeSetLocal(STAR_KEY, JSON.stringify(Array.isArray(list) ? list : []));
 }
 
 function deriveIdentity(f){
-  const flat = flattenObject(f || {});
-  const flightNo = pickAnyPath(flat, ["flight.iataNumber","flight_iata","flightNumber","flight.iata","flight.number"]) || "";
-  const dep = pickAnyPath(flat, ["departure.iataCode","departure.iata","dep_iata","origin","from"]) || "";
-  const arr = pickAnyPath(flat, ["arrival.iataCode","arrival.iata","arr_iata","destination","to"]) || "";
-  const schedDep = pickAnyPath(flat, ["departure.scheduledTime","departure.scheduled","scheduled_departure","departure_time"]) || "";
-  const schedArr = pickAnyPath(flat, ["arrival.scheduledTime","arrival.scheduled","scheduled_arrival","arrival_time"]) || "";
-  return { flightNo, dep, arr, schedDep, schedArr };
+  return {
+    flightNo: F.flightNo(f),
+    dep: f?.departure?.iataCode || "",
+    arr: f?.arrival?.iataCode || "",
+    schedDep: f?.departure?.scheduledTime || "",
+    schedArr: f?.arrival?.scheduledTime || "",
+  };
 }
 
 function isFlightSaved(flight){
@@ -301,67 +169,105 @@ function saveFlight(flight, context){
   if (idx >= 0){
     cur.splice(idx, 1);
   } else {
-    const flat = flattenObject(flight || {});
     cur.unshift({
       id,
       updatedAt: Date.now(),
       context: context || null,
-      airline: pickAnyPath(flat, ["airline.name","airlineName","airline"]) || "",
+      airline: flight?.airline?.name || "",
       flight
     });
     if (cur.length > 200) cur.length = 200;
   }
   setSavedFlights(cur);
-  renderSavedDrawer(false);
+  renderMyFlights();
 }
 
-function renderSavedDrawer(forceOpen){
-  const drawer = document.getElementById("savedDrawer");
-  const bar = document.getElementById("savedBar");
-  if (!drawer || !bar) return;
+// ---- "My flights": saved flights shown as live cards at the top of the list ----
+const SAVED_MAX_AGE_MS = 12 * 60 * 60 * 1000;   // drop a saved flight 12 h after its time at Bristol
 
-  const list = getSavedFlights();
-  bar.innerHTML = list.map((item, i) => {
-    const id = item?.id || {};
-    const label = `${escapeHtml(id.flightNo || "Flight")} · ${escapeHtml(id.dep||"")}→${escapeHtml(id.arr||"")}`;
-    return `<div class="chip" data-idx="${i}">
-      <span>${label}</span><span class="share" title="Share" aria-label="Share ${escapeHtml(id.flightNo || "flight")}">↗</span><span class="x" title="Remove" aria-label="Remove">×</span>
-    </div>`;
-  }).join("");
+function savedMode(item){ return F.normMode(item?.context?.mode || item?.flight?.type); }
 
-  bar.querySelectorAll(".chip").forEach(ch => {
-    ch.addEventListener("click", (e) => {
-      const idx = Number(ch.getAttribute("data-idx"));
-      if (Number.isNaN(idx)) return;
-      const list2 = getSavedFlights();
-      const item = list2[idx];
-      if (!item) return;
+/** Saved flights with expired ones removed (persisted). */
+function activeSavedFlights(){
+  const all = getSavedFlights();
+  const cutoff = Date.now() - SAVED_MAX_AGE_MS;
+  const keep = all.filter(item => {
+    if (!item || !item.flight) return false;
+    const d = F.keyTime(item.flight, savedMode(item));
+    return !d || d.getTime() >= cutoff;
+  });
+  if (keep.length !== all.length) setSavedFlights(keep);
+  return keep;
+}
 
-      if (e.target && e.target.classList && e.target.classList.contains("x")){
-        list2.splice(idx,1);
-        setSavedFlights(list2);
-        renderSavedDrawer(true);
-        renderList(currentTab);
-        return;
-      }
-      if (e.target && e.target.classList && e.target.classList.contains("share")){
-        F.shareFlight(item.flight, item.context?.mode || item.flight?.type, toast);
-        return;
-      }
-      openFlightDetails(item.flight, item.context?.mode || item.flight?.type);
+/** The current timetable record for a saved flight (matched by number + scheduled time), or null. */
+function findLiveFor(item){
+  const mode = savedMode(item);
+  const list = F.isDep(mode) ? depFlights : arrFlights;
+  const sched = F.seg(item.flight, mode).scheduledTime;
+  const no = F.flightNo(item.flight);
+  return list.find(f =>
+    F.seg(f, mode).scheduledTime === sched &&
+    (F.sameFlightNo(F.flightNo(f), no) || (f.codeshares || []).some(n => F.sameFlightNo(n, no)))
+  ) || null;
+}
+
+/** After a refresh, keep the stored copy of each saved flight current (it is what shows offline). */
+function syncSavedFromLive(){
+  const list = activeSavedFlights();
+  let changed = false;
+  for (const item of list){
+    const live = findLiveFor(item);
+    if (live && JSON.stringify(live) !== JSON.stringify(item.flight)){ item.flight = live; item.updatedAt = Date.now(); changed = true; }
+  }
+  if (changed) setSavedFlights(list);
+}
+
+function renderMyFlights(){
+  const section = document.getElementById("myFlights");
+  const listEl = document.getElementById("myFlightsList");
+  if (!section || !listEl) return;
+
+  const items = activeSavedFlights()
+    .map(item => ({ item, mode: savedMode(item), live: findLiveFor(item) }))
+    .sort((a, b) => (F.keyTime(a.live || a.item.flight, a.mode)?.getTime() || 0) - (F.keyTime(b.live || b.item.flight, b.mode)?.getTime() || 0));
+
+  section.hidden = items.length === 0;
+  listEl.innerHTML = items.map((x, i) => flightCardHtml(
+    x.live || x.item.flight,
+    x.mode + "s",
+    i,
+    { share: true, note: (!x.live && hasLoadedOnce) ? "Not in the current timetable" : "" }
+  )).join("");
+
+  listEl.querySelectorAll("[data-open]").forEach(card => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("[data-save],[data-share]")) return;
+      const x = items[Number(card.getAttribute("data-idx"))];
+      if (x) openFlightDetails(x.live || x.item.flight, x.mode);
     });
   });
-
-  drawer.style.display = (forceOpen || list.length) ? "" : "none";
+  listEl.querySelectorAll("[data-share]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const x = items[Number(btn.getAttribute("data-idx"))];
+      if (x) F.shareFlight(x.live || x.item.flight, x.mode, toast);
+    });
+  });
+  listEl.querySelectorAll("[data-save]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const x = items[Number(btn.getAttribute("data-idx"))];
+      if (!x) return;
+      saveFlight(x.live || x.item.flight, x.item.context || { mode: x.mode, airport: airportIata });  // already saved -> removes it
+      renderList(currentTab);
+      toast("Removed");
+    });
+  });
 }
 
 function initSavedUI(){
-  document.getElementById("savedBtn")?.addEventListener("click", () => renderSavedDrawer(true));
-  document.getElementById("savedCloseBtn")?.addEventListener("click", () => {
-    const drawer = document.getElementById("savedDrawer");
-    if (drawer) drawer.style.display = "none";
-  });
-  renderSavedDrawer(false);
+  renderMyFlights();
 }
 
 /** Open the details page. The flight is cached locally and the URL carries type/flight/date, so it can be shared and reloaded. */
@@ -370,7 +276,7 @@ function openFlightDetails(flight, mode){
 }
 
 /** Render a flight card for the list (departures/arrivals tabs). */
-function flightCardHtml(flight, mode, idx){
+function flightCardHtml(flight, mode, idx, opts = {}){
   const isDep = mode === "departures";
   const flightNo = F.flightNo(flight) || "—";
   const city = getCityName(F.otherSeg(flight, mode).iataCode);
@@ -399,6 +305,7 @@ function flightCardHtml(flight, mode, idx){
         </div>
       </div>
       <div class="route">${escapeHtml(route)}</div>
+      ${opts.note ? `<div class="fc-note">${escapeHtml(opts.note)}</div>` : ""}
       <div class="fc-bottom">
         <div class="airline">
           ${logo ? `<img class="airline-logo" src="${logo}" alt="" onerror="this.style.display='none';" />` : ``}
@@ -406,6 +313,7 @@ function flightCardHtml(flight, mode, idx){
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
           <span class="status ${info.tone}">${escapeHtml(info.text)}</span>
+          ${opts.share ? `<button class="share-btn" data-share="1" data-idx="${idx}" aria-label="Share ${escapeHtml(flightNo)}">↗</button>` : ""}
           <button class="save-btn ${saved ? "saved" : ""}" data-save="1" data-idx="${idx}" aria-label="Save flight">${saved ? "★" : "☆"}</button>
         </div>
       </div>
@@ -655,6 +563,7 @@ async function refreshAll({force=false} = {}){
       arrFlights = cachedArr.data;
       hasLoadedOnce = true;
       renderList(currentTab);
+      renderMyFlights();
       if (lr) lr.textContent = `Updated ${T.fmtTime(cachedDep.ts)} (cached)`;
     }
   }
@@ -683,11 +592,11 @@ async function refreshAll({force=false} = {}){
 
     hasLoadedOnce = true;
     lastOkAt = Date.now();
+    syncSavedFromLive();
     renderList(currentTab);
+    renderMyFlights();
     if (lr) lr.textContent = `Updated ${T.fmtTime(new Date())}`;
 
-    // Warm the airport geo cache for accurate pins on the details map.
-    prefetchAirportsFromFlights(dep, arr).catch(()=>{});
   } catch (err){
     console.error(err);
     if (hasLoadedOnce){
@@ -714,7 +623,7 @@ function startAutoRefresh(){
 // =======================
 (function init(){
   // Load airport index in the background (non-blocking). Once loaded, re-render so missing IATA names fill in.
-  loadAirportIndexBestEffort().then(()=>{ try{ renderList(currentTab); }catch{} }).catch(()=>{});
+  loadAirportIndexBestEffort().then(()=>{ try{ renderList(currentTab); renderMyFlights(); }catch{} }).catch(()=>{});
   // iOS Safari viewport fix
   function updateVH() {
     const vh = window.innerHeight * 0.01;
