@@ -1,6 +1,8 @@
 "use strict";
 /* flight-details.js
-   Route map upgrade (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
+   Flight details page. The URL (?type=arrival&flight=U2 2806&date=2026-10-02) identifies the flight,
+   so the page can be reloaded and shared. Data comes from the Cloudflare worker (AeroDataBox).
+   Route map (Leaflet basemap + animated route + dark/light) + Weather (Open‑Meteo)
    Notes:
    - Uses Leaflet tiles (no API key) when available; falls back to your SVG route if Leaflet isn't loaded.
    - Weather remains Open‑Meteo (free) via geocoding -> forecast.
@@ -162,18 +164,25 @@
   const els = {
     headline: document.getElementById("headline"),
     subhead: document.getElementById("subhead"),
-    statusBanner: document.getElementById("statusBanner"),
     netBanner: document.getElementById("netBanner"),
+    updatedLine: document.getElementById("updatedLine"),
+    toast: document.getElementById("toast"),
+
+    notFound: document.getElementById("notFound"),
+    notFoundTitle: document.getElementById("notFoundTitle"),
+    notFoundMsg: document.getElementById("notFoundMsg"),
+    notFoundRetry: document.getElementById("notFoundRetry"),
 
     depKv: document.getElementById("depKv"),
     arrKv: document.getElementById("arrKv"),
     kpis: document.getElementById("kpis"),
     opsBar: document.getElementById("opsBar"),
-    rawJson: document.getElementById("rawJson"),
 
     backBtn: document.getElementById("backBtn"),
     refreshBtn: document.getElementById("refreshBtn"),
     autoBtn: document.getElementById("autoBtn"),
+    shareBtn: document.getElementById("shareBtn"),
+    shareIconBtn: document.getElementById("shareIconBtn"),
 
     overflowBtn: document.getElementById("overflowDetailsBtn"),
     menu: document.getElementById("detailsMenu"),
@@ -195,19 +204,7 @@
     weatherBox: document.getElementById("weatherBox"),
     wxHint: document.getElementById("wxHint"),
 
-    // Flight time hero (original)
-    depDate: document.getElementById("depDate"),
-    arrDate: document.getElementById("arrDate"),
-    depAirport: document.getElementById("depAirport"),
-    arrAirport: document.getElementById("arrAirport"),
-    depTimeActual: document.getElementById("depTimeActual"),
-    depTimeSched: document.getElementById("depTimeSched"),
-    arrTimeActual: document.getElementById("arrTimeActual"),
-    arrTimeSched: document.getElementById("arrTimeSched"),
-    depDelay: document.getElementById("depDelay"),
-    arrDelay: document.getElementById("arrDelay"),
-
-    // New Hero Card elements
+    // Hero card
     heroCard: document.getElementById("heroCard"),
     heroAirline: document.getElementById("heroAirline"),
     heroAirlineLogo: document.getElementById("heroAirlineLogo"),
@@ -224,6 +221,8 @@
     heroArrTime: document.getElementById("heroArrTime"),
     heroArrTimeOld: document.getElementById("heroArrTimeOld"),
     heroArrDelay: document.getElementById("heroArrDelay"),
+    heroGateItem: document.getElementById("heroGateItem"),
+    heroBeltItem: document.getElementById("heroBeltItem"),
     heroGate: document.getElementById("heroGate"),
     heroBaggage: document.getElementById("heroBaggage"),
     heroCountdown: document.getElementById("heroCountdown"),
@@ -233,11 +232,15 @@
   // ---------- State ----------
   const state = {
     storageKey: null,
+    route: null,        // { type: "arrival"|"departure", flight: "U2 2806", date: "YYYY-MM-DD" } from the URL
     context: null,
     current: null,
     auto: true,
-    intervalMs: 30000,
+    intervalMs: 60000,
     timer: null,
+    countdownTimer: null,
+    lastOkAt: 0,
+    updatedText: "",
 
     fetching: false,
     lastFetchOk: true,
@@ -273,24 +276,24 @@
   }
   function opsChanged(suffix, nextVal) {
     const key = getOpsKey(suffix);
-    const prev = sessionStorage.getItem(key);
+    const prev = safeGetSession(key);
     const next = (nextVal == null) ? "" : String(nextVal);
     // Only count as "changed" if we had a previous non-empty value and it differs.
     const changed = (prev != null && prev !== "" && next !== "" && prev !== next);
-    sessionStorage.setItem(key, next);
+    safeSetSession(key, next);
     return changed;
   }
 
   function opsChangedSticky(suffix, nextVal) {
     const key = getOpsKey(suffix);
-    const prev = sessionStorage.getItem(key) || "";
+    const prev = safeGetSession(key) || "";
     const next = (nextVal == null) ? "" : String(nextVal).trim();
 
     // If next is empty, keep the previous non-empty value (don't "forget" the last known gate).
     if (!next) return false;
 
     const changed = (prev !== "" && prev !== next);
-    sessionStorage.setItem(key, next);
+    safeSetSession(key, next);
     return changed;
   }
 
@@ -305,22 +308,10 @@
       .replaceAll("'", "&#039;");
   }
 
-  function toDate(v) {
-    if (!v) return null;
-    if (v instanceof Date) return v;
+  // All time parsing/formatting goes through shared/time.js (Safari-safe, Europe/London).
+  function toDate(v) { return window.BrsTime.parse(v); }
 
-    const n = Number(v);
-    if (!Number.isNaN(n) && String(v).length >= 10) return new Date(n < 2e10 ? n * 1000 : n);
-
-    const d = new Date(v);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-
-  function fmtTime(v) {
-    const d = toDate(v);
-    if (!d) return v ? String(v) : "";
-    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  }
+  function fmtTime(v) { return window.BrsTime.fmtTime(v); }
 
   function flattenObject(obj, prefix = "", out = {}) {
     if (obj == null) return out;
@@ -485,8 +476,34 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
   }
 
   // ---------- Controls ----------
-  if (els.backBtn) els.backBtn.addEventListener("click", () => window.history.back());
+  let toastT = null;
+  function showToast(msg) {
+    if (!els.toast) return;
+    els.toast.textContent = msg;
+    els.toast.classList.add("show");
+    clearTimeout(toastT);
+    toastT = setTimeout(() => els.toast.classList.remove("show"), 2000);
+  }
+
+  // Someone who opened a shared link has no history to go back to: go to the list instead.
+  function goBack() {
+    let sameOrigin = false;
+    try { sameOrigin = !!document.referrer && new URL(document.referrer).origin === window.location.origin; } catch { /* ignore */ }
+    if (sameOrigin && window.history.length > 1) window.history.back();
+    else window.location.href = "index.html";
+  }
+
+  function shareCurrent() {
+    if (!state.current || !state.route) return;
+    // Share exactly the URL being viewed (type/flight/date) so the link always resolves.
+    window.BrsFlights.shareFlight(state.current, state.route.type, showToast, window.BrsFlights.urlFor(state.route));
+  }
+
+  if (els.backBtn) els.backBtn.addEventListener("click", goBack);
   if (els.refreshBtn) els.refreshBtn.addEventListener("click", () => refreshNow(true));
+  if (els.notFoundRetry) els.notFoundRetry.addEventListener("click", () => refreshNow(true));
+  if (els.shareBtn) els.shareBtn.addEventListener("click", shareCurrent);
+  if (els.shareIconBtn) els.shareIconBtn.addEventListener("click", shareCurrent);
   if (els.autoBtn) {
     els.autoBtn.addEventListener("click", () => {
       state.auto = !state.auto;
@@ -496,115 +513,171 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     });
   }
 
+  // ---------- Not-found / error state ----------
+  function showNotFound(kind) {
+    document.body.classList.add("is-notfound");
+    if (els.notFound) els.notFound.hidden = false;
+    const r = state.route;
+    const label = r ? `${r.flight} on ${window.BrsTime.fmtDay(`${r.date}T12:00:00Z`)}` : "that flight";
+    let title = "Flight not found";
+    let msg = `We couldn’t find ${label}. It may have been removed from the timetable, or the link may be wrong.`;
+    if (kind === "network") {
+      title = "Couldn’t load this flight";
+      msg = "Check your connection and try again.";
+    } else if (kind === "invalid") {
+      title = "Flight link incomplete";
+      msg = "This link doesn’t say which flight to show. Pick a flight from the list instead.";
+    }
+    setText(els.notFoundTitle, title);
+    setText(els.notFoundMsg, msg);
+    if (els.notFoundRetry) els.notFoundRetry.style.display = kind === "invalid" ? "none" : "";
+    setText(els.headline, r ? r.flight : "Flight details");
+    setText(els.subhead, "—");
+    setText(els.updatedLine, "");
+    document.title = `${r ? r.flight : "Flight"} not found · BRS Flights`;
+  }
+  function hideNotFound() {
+    document.body.classList.remove("is-notfound");
+    if (els.notFound) els.notFound.hidden = true;
+  }
+
   // ---------- Init ----------
-  init();
+  // The URL identifies the flight: ?type=arrival&flight=U2%202806&date=2026-10-02
+  // (older links used ?key=… with the flight stored in sessionStorage — still understood).
+  function readRoute(params) {
+    const flight = String(params.get("flight") || "").trim();
+    const type = String(params.get("type") || "").trim();
+    if (!flight || !type) return null;
+    const dateParam = String(params.get("date") || "");
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : window.BrsTime.londonDateKey(new Date());
+    return { type: window.BrsFlights.normMode(type), flight: window.BrsFlights.normFlightNo(flight), date };
+  }
+
+  function routeFromLegacyKey(params) {
+    const key = params.get("key");
+    if (!key) return null;
+    const raw = safeGetSession(key);
+    if (!raw) return null;
+    try {
+      const payload = JSON.parse(raw);
+      if (!payload || !payload.flight) return null;
+      const mode = (payload.context && payload.context.mode) || payload.flight.type;
+      const route = window.BrsFlights.routeOf(payload.flight, mode);
+      if (!route.flight) return null;
+      window.BrsFlights.saveCached(route, payload.flight);
+      return route;
+    } catch { return null; }
+  }
 
   function init() {
     const params = new URLSearchParams(window.location.search);
-    state.storageKey = params.get("key");
+    const route = readRoute(params) || routeFromLegacyKey(params);
 
-    let payload = null;
-    if (state.storageKey) {
-      const raw = safeGetSession(state.storageKey);
-      if (raw) { try { payload = JSON.parse(raw); } catch { payload = null; } }
-    }
-
-    if (!payload) {
-      const flightParam = params.get("flight");
-      setText(els.headline, flightParam ? `Flight ${flightParam}` : "Flight details");
-      setText(els.subhead, "Open this page from the list to see full details.");
-      if (els.statusBadge) { els.statusBadge.className = "badge neutral"; els.statusBadge.textContent = "Unavailable"; }
-      setText(els.sourceLine, "No stored flight context");
+    if (!route) {
+      showNotFound("invalid");
       stopAuto();
       return;
     }
 
-    state.context = payload.context || null;
-    state.current = payload.flight || null;
+    state.route = route;
+    state.context = { mode: route.type, airport: window.BrsConfig.AIRPORT };
+    state.storageKey = window.BrsFlights.cacheKey(route);
 
-    render(state.current, null);
+    // Keep the address bar canonical (fills in a missing date, replaces legacy ?key= links).
+    try {
+      const canon = window.BrsFlights.urlFor(route);
+      if (canon !== window.location.href) window.history.replaceState(null, "", canon);
+    } catch { /* ignore */ }
+
+    document.title = `${route.flight} · BRS Flights`;
+
+    // Airport names (offline-first index) — used for city names in the hero and in share text.
+    if (window.BrsAirports) {
+      window.BrsAirports.loadAirportIndexBestEffort().then(() => { if (state.current) repaintHero(); }).catch(() => {});
+    }
+
+    // Paint instantly from the last known copy of this flight, then refresh from the network.
+    const cached = window.BrsFlights.loadCached(route);
+    if (cached) {
+      state.current = cached.flight;
+      render(state.current, null);
+      setUpdated(cached.ts, true);
+    } else {
+      setText(els.headline, route.flight);
+      setText(els.subhead, "Loading…");
+    }
+
+    refreshNow(false);
     startAuto();
   }
 
+  function repaintHero() {
+    if (!state.current) return;
+    renderHeroCard(state.current, flattenObject(state.current), deriveIdentity(state.current));
+  }
+
+  function setUpdated(ts, fromCache) {
+    const t = window.BrsTime.fmtTime(ts);
+    state.updatedText = t ? (fromCache ? `Showing saved data from ${t}` : `Updated ${t}`) : "";
+    setText(els.updatedLine, state.updatedText);
+  }
+
+  // Poll only while the page is visible; refresh straight away when coming back to it.
   function startAuto() {
     stopAuto();
-    if (!state.auto) return;
+    if (!state.auto || document.visibilityState !== "visible") return;
     state.timer = setInterval(() => refreshNow(false), state.intervalMs);
   }
   function stopAuto() { if (state.timer) clearInterval(state.timer); state.timer = null; }
 
-  // ---------- Registration fallback (OpenSky → hexdb.io) ----------
-
-  async function fetchRegistrationFallback(flight) {
-    const icaoNo = flight?.flight?.icaoNumber || "";
-    const iataNo = flight?.flight?.iataNumber || "";
-    const callsigns = [icaoNo, iataNo].filter(Boolean).map(s => s.toUpperCase());
-    if (!callsigns.length) return null;
-
-    let icao24 = null;
-    for (const callsign of callsigns) {
-      try {
-        const url = `https://opensky-network.org/api/states/all?callsign=${encodeURIComponent(callsign)}`;
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) continue;
-        const data = await res.json();
-        const states = data?.states;
-        if (!Array.isArray(states) || !states.length) continue;
-        const match = states.find(s => s[1] && s[1].trim().toUpperCase() === callsign);
-        if (match?.[0]) { icao24 = match[0]; break; }
-      } catch { /* try next */ }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      if (state.route && Date.now() - state.lastOkAt > 30000) refreshNow(false);
+      startAuto();
+      startCountdownTimer();
+    } else {
+      stopAuto();
+      stopCountdownTimer();
     }
+  });
 
-    if (!icao24) return null;
-
-    try {
-      const res = await fetch(`https://hexdb.io/api/v1/aircraft/${icao24}`, { cache: "no-store" });
-      if (!res.ok) return null;
-      const data = await res.json();
-      const registration = data?.Registration || "";
-      const type = data?.Type || "";
-      return registration ? { registration, type } : null;
-    } catch { return null; }
+  // Keep the "Lands in 23 min" countdown ticking between refreshes.
+  function startCountdownTimer() {
+    stopCountdownTimer();
+    if (document.visibilityState !== "visible") return;
+    state.countdownTimer = setInterval(renderCountdown, 30000);
   }
+  function stopCountdownTimer() { if (state.countdownTimer) clearInterval(state.countdownTimer); state.countdownTimer = null; }
 
-  // ---------- Refresh (best-effort) ----------
-  const PROXY_BASE = "https://flat-dust-a68a.cjchiffers.workers.dev";
-
+  // ---------- Refresh ----------
   async function refreshNow(forceFeedback) {
-    if (!state.context || !state.current) return;
+    if (!state.route || state.fetching) return;
     setFetching(true);
     try {
-      let updated = await fetchBestEffortUpdate(state.context, state.current);
-      if (!updated) return;
+      const updated = await fetchBestEffortUpdate(state.route, state.current);
 
-      if (!updated.aircraft?.regNumber) {
-        const regData = await fetchRegistrationFallback(updated);
-        if (regData) {
-          updated = {
-            ...updated,
-            aircraft: {
-              ...updated.aircraft,
-              regNumber: regData.registration,
-              model: {
-                ...updated.aircraft?.model,
-                text: updated.aircraft?.model?.text || regData.type,
-              },
-            },
-          };
-        }
+      if (!updated) {
+        // The worker answered but the flight isn't in it.
+        setNetBanner(false);
+        if (!state.current) showNotFound("missing");
+        else if (forceFeedback) showToast("No newer data for this flight");
+        return;
       }
 
+      hideNotFound();
       const prev = state.current;
-      state.current = updated;
-
-      if (state.storageKey) safeSetSession(state.storageKey, JSON.stringify({ flight: state.current, context: state.context }));
+      state.current = mergeKnown(prev, updated);
+      window.BrsFlights.saveCached(state.route, state.current);
+      state.lastOkAt = Date.now();
       render(state.current, prev);
       setNetBanner(false);
-      if (forceFeedback) flashStatus("good", "Updated");
+      setUpdated(Date.now(), false);
+      if (forceFeedback) showToast("Updated");
     } catch (e) {
       console.error(e);
-      setNetBanner(true);
-      if (forceFeedback) flashStatus("bad", "Refresh failed");
+      if (!state.current) showNotFound("network");
+      else setNetBanner(true);
+      if (forceFeedback) showToast("Refresh failed");
     } finally {
       setFetching(false);
     }
@@ -612,9 +685,8 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
 
   function setFetching(isFetching) {
     state.fetching = !!isFetching;
-    if (els.refreshSpin) {
-      els.refreshSpin.className = `refresh-spin${state.fetching ? " on" : ""}`;
-    }
+    if (isFetching && state.current) setText(els.updatedLine, "Updating…");
+    else setText(els.updatedLine, state.updatedText);
   }
 
   function setNetBanner(isError) {
@@ -629,10 +701,14 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     els.netBanner.textContent = "Connection issue — showing last known data.";
   }
 
-  function flashStatus(kind, text) {
-    if (!els.statusBadge) return;
-    els.statusBadge.className = `badge ${kind}`;
-    els.statusBadge.textContent = text;
+  // If the newer record lacks something we already knew (e.g. registration), keep it.
+  function mergeKnown(prev, next) {
+    if (!prev) return next;
+    const out = { ...next, aircraft: { ...(next.aircraft || {}) } };
+    for (const k of ["regNumber", "modelText"]) {
+      if (!out.aircraft[k] && prev.aircraft && prev.aircraft[k]) out.aircraft[k] = prev.aircraft[k];
+    }
+    return out;
   }
 
   function scoreMatch(a, b) {
@@ -654,116 +730,46 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
   }
 
   function timeDistanceMinutes(t1, t2) {
-    const a = toDate(t1);
-    const b = toDate(t2);
-    if (!a || !b) return null;
-    return Math.abs(a.getTime() - b.getTime()) / 60000;
+    const m = window.BrsTime.minutesBetween(t1, t2);
+    return m === null ? null : Math.abs(m);
   }
 
-  async function fetchBestEffortUpdate(context, current) {
-    const isDep = !String(context.mode || "").toLowerCase().includes("arr");
-    const airport = context.airport || "BRS";
-    const curId = deriveIdentity(current);
-    const flightNo = curId.flightNo || "";
+  /** Ask the worker for this flight; returns the best matching record, null if not listed. Throws on network/HTTP errors. */
+  async function fetchBestEffortUpdate(route, current) {
+    const F = window.BrsFlights;
+    const home = window.BrsConfig.AIRPORT;
 
-    const url = new URL(`${PROXY_BASE}/api/flights`);
-    if (flightNo) url.searchParams.set("flight_iata", flightNo);
-    if (isDep) {
-      url.searchParams.set("dep_iata", airport);
-    } else {
-      url.searchParams.set("arr_iata", airport);
-    }
+    const url = new URL(`${window.BrsConfig.API_BASE}/flights`);
+    url.searchParams.set("flight_iata", route.flight);
+    url.searchParams.set(route.type === "departure" ? "dep_iata" : "arr_iata", home);
+    url.searchParams.set("date", route.date);
 
     const res = await fetch(url.toString(), { cache: "no-store" });
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error(`Flight HTTP ${res.status}`);
 
     const data = await res.json();
-    const list =
-      (data && Array.isArray(data.data) && data.data) ||
-      (Array.isArray(data) && data) ||
-      null;
-    if (!list) return null;
+    const list = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
 
+    const curId = current ? deriveIdentity(current) : null;
     let best = null;
     let bestScore = -1;
     for (const f of list) {
-      const normalized = normalizeAviationStack(f);
-      const candId = deriveIdentity(normalized);
-      const score = scoreMatch(curId, candId);
-      if (score > bestScore) { bestScore = score; best = normalized; }
-    }
-    if (bestScore < 3) return null;
-    return best;
-  }
+      // Must be the same flight number, with Bristol on the right side of it.
+      if (!F.sameFlightNo(F.flightNo(f), route.flight)) continue;
+      const homeCode = normIata(F.seg(f, route.type).iataCode);
+      if (homeCode && homeCode !== home) continue;
 
-  // Maps AviationStack response fields to the shape the rest of the code expects.
-  function normalizeAviationStack(f) {
-    if (!f || typeof f !== "object") return f;
-    const dep = f.departure || {};
-    const arr = f.arrival || {};
-    const fl = f.flight || {};
-    const ac = f.aircraft || {};
-    return {
-      type: f.flight_status && f.departure && f.departure.iata ? "departure" : (f.type || ""),
-      status: f.flight_status || f.status || "",
-      flight_status: f.flight_status || f.status || "",
-      departure: {
-        iataCode: dep.iata || dep.iataCode || "",
-        scheduledTime: dep.scheduled || dep.scheduledTime || "",
-        estimatedTime: dep.estimated || dep.estimatedTime || "",
-        actualTime: dep.actual || dep.actualTime || "",
-        delay: dep.delay != null ? dep.delay : "",
-        terminal: dep.terminal || "",
-        gate: dep.gate || "",
-        baggage: dep.baggage || arr.baggage || "",
-      },
-      arrival: {
-        iataCode: arr.iata || arr.iataCode || "",
-        scheduledTime: arr.scheduled || arr.scheduledTime || "",
-        estimatedTime: arr.estimated || arr.estimatedTime || "",
-        actualTime: arr.actual || arr.actualTime || "",
-        delay: arr.delay != null ? arr.delay : "",
-        terminal: arr.terminal || "",
-        gate: arr.gate || "",
-        baggage: arr.baggage || "",
-      },
-      airline: {
-        iataCode: (f.airline && (f.airline.iata || f.airline.iataCode)) || "",
-        icaoCode: (f.airline && (f.airline.icao || f.airline.icaoCode)) || "",
-        name: (f.airline && f.airline.name) || "",
-      },
-      flight: {
-        iataNumber: fl.iata || fl.iataNumber || "",
-        icaoNumber: fl.icao || fl.icaoNumber || "",
-        number: fl.number || "",
-      },
-      aircraft: {
-        iataCode: ac.iata || "",
-        icaoCode: ac.icao || ac.iata || "",
-        regNumber: ac.registration || ac.regNumber || "",
-        model: {
-          text: ac.modelText || ac.model?.text || "",
-          code: ac.modelCode || ac.icao || ac.iata || "",
-        },
-      },
-      codeshared: f.codeshared || null,
-      // preserve originals for flattenObject / pickAny
-      _raw: f,
-    };
+      let score = 1;
+      if (F.dateKey(f, route.type) === route.date) score += 4;
+      if (curId) score += scoreMatch(curId, deriveIdentity(f));
+      if (score > bestScore) { bestScore = score; best = f; }
+    }
+    return best;
   }
 
   // ---------- Render ----------
   function render(flight, prev) {
     if (!flight) return;
-
-    const now = new Date().toLocaleString("en-GB", { timeZone: "Europe/London" });
-    setText(els.lastUpdated, `Last updated: ${now}`);
-
-    if (els.sourceLine) {
-      els.sourceLine.textContent = state.context
-        ? `Source: Timetable (${state.context.airport || "—"} • ${state.context.mode || "—"})`
-        : "Source: stored flight";
-    }
 
     const flat = flattenObject(flight);
     const id = deriveIdentity(flight);
@@ -793,16 +799,11 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     ]));
     setText(els.subhead, depTime && arrTime ? `${depTime} → ${arrTime}` : depTime ? `Departs ${depTime}` : "—");
 
-    // Big time hero (departure / arrival times + delay chips)
-    renderTimeHero(flight, flat, id);
-    
-    // New hero card (app-style flight overview)
+    // Hero card (app-style flight overview) + operational info
     renderHeroCard(flight, flat, id);
+    renderOpsBar(flight);
 
-    // Status + operational info
-    // Keep this page "glanceable": no duplicated top banners.
-    renderStatusBadge(flat);
-    renderOpsBar(flight, flat);
+    if (state.route) document.title = `${displayNo} ${route.replace(" → ", "→")} · BRS Flights`;
 
     // Airline basics
     const airlineNameVal = pickAny(flat, ["airline.name", "flight.airline.name", "airlineName", "airline"]) || "—";
@@ -894,15 +895,18 @@ function kvLine(label, val, showEmpty, cls) {
   return `<div class="${divCls}"><span class="kv-k">${escapeHtml(label)}</span><span class="kv-v">${escapeHtml(v)}</span></div>`;
 }
 
+// Terminal / gate / belt only mean something at Bristol; the other airport's values are hidden.
+const atDeparture = currentMode(flight) === "departure";
+
 if (els.depKv) {
   els.depKv.innerHTML = `
     <div class="kv-stack">
       ${kvLine("Scheduled", depInfo.sched || "—")}
       ${kvLine("Estimated", depInfo.est)}
       ${kvLine("Actual", depInfo.act)}
-      ${kvLine("Terminal", depInfo.term)}
-      ${kvLine(depInfo.gateChanged ? "New gate" : "Gate", depInfo.gate, true, depInfo.gateChanged ? "newgate" : "gate")}
-      ${kvLine("Stand", depInfo.stand)}
+      ${atDeparture ? kvLine("Terminal", depInfo.term) : ""}
+      ${atDeparture ? kvLine(depInfo.gateChanged ? "New gate" : "Gate", depInfo.gate, true, depInfo.gateChanged ? "newgate" : "gate") : ""}
+      ${atDeparture ? kvLine("Stand", depInfo.stand) : ""}
     </div>
   `;
 }
@@ -913,144 +917,45 @@ if (els.arrKv) {
       ${kvLine("Scheduled", arrInfo.sched || "—")}
       ${kvLine("Estimated", arrInfo.est)}
       ${kvLine("Actual", arrInfo.act)}
-      ${kvLine("Terminal", arrInfo.term)}
-      ${kvLine(arrInfo.gateChanged ? "New gate" : "Gate", arrInfo.gate, true, arrInfo.gateChanged ? "newgate" : "gate")}
-      ${kvLine("Belt", arrInfo.belt, true, "belt")}
+      ${!atDeparture ? kvLine("Terminal", arrInfo.term) : ""}
+      ${!atDeparture ? kvLine("Belt", arrInfo.belt, true, "belt") : ""}
     </div>
   `;
 }
 
 
-    // Raw JSON
-    if (els.rawJson) els.rawJson.textContent = JSON.stringify(flight, null, 2);
-
-    
     // KPIs (duration, distance, carbon, delay trend)
     renderKpis(flat, id);
 // Weather
     renderWeatherByCityName(flat).catch((e) => console.warn("Weather render failed:", e));
   }
 
-  // Back-compat: older cached builds called this. We now avoid the big green banner entirely.
-  function renderStatusBannerAndOps(flight, flat, id) {
-    renderOpsBar(flight, flat);
-    // Safety: if an old HTML still includes the banner element, hide it.
-    if (els.statusBanner) {
-      els.statusBanner.style.display = "none";
-      els.statusBanner.innerHTML = "";
-    }
-  }
-
-  function renderOpsBar(flight, flat) {
-    if (!els.opsBar) return;
+  // Which side of the flight is at Bristol: departures -> departure, arrivals -> arrival.
+  function currentMode(flight) {
+    if (state.route) return state.route.type;
     const t = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase();
-    const isDeparture = t.includes("depart");
-
-    const dep = (flight && flight.departure) || {};
-    const arr = (flight && flight.arrival) || {};
-
-    // Aviation Edge / timetables are inconsistent. Prefer multiple field shapes.
-    const gate = (
-      (isDeparture ? dep.gate : arr.gate) ||
-      pickAny(flat || {}, [
-        "departure.gate", "departure.gateNumber", "departureGate", "gate", "gate_number",
-        "arrival.gate", "arrival.gateNumber", "arrivalGate",
-      ])
-    ) || null;
-
-    const terminal = (
-      (isDeparture ? dep.terminal : arr.terminal) ||
-      pickAny(flat || {}, [
-        "departure.terminal", "departureTerminal", "terminal", "terminal_number",
-        "arrival.terminal", "arrivalTerminal",
-      ])
-    ) || null;
-
-    const baggage = (
-      (!isDeparture ? arr.baggage : null) ||
-      (!isDeparture ? pickAny(flat || {}, [
-        "arrival.baggage", "arrival.baggage_belt", "arrival.baggageBelt",
-        "arrival.belt", "arrival.beltNumber", "baggage", "baggage_belt", "belt",
-      ]) : null)
-    ) || null;
-
-    // Hide if we have nothing useful.
-    if (!gate && !terminal && !baggage) {
-      els.opsBar.style.display = "none";
-      els.opsBar.innerHTML = "";
-      return;
-    }
-
-    const fmt = (v) => (v === null || v === undefined || String(v).trim() === "" ? "—" : String(v));
-    els.opsBar.style.display = "";
-    els.opsBar.innerHTML = `
-      <div class="ops-item">
-        <div class="ops-k">🚪 Gate</div>
-        <div class="ops-v">${escapeHtml(fmt(gate))}</div>
-      </div>
-      <div class="ops-item">
-        <div class="ops-k">🏢 Terminal</div>
-        <div class="ops-v">${escapeHtml(fmt(terminal))}</div>
-      </div>
-      <div class="ops-item">
-        <div class="ops-k">🧳 Belt</div>
-        <div class="ops-v">${escapeHtml(fmt(baggage))}</div>
-      </div>
-    `;
+    return t.includes("dep") ? "departure" : "arrival";
   }
 
-  function renderStatusBanner(flight, flat, id) {
-    if (!els.statusBanner) return;
-    const stRaw = pickAny(flat, ["flight_status", "status"]) || "Unknown";
-    const st = String(stRaw).toLowerCase();
+  // Gate / terminal / check-in (departures) or belt / terminal (arrivals): Bristol's values only.
+  function renderOpsBar(flight) {
+    if (!els.opsBar) return;
+    const atDeparture = currentMode(flight) === "departure";
+    const seg = (atDeparture ? flight.departure : flight.arrival) || {};
+    const tbc = (v) => (v === null || v === undefined || String(v).trim() === "" ? "TBC" : String(v));
 
-    const isDeparture = String((flight && flight.type) || (state.context && state.context.mode) || "").toLowerCase().includes("depart");
-    const delayStr = isDeparture ? (flight?.departure?.delay) : (flight?.arrival?.delay);
-    const delayMin = Number(delayStr);
-    const hasDelay = Number.isFinite(delayMin) && delayMin > 0;
+    const items = [];
+    if (atDeparture) items.push(["🚪 Gate", tbc(seg.gate)]);
+    if (seg.terminal) items.push(["🏢 Terminal", String(seg.terminal)]);
+    if (atDeparture && seg.checkInDesk) items.push(["🛄 Check-in", String(seg.checkInDesk)]);
+    if (!atDeparture) items.push(["🧳 Belt", tbc(seg.baggage)]);
 
-    const times = pickPrimaryTimes(flight, isDeparture);
-    const now = Date.now();
-    const targetMs = times.target ? times.target.getTime() : null;
-    const minsTo = targetMs ? Math.round((targetMs - now) / 60000) : null;
-
-    const depArrWord = isDeparture ? "Departs" : "Arrives";
-    const countdown = (minsTo === null)
-      ? "—"
-      : minsTo > 0 ? `${depArrWord} in ${fmtRelative(minsTo)}` : `${depArrWord} ${fmtRelative(Math.abs(minsTo))} ago`;
-
-    // Boarding estimate (no explicit API field): 30 min before target.
-    let boardingLine = "";
-    if (targetMs && isDeparture) {
-      const boardMs = targetMs - 30 * 60000;
-      const minsToBoard = Math.round((boardMs - now) / 60000);
-      if (minsToBoard > 0) boardingLine = `Boarding in ${fmtRelative(minsToBoard)}`;
-      else if (minsToBoard >= -10 && minsTo <= 15) boardingLine = "Boarding window";
-    }
-
-    let label = stRaw;
-    let cls = "neutral";
-
-    if (st.includes("cancel")) { label = "Cancelled"; cls = "bad"; }
-    else if (hasDelay) { label = `Delayed ${delayMin}m`; cls = "warn"; }
-    else if (st.includes("board")) { label = "Boarding"; cls = "good"; }
-    else if (st.includes("land")) { label = "Landed"; cls = "good"; }
-    else if (st.includes("depart")) { label = "Departed"; cls = "good"; }
-    else if (st.includes("active")) { label = "Active"; cls = "good"; }
-    else if (st.includes("sched") || st.includes("on time")) { label = "On time"; cls = "good"; }
-
-    const subBits = [countdown, boardingLine].filter(Boolean);
-    const sub = subBits.join(" • ");
-
-    els.statusBanner.className = `status-banner ${cls}`;
-    els.statusBanner.style.display = "";
-    els.statusBanner.innerHTML = `
-      <div class="sb-left">
-        <div class="sb-title">${escapeHtml(label)}</div>
-        <div class="sb-sub">${escapeHtml(sub || "—")}</div>
-      </div>
-      <div class="sb-right small">${escapeHtml((id.dep || "—") + " → " + (id.arr || "—"))}</div>
-    `;
+    els.opsBar.style.display = "";
+    els.opsBar.innerHTML = items.map(([k, v]) => `
+      <div class="ops-item">
+        <div class="ops-k">${escapeHtml(k)}</div>
+        <div class="ops-v">${escapeHtml(v)}</div>
+      </div>`).join("");
   }
 
   function pickPrimaryTimes(flight, isDeparture) {
@@ -1070,284 +975,118 @@ if (els.arrKv) {
     return mm ? `${h}h ${String(mm).padStart(2, "0")}m` : `${h}h`;
   }
 
-  // ---------- Time hero (KLM-style) ----------
-  function fmtDayMon(v) {
-    const d = toDate(v);
-    if (!d) return "—";
-    try {
-      return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-    } catch {
-      return "—";
-    }
-  }
-
-  function setHeroTime(mainEl, oldEl, actualOrEst, scheduled) {
-    if (!mainEl) return;
-    const main = fmtTime(actualOrEst || scheduled);
-    const old = fmtTime(scheduled);
-    mainEl.textContent = main || "—";
-
-    // Only show the crossed-out scheduled time if it's meaningfully different.
-    if (oldEl && scheduled && actualOrEst && main && old && main !== old) {
-      oldEl.textContent = old;
-      oldEl.style.display = "";
-    } else if (oldEl) {
-      oldEl.textContent = "";
-      oldEl.style.display = "none";
-    }
-  }
-
-  function paintDelayChip(el, mins) {
+  // ---------- Hero card ----------
+  function setShown(el, shown) {
     if (!el) return;
-    const n = Number(mins);
-    if (!Number.isFinite(n) || n === 0) {
-      el.hidden = true;
-      el.textContent = "";
-      el.classList.remove("fh-delay-good");
-      el.classList.remove("fh-delay-warn");
-      return;
-    }
-
-    // Aviation Edge delay is often in minutes; negative can indicate early.
-    if (n > 0) {
-      el.textContent = `${Math.round(n)}m delayed`;
-      el.classList.remove("fh-delay-good");
-      el.classList.add("fh-delay-warn");
-      el.hidden = false;
-      return;
-    }
-    el.textContent = `${Math.abs(Math.round(n))}m early`;
-    el.classList.remove("fh-delay-warn");
-    el.classList.add("fh-delay-good");
-    el.hidden = false;
+    el.hidden = !shown;
+    el.style.display = shown ? "" : "none";
   }
 
-  function renderTimeHero(flight, flat, id) {
-    if (!flight || !flat) return;
-
-    const dep = flight.departure || {};
-    const arr = flight.arrival || {};
-
-    // Best-effort times (prefer actual, else estimated, else scheduled)
-    const depSched = dep.scheduledTime || pickAny(flat, ["departure.scheduledTime", "departure.scheduled", "scheduledDeparture", "flight.time.scheduled.departure"]);
-    const depActOrEst = dep.actualTime || dep.estimatedTime || pickAny(flat, ["departure.actualTime", "departure.estimatedTime", "departure.estimated", "flight.time.actual.departure", "flight.time.estimated.departure"]);
-
-    const arrSched = arr.scheduledTime || pickAny(flat, ["arrival.scheduledTime", "arrival.scheduled", "scheduledArrival", "flight.time.scheduled.arrival"]);
-    const arrActOrEst = arr.actualTime || arr.estimatedTime || pickAny(flat, ["arrival.actualTime", "arrival.estimatedTime", "arrival.estimated", "flight.time.actual.arrival", "flight.time.estimated.arrival"]);
-
-    setHeroTime(els.depTimeActual, els.depTimeSched, depActOrEst, depSched);
-    setHeroTime(els.arrTimeActual, els.arrTimeSched, arrActOrEst, arrSched);
-
-    if (els.depDate) els.depDate.textContent = fmtDayMon(depSched || depActOrEst || Date.now());
-    if (els.arrDate) els.arrDate.textContent = fmtDayMon(arrSched || arrActOrEst || Date.now());
-    if (els.depAirport) els.depAirport.textContent = id?.dep || "—";
-    if (els.arrAirport) els.arrAirport.textContent = id?.arr || "—";
-
-    // Delay chips
-    paintDelayChip(els.depDelay, dep.delay);
-    paintDelayChip(els.arrDelay, arr.delay);
+  function fmtCountdown(mins) {
+    const m = Math.abs(Math.round(mins));
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return mm ? `${h}h ${String(mm).padStart(2, "0")}m` : `${h}h`;
   }
 
-  // ---------- New Hero Card Renderer ----------
+  // Prefer the airport index (offline-first, ~9k airports) for display names; fall back to the small local map.
+  function displayCity(code) {
+    const c = normIata(code);
+    if (!c) return "";
+    const A = window.BrsAirports;
+    const rec = A && A.getAirportRecord ? A.getAirportRecord(c) : null;
+    return (rec && (rec.city || rec.name)) || getCityName(c) || c;
+  }
+
+  function paintHeroSide(seg, code, dateEl, cityEl, timeEl, oldEl) {
+    const T = window.BrsTime;
+    if (dateEl) dateEl.textContent = T.fmtDay(seg.scheduledTime || seg.estimatedTime) || "—";
+    if (cityEl) cityEl.textContent = displayCity(code) || "—";
+
+    const sched = T.fmtTime(seg.scheduledTime);
+    const live = T.fmtTime(seg.actualTime || seg.estimatedTime);
+    if (timeEl) timeEl.textContent = live || sched || "—";
+    if (oldEl) {
+      const moved = !!(sched && live && sched !== live);
+      oldEl.textContent = moved ? sched : "";
+      oldEl.style.display = moved ? "" : "none";
+    }
+  }
+
+  function paintHeroStatus(el, info) {
+    if (!el) return;
+    if (!info) { setShown(el, false); return; }
+    el.classList.remove("hero-delay-good", "hero-delay-warn", "hero-delay-bad", "hero-delay-neutral");
+    el.classList.add(`hero-delay-${info.tone}`);
+    el.textContent = info.text;
+    setShown(el, true);
+  }
+
+  // "Lands in 23 min" / "Landed 14:52" (arrivals) — "Departs in 1h 05m" / "Departed" (departures).
+  function renderCountdown() {
+    if (!els.heroCountdownText || !state.current) return;
+    const F = window.BrsFlights;
+    const T = window.BrsTime;
+    const flight = state.current;
+    const mode = currentMode(flight);
+    const info = F.statusInfo(flight, mode);
+    const target = F.keyTime(flight, mode);
+    const mins = target ? Math.round((target.getTime() - Date.now()) / 60000) : null;
+    const when = T.fmtTime(target);
+
+    let text = "—";
+    if (info.key === "cancelled" || info.key === "diverted") text = info.text;
+    else if (mode === "arrival") {
+      if (info.key === "landed") text = info.text;
+      else if (mins === null) text = "—";
+      else if (mins > 0) text = `Lands in ${fmtCountdown(mins)}`;
+      else text = when ? `Due ${when}` : "—";
+    } else {
+      if (info.key === "departed") text = "Departed";
+      else if (mins === null) text = "—";
+      else if (mins > 0) text = `Departs in ${fmtCountdown(mins)}`;
+      else text = when ? `Due to depart ${when}` : "—";
+    }
+    els.heroCountdownText.textContent = text;
+  }
+
   function renderHeroCard(flight, flat, id) {
-    if (!flight || !flat || !els.heroCard) return;
+    if (!flight || !els.heroCard) return;
+    const F = window.BrsFlights;
 
+    const mode = currentMode(flight);
+    const atDeparture = mode === "departure";
     const dep = flight.departure || {};
     const arr = flight.arrival || {};
 
-    // Flight number - Aviation Edge uses flight.iataNumber
-    const flightNo = flight.flight?.iataNumber || id?.flightNo || "—";
-    const airlineIata = flight.airline?.iataCode || "";
-    if (els.heroFlightNumber) {
-      els.heroFlightNumber.textContent = flightNo;
+    if (els.heroFlightNumber) els.heroFlightNumber.textContent = F.flightNo(flight) || id?.flightNo || "—";
+
+    paintHeroSide(dep, dep.iataCode || id?.dep, els.heroDepDate, els.heroDepCity, els.heroDepTime, els.heroDepTimeOld);
+    paintHeroSide(arr, arr.iataCode || id?.arr, els.heroArrDate, els.heroArrCity, els.heroArrTime, els.heroArrTimeOld);
+
+    // Status only on the Bristol side — the other airport's status isn't what you're here for.
+    const info = F.statusInfo(flight, mode);
+    paintHeroStatus(els.heroDepDelay, atDeparture ? info : null);
+    paintHeroStatus(els.heroArrDelay, atDeparture ? null : info);
+
+    // Gate for departures, belt for arrivals (the other side's gate/belt is irrelevant at Bristol).
+    setShown(els.heroGateItem, atDeparture);
+    setShown(els.heroBeltItem, !atDeparture);
+
+    if (els.heroGate) {
+      const gate = String(dep.gate || "").trim();
+      els.heroGate.textContent = gate || "TBC";
+      // Yellow by default; red if the gate changes (sticky across refreshes).
+      els.heroGate.classList.toggle("is-changed", atDeparture && opsChangedSticky("hero_gate", gate));
+    }
+    if (els.heroBaggage) {
+      const belt = String(arr.baggage || "").trim();
+      els.heroBaggage.textContent = belt || "TBC";
     }
 
-    // Departure info
-    if (els.heroDepDate) {
-      const depDateVal = dep.scheduledTime || dep.estimatedTime || Date.now();
-      els.heroDepDate.textContent = fmtDayMon(depDateVal);
-    }
-    if (els.heroDepCity) {
-      const depCode = dep.iataCode || id?.dep || "";
-      els.heroDepCity.textContent = getCityName(depCode) || depCode || "—";
-    }
-    if (els.heroDepTime) {
-      const mainTime = fmtTime(dep.actualTime || dep.estimatedTime || dep.scheduledTime);
-      els.heroDepTime.textContent = mainTime || "—";
-    }
-    if (els.heroDepTimeOld) {
-      const schedTime = fmtTime(dep.scheduledTime);
-      const actualTime = fmtTime(dep.actualTime || dep.estimatedTime);
-      if (schedTime && actualTime && schedTime !== actualTime) {
-        els.heroDepTimeOld.textContent = schedTime;
-        els.heroDepTimeOld.style.display = "";
-      } else {
-        els.heroDepTimeOld.textContent = "";
-        els.heroDepTimeOld.style.display = "none";
-      }
-    }
-
-    // Arrival info
-    if (els.heroArrDate) {
-      const arrDateVal = arr.scheduledTime || arr.estimatedTime || Date.now();
-      els.heroArrDate.textContent = fmtDayMon(arrDateVal);
-    }
-    if (els.heroArrCity) {
-      const arrCode = arr.iataCode || id?.arr || "";
-      els.heroArrCity.textContent = getCityName(arrCode) || arrCode || "—";
-    }
-    if (els.heroArrTime) {
-      const mainTime = fmtTime(arr.actualTime || arr.estimatedTime || arr.scheduledTime);
-      els.heroArrTime.textContent = mainTime || "—";
-    }
-    if (els.heroArrTimeOld) {
-      const schedTime = fmtTime(arr.scheduledTime);
-      const actualTime = fmtTime(arr.actualTime || arr.estimatedTime);
-      if (schedTime && actualTime && schedTime !== actualTime) {
-        els.heroArrTimeOld.textContent = schedTime;
-        els.heroArrTimeOld.style.display = "";
-      } else {
-        els.heroArrTimeOld.textContent = "";
-        els.heroArrTimeOld.style.display = "none";
-      }
-    }
-
-    // Status badges - show flight status with appropriate colors
-    function paintHeroStatus(el, segment, status, delayVal) {
-      if (!el) return;
-      
-      // Get flight status
-      const flightStatus = String(status || "").toLowerCase();
-      const delay = Number(delayVal);
-      const hasDelay = Number.isFinite(delay) && delay !== 0;
-      
-      // Reset classes
-      el.classList.remove("hero-delay-good", "hero-delay-warn", "hero-delay-bad", "hero-delay-neutral");
-      
-      // Determine status and styling
-      let text = "";
-      let className = "";
-      
-      // Priority 1: Cancelled
-      if (flightStatus.includes("cancel")) {
-        text = "Cancelled";
-        className = "hero-delay-neutral";
-      }
-      // Priority 2: Departed/Landed (completed)
-      else if (flightStatus.includes("departed") || flightStatus.includes("depart")) {
-        text = "Departed";
-        className = "hero-delay-good";
-      }
-      else if (flightStatus.includes("landed") || flightStatus.includes("land")) {
-        text = "Landed";
-        className = "hero-delay-good";
-      }
-      // Priority 3: Delayed (has positive delay value)
-      else if (hasDelay && delay > 0) {
-        text = `${Math.round(delay)}m delayed`;
-        className = "hero-delay-bad";
-      }
-      // Priority 4: Early (negative delay)
-      else if (hasDelay && delay < 0) {
-        text = `${Math.abs(Math.round(delay))}m early`;
-        className = "hero-delay-good";
-      }
-      // Priority 5: On time (scheduled with no delay)
-      else if (flightStatus.includes("scheduled") || 
-               flightStatus.includes("on time") || 
-               flightStatus.includes("active") ||
-               flightStatus.includes("boarding")) {
-        text = "On time";
-        className = "hero-delay-good";
-      }
-      
-      // Show badge only if we have status information
-      if (text) {
-        el.textContent = text;
-        el.classList.add(className);
-        el.hidden = false;
-      } else {
-        el.hidden = true;
-      }
-    }
-    
-    // Get flight status
-    const flightStatus = flight.flight_status || flight.status || "";
-    
-    paintHeroStatus(els.heroDepDelay, dep, flightStatus, dep.delay);
-    paintHeroStatus(els.heroArrDelay, arr, flightStatus, arr.delay);
-
-    // Info grid - Aviation Edge provides these fields directly in departure/arrival objects
-    const isDeparture = String(flight.type || (state.context && state.context.mode) || "").toLowerCase().includes("depart");
-    
-    // Gate + Belt pills (always shown)
-    const gateEl = els.heroGate;
-    const beltEl = els.heroBaggage;
-
-    const gateRaw =
-      pickAny(flat, ["departure.gate", "flight.departure.gate", "departureGate"]) ||
-      dep.gate ||
-      "";
-    const gate = String(gateRaw || "").trim();
-
-    if (gateEl) {
-      gateEl.textContent = gate || "See screens";
-
-      // Default: yellow. If gate changes (sticky), turn red.
-      const changed = opsChangedSticky("hero_gate", gate);
-      gateEl.classList.toggle("is-changed", changed);
-    }
-
-    const beltRaw =
-      pickAny(flat, ["arrival.baggage", "arrival.belt", "flight.arrival.baggage", "baggage", "belt"]) ||
-      arr.baggage ||
-      "";
-    const belt = String(beltRaw || "").trim();
-
-    if (beltEl) {
-      beltEl.textContent = belt || "See screens";
-    }
-
-    // Countdown
-    if (els.heroCountdownText) {
-      const times = pickPrimaryTimes(flight, isDeparture);
-      const now = Date.now();
-      const targetMs = times.target ? times.target.getTime() : null;
-      const minsTo = targetMs ? Math.round((targetMs - now) / 60000) : null;
-
-      const depArrWord = isDeparture ? "departure" : "arrival";
-      if (minsTo === null) {
-        els.heroCountdownText.textContent = "—";
-      } else if (minsTo > 0) {
-        els.heroCountdownText.textContent = `${fmtRelative(minsTo)} before ${depArrWord}`;
-      } else {
-        els.heroCountdownText.textContent = `${fmtRelative(Math.abs(minsTo))} after ${depArrWord}`;
-      }
-    }
+    renderCountdown();
   }
-
-  function renderStatusBadge(flat) {
-    if (!els.statusBadge) return;
-    const rawStatus = pickAny(flat, ["status", "flight_status", "arrival.status", "departure.status", "flight.status", "info.status"]) || "Unknown";
-    const st = String(rawStatus).toLowerCase();
-
-    let label = rawStatus;
-    if (st.includes("cancel")) label = "Cancelled";
-    else if (st.includes("delay")) label = "Delayed";
-    else if (st.includes("boarding")) label = "Boarding";
-    else if (st.includes("depart")) label = "Departed";
-    else if (st.includes("land")) label = "Landed";
-    else if (st.includes("scheduled") || st.includes("on time")) label = "On time";
-
-    let cls = "neutral";
-    if (st.includes("cancel")) cls = "bad";
-    else if (st.includes("delay")) cls = "warn";
-    else if (st.includes("on time") || st.includes("scheduled") || st.includes("boarding") || st.includes("active") || st.includes("depart") || st.includes("land")) cls = "good";
-
-    els.statusBadge.className = `badge ${cls}`;
-    els.statusBadge.textContent = label;
-  }
-
 
   // ---------- Flight metrics (duration, distance, carbon) + delay trend ----------
   function minutesBetween(a, b) {
@@ -1420,6 +1159,7 @@ if (els.arrKv) {
       "actualDeparture",
       "departure.actualTimeLocal",
       "departure.actual_time",
+      "departure.estimatedTime",
     ]);
 
     const actualArr = getTimeValue(flat, [
@@ -1430,6 +1170,7 @@ if (els.arrKv) {
       "actualArrival",
       "arrival.actualTimeLocal",
       "arrival.actual_time",
+      "arrival.estimatedTime",
     ]);
 
     const depDelay = minutesBetween(schedDep, actualDep);
@@ -1590,15 +1331,10 @@ if (els.arrKv) {
     }
   }
 
-  function fmtSun(timeStr, timezone) {
-    // Open-Meteo returns ISO time in local tz when timezone=auto; still safe to format.
-    const d = toDate(timeStr);
-    if (!d) return "—";
-    try {
-      return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: timezone || "UTC" });
-    } catch {
-      return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-    }
+  function fmtSun(timeStr) {
+    // Open-Meteo (timezone=auto) returns local ISO time, e.g. "2026-10-02T07:12": just take HH:MM.
+    const m = /T(\d{2}:\d{2})/.exec(String(timeStr || ""));
+    return m ? m[1] : "—";
   }
 
   async function geocodeCityOpenMeteo(name) {
@@ -1760,8 +1496,8 @@ if (els.arrKv) {
       const pProb = Number.isFinite(Number(precipProb[i])) ? `${Number(precipProb[i]).toFixed(0)}%` : "—";
       const w = Number.isFinite(Number(windMax[i])) ? `${Number(windMax[i]).toFixed(0)} km/h` : "—";
       const uv = Number.isFinite(Number(uvMax[i])) ? `${Number(uvMax[i]).toFixed(0)}` : "—";
-      const sr = sunrise[i] ? fmtSun(sunrise[i], tz) : "—";
-      const ss = sunset[i] ? fmtSun(sunset[i], tz) : "—";
+      const sr = sunrise[i] ? fmtSun(sunrise[i]) : "—";
+      const ss = sunset[i] ? fmtSun(sunset[i]) : "—";
 
       rows += `
         <div class="wx-row ${tempClass(tmax[i])}">
@@ -2225,3 +1961,8 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
     // Ensure Leaflet sizes correctly after animation + layout settles
     setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 120);
   }
+
+  // ---------- Start ----------
+  // (Called last so every const above is initialised before the first render.)
+  init();
+  startCountdownTimer();

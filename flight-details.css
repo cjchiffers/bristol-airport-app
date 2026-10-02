@@ -1240,3 +1240,15 @@ body.leaflet-on #routeSvg{ display:none; }
   align-items:flex-start;
   text-align:left;
 }
+
+
+/* ---- Share / reload additions ---- */
+.updated-line{ margin: 0 2px 8px; min-height: 16px; }
+
+.notfound-card{ text-align:center; padding: 28px 18px; }
+.notfound-card h2{ font-size: 18px; margin-bottom: 8px; }
+.notfound-card p{ margin: 0 0 16px; font-size: 14px; color: var(--muted); }
+.notfound-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.notfound-actions .btn{ text-decoration:none; font-size:14px; padding: 12px 16px; cursor:pointer; }
+.notfound-card[hidden]{ display:none; }
+body.is-notfound .details-container > *:not(#notFound):not(#netBanner){ display:none !important; }

@@ -269,6 +269,13 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   border: 1px solid var(--stroke);
   color: var(--muted);
 }
+.chip .share{
+  width: 22px; height: 22px;
+  display:grid; place-items:center;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  color: var(--muted);
+}
 .chip:active{ transform: translateY(1px); }
 
 .list-wrap{ margin-top: 12px; }
@@ -313,6 +320,16 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   font-weight: 950;
   font-size: 18px;
   font-family: var(--mono);
+}
+.time-wrap{ display:flex; align-items:baseline; gap:8px; }
+.time.is-late{ color: var(--warn); }
+.time.is-early{ color: var(--good); }
+.time-old{
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: line-through;
 }
 .route{
   margin-top: 8px;
@@ -482,37 +499,12 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   transform: translateX(-50%) translateY(-4px);
 }
 
-/* Reuse existing flight-details styling */
-.app-header, header.app-header, .container, .card, .btn, .badge, .grid, .kpis, .kv, .callout, .modal-backdrop, .modal,
-.section-title, .hero, .aircraft-image, .map-wrap, details.raw, pre#rawJson, .row, input#secMinutes {}
-
-/* A tiny improvement for flight-details: make its header actions wrap better on mobile */
-@media (max-width: 520px){
-  header.app-header .header-actions{ gap: 8px; }
-  header.app-header .btn{ padding: 10px 10px; }
-}
-
-/* Mobile friendly fonts */
-body {
-    font-family: Arial, sans-serif;
-    font-size: 16px;
-}
-
-h1, h2, h3, h4 {
-    font-family: 'Helvetica Neue', Helvetica, sans-serif;
-}
-
-/* Add responsiveness for smaller screens */
-@media (max-width: 768px) {
-    body {
-        font-size: 14px;
-    }
+body{ font-size: 16px; }
+@media (max-width: 768px){
+  body{ font-size: 14px; }
 }
 
 .day-sep{margin:12px 0 6px; padding:6px 10px; font-weight:700; opacity:.8;}
-
-.star-btn{border:none;background:transparent;font-size:18px;cursor:pointer;opacity:.7}
-.star-btn.is-on{opacity:1}
 
 @media (max-width: 420px){
   .flight-card{
@@ -520,11 +512,6 @@ h1, h2, h3, h4 {
   }
   .fc-bottom{
     align-items:flex-start;
-  }
-  .status{
-    max-width: 112px;
-    overflow:hidden;
-    text-overflow: ellipsis;
   }
   .save-btn{
     width: 38px;

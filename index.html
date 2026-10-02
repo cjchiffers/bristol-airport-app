@@ -11,6 +11,13 @@
   <link rel="preconnect" href="https://flightapp-workers.chiffers.com">
   <link rel="dns-prefetch" href="https://geocoding-api.open-meteo.com">
   <link rel="dns-prefetch" href="https://api.open-meteo.com">
+  <meta name="description" content="Live departures and arrivals at Bristol Airport (BRS)." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Bristol Airport Flights" />
+  <meta property="og:title" content="Bristol Airport Flights" />
+  <meta property="og:description" content="Live departures and arrivals at Bristol Airport (BRS)." />
+  <meta property="og:image" content="https://flightapp.chiffers.com/assets/icon-512.png" />
+  <meta name="twitter:card" content="summary" />
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -55,7 +62,7 @@
         <button class="chip-btn active" data-filter="all" type="button">All</button>
         <button class="chip-btn" data-filter="next" type="button">Next 4h</button>
         <button class="chip-btn" data-filter="delayed" type="button">Delayed</button>
-        <button class="chip-btn" data-filter="gate" type="button">Gate</button>
+        <button class="chip-btn" data-filter="cancelled" type="button">Cancelled</button>
       </div>
 
       <div class="meta-row">
@@ -114,8 +121,11 @@
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </main>
 
+  <script src="shared/config.js"></script>
+  <script src="shared/time.js"></script>
   <script src="shared/airports.js"></script>
   <script src="shared/airlines.js"></script>
+  <script src="shared/flights.js"></script>
   <script src="script.js"></script>
   <script>
     // Service workers (and sometimes manifests) will error when opened via file://.

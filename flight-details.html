@@ -8,6 +8,12 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Flight Details</title>
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Bristol Airport Flights" />
+  <meta property="og:title" content="Bristol Airport Flights" />
+  <meta property="og:description" content="Live flight status at Bristol Airport (BRS)." />
+  <meta property="og:image" content="https://flightapp.chiffers.com/assets/icon-512.png" />
+  <meta name="twitter:card" content="summary" />
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="flight-details.css" />
@@ -25,6 +31,10 @@
       <div class="details-headline" id="headline">Loading…</div>
       <div class="details-subhead" id="subhead">—</div>
     </div>
+
+    <button class="icon-btn" id="shareIconBtn" aria-label="Share this flight" title="Share">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4M6 12v6.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
 
     <button class="icon-btn" id="overflowDetailsBtn" aria-haspopup="menu" aria-expanded="false" aria-label="More">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.2a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z" fill="currentColor"/></svg>
@@ -44,7 +54,16 @@
 
   <main class="container details-container">
     <div id="netBanner" class="net-banner" style="display:none" role="status" aria-live="polite"></div>
-    <div id="statusBanner" class="status-banner" style="display:none" role="status" aria-live="polite"></div>
+    <div class="updated-line small" id="updatedLine" role="status" aria-live="polite"></div>
+
+    <section class="card notfound-card" id="notFound" hidden>
+      <h2 id="notFoundTitle">Flight not found</h2>
+      <p id="notFoundMsg"></p>
+      <div class="notfound-actions">
+        <button class="btn" id="notFoundRetry" type="button">Try again</button>
+        <a class="btn ghost" href="index.html">See all flights</a>
+      </div>
+    </section>
 
     <!-- New Hero Card Section -->
     <section class="hero-card" id="heroCard" aria-label="Flight overview">
@@ -83,11 +102,11 @@
       </div>
 
       <div class="hero-info-grid" id="heroInfoGrid">
-        <div class="hero-info-item">
+        <div class="hero-info-item" id="heroGateItem">
           <div class="hero-info-label">Gate</div>
           <div class="hero-info-value pill-gate" id="heroGate">—</div>
         </div>
-        <div class="hero-info-item">
+        <div class="hero-info-item" id="heroBeltItem">
           <div class="hero-info-label">Belt</div>
           <div class="hero-info-value pill-belt" id="heroBaggage">—</div>
         </div>
@@ -101,31 +120,6 @@
         <span id="heroCountdownText">—</span>
       </div>
     </section>
-<!-- Flight time hero (original - kept for compatibility) -->
-    <section class="flight-hero" id="flightHero" aria-label="Departure and arrival times" style="display:none">
-      <div class="flight-hero-col">
-        <div class="fh-date" id="depDate">—</div>
-        <div class="fh-airport" id="depAirport">—</div>
-        <div class="fh-time">
-          <span class="fh-time-main" id="depTimeActual">—</span>
-          <span class="fh-time-old" id="depTimeSched"></span>
-        </div>
-        <div class="fh-delay fh-delay-warn" id="depDelay" hidden></div>
-      </div>
-
-      <div class="flight-hero-arrow" aria-hidden="true">→</div>
-
-      <div class="flight-hero-col">
-        <div class="fh-date" id="arrDate">—</div>
-        <div class="fh-airport" id="arrAirport">—</div>
-        <div class="fh-time">
-          <span class="fh-time-main" id="arrTimeActual">—</span>
-          <span class="fh-time-old" id="arrTimeSched"></span>
-        </div>
-        <div class="fh-delay fh-delay-warn" id="arrDelay" hidden></div>
-      </div>
-    </section>
-
     <section class="card details-card details-summary-card" aria-label="Flight essentials">
       <div id="opsBar" class="ops-bar" style="display:none"></div>
       <div id="kpis" class="kpis" aria-label="Flight metrics"></div>
@@ -204,9 +198,14 @@
     </div>
   </div>
 
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="shared/airports.js"></script>
+  <script src="shared/config.js"></script>
+  <script src="shared/time.js"></script>
+  <script src="shared/airports.js"></script>
   <script src="shared/airlines.js"></script>
+  <script src="shared/flights.js"></script>
   <script src="flight-details.js"></script>
 
 </body>

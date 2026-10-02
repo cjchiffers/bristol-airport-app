@@ -1,9 +1,11 @@
-const API_BASE = "https://flightapp-workers.chiffers.com/api";
-// Bristol Airport — redesigned mobile UI (stable build)
-// - Aviation Edge timetable (departures/arrivals)
+// Bristol Airport — flights list page.
+// - Timetable comes from the Cloudflare worker (AeroDataBox): departures / arrivals
 // - Saved (starred) flights stored in localStorage
 // - Install button (optional) + security wait samples
 "use strict";
+
+const T = window.BrsTime;
+const F = window.BrsFlights;
 
 // =======================
 // Configuration
@@ -127,18 +129,12 @@ async function prefetchAirportsFromFlights(depList, arrList){
   });
   await Promise.all(workers);
 }
-// replace with your own key
-
 // Airport IATA code (Bristol Airport = BRS)
-const airportIata = "BRS";
-
-// Stores current airport coordinates (for details page map fallback)
-window.__brsAirportPos = window.__brsAirportPos || null;
+const airportIata = window.BrsConfig.AIRPORT;
 
 // =======================
 // Small utilities
 // =======================
-function safeSetSession(key, value){ try { sessionStorage.setItem(key, value); return true; } catch { return false; } }
 function safeGetLocal(key){ try { return localStorage.getItem(key);} catch { return null; } }
 function safeSetLocal(key, value){ try { localStorage.setItem(key,value); return true;} catch { return false; } }
 function escapeHtml(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
@@ -167,11 +163,6 @@ function flattenObject(obj, prefix = ""){
   return out;
 }
 
-function toDate(value){
-  const d = parseAviationEdgeTime(value);
-  return d;
-}
-
 // =======================
 // Airport name lookup (offline-first)
 // =======================
@@ -191,65 +182,17 @@ function getCityName(code){
 }
 
 // =======================
-// Time helpers (London)
+// Time helpers (London) — see shared/time.js
 // =======================
-const LONDON_TZ = "Europe/London";
-const LONDON_TIME_FMT = new Intl.DateTimeFormat("en-GB", { timeZone: LONDON_TZ, hour12:false, hour:"2-digit", minute:"2-digit" });
-const LONDON_DATE_KEY_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: LONDON_TZ, year:"numeric", month:"2-digit", day:"2-digit" });
-
-function parseAviationEdgeTime(value){
-  if (!value) return null;
-  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
-  if (typeof value === "number"){
-    const d = new Date(value);
-    return Number.isFinite(d.getTime()) ? d : null;
-  }
-  if (typeof value !== "string") return null;
-  const s = value.trim();
-  if (!s) return null;
-  if (/[zZ]$/.test(s) || /[+-]\d\d:\d\d$/.test(s)){
-    const d = new Date(s);
-    return Number.isFinite(d.getTime()) ? d : null;
-  }
-  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$/.test(s)){
-    const d = new Date(s.replace(" ","T") + "Z");
-    return Number.isFinite(d.getTime()) ? d : null;
-  }
-  
-// Aviation Edge often returns ISO strings without timezone (e.g. 2026-01-04T19:10:00.000).
-// Treat these as UTC to avoid client-timezone shifting (important for users outside the UK).
-if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/.test(s)){
-  const d = new Date(s + "Z");
-  return Number.isFinite(d.getTime()) ? d : null;
-}
-
-const d = new Date(s);
-  return Number.isFinite(d.getTime()) ? d : null;
-}
-
-function convertToLondonTime(v){
-  const d = parseAviationEdgeTime(v);
-  return d ? LONDON_TIME_FMT.format(d) : "—";
-}
-
-function scheduledMs(f){
-  const d = parseAviationEdgeTime(f?.departure?.scheduledTime || f?.arrival?.scheduledTime);
-  return d ? d.getTime() : 0;
-}
-
-function getCurrentTimeMinusOneHour(){
-  const now = new Date();
-  now.setHours(now.getHours() - 1);
-  return now.getTime();
-}
-
-function filterFlightsByTime(flights){
-  const cutoff = getCurrentTimeMinusOneHour();
+// Hide flights that are well past: departures after 30 min, arrivals after 60 min
+// (people collecting may still be waiting). Uses the best-known time at Bristol.
+function filterFlightsByTime(flights, mode){
+  const grace = (F.isDep(mode) ? 30 : 60) * 60 * 1000;
+  const cutoff = Date.now() - grace;
   return (flights || []).filter(f => {
-    const d = parseAviationEdgeTime(f?.departure?.scheduledTime || f?.arrival?.scheduledTime);
+    const d = F.keyTime(f, mode);
     // If time missing, keep (don’t hide everything)
-    if (!d) return true;
-    return d.getTime() >= cutoff;
+    return !d || d.getTime() >= cutoff;
   });
 }
 
@@ -259,22 +202,6 @@ function filterFlightsByTime(flights){
 function getAirlineLogoUrl(iataCode){
   if (!iataCode) return null;
   return `https://www.gstatic.com/flights/airline_logos/70px/${iataCode}.png`;
-}
-
-function getFlightStatusString(seg){
-  if (!seg) return "—";
-  if (seg.cancelled) return "Cancelled";
-  if (seg.boarding) return "Boarding";
-  if (seg.gate) return `Gate ${seg.gate}`;
-  if (seg.delay) return `Delayed ${seg.delay} min`;
-  return "—";
-}
-function statusTone(statusText){
-  const s = String(statusText||"").toLowerCase();
-  if (s.includes("cancel")) return "bad";
-  if (s.includes("delay")) return "warn";
-  if (s.includes("gate") || s.includes("boarding")) return "good";
-  return "neutral";
 }
 
 function renderLoadingList(mode){
@@ -310,6 +237,7 @@ let arrFlights = [];
 let currentTab = "departures";
 let quickFilter = "all";
 let searchQuery = "";
+let hasLoadedOnce = false;   // true once we have any timetable data (cache or network)
 
 // =======================
 // Toast
@@ -398,7 +326,7 @@ function renderSavedDrawer(forceOpen){
     const id = item?.id || {};
     const label = `${escapeHtml(id.flightNo || "Flight")} · ${escapeHtml(id.dep||"")}→${escapeHtml(id.arr||"")}`;
     return `<div class="chip" data-idx="${i}">
-      <span>${label}</span><span class="x" title="Remove" aria-label="Remove">×</span>
+      <span>${label}</span><span class="share" title="Share" aria-label="Share ${escapeHtml(id.flightNo || "flight")}">↗</span><span class="x" title="Remove" aria-label="Remove">×</span>
     </div>`;
   }).join("");
 
@@ -414,9 +342,14 @@ function renderSavedDrawer(forceOpen){
         list2.splice(idx,1);
         setSavedFlights(list2);
         renderSavedDrawer(true);
+        renderList(currentTab);
         return;
       }
-      openFlightDetailsWithStorage(item.flight, item.context || { mode:"departure", airport: airportIata, day:1, airportPos: window.__brsAirportPos });
+      if (e.target && e.target.classList && e.target.classList.contains("share")){
+        F.shareFlight(item.flight, item.context?.mode || item.flight?.type, toast);
+        return;
+      }
+      openFlightDetails(item.flight, item.context?.mode || item.flight?.type);
     });
   });
 
@@ -432,35 +365,39 @@ function initSavedUI(){
   renderSavedDrawer(false);
 }
 
-function openFlightDetailsWithStorage(flight, context){
-  const key = `flight_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  safeSetSession(key, JSON.stringify({ flight, context }));
-
-  const url = new URL("flight-details.html", window.location.href);
-  url.searchParams.set("key", key);
-  window.location.href = url.toString();
+/** Open the details page. The flight is cached locally and the URL carries type/flight/date, so it can be shared and reloaded. */
+function openFlightDetails(flight, mode){
+  window.location.href = F.prepareDetails(flight, mode);
 }
 
 /** Render a flight card for the list (departures/arrivals tabs). */
 function flightCardHtml(flight, mode, idx){
   const isDep = mode === "departures";
-  const flightNo = (flight?.flight?.iataNumber) ? flight.flight.iataNumber : (flight?.flight_iata || flight?.flightNumber || "—");
-  const otherIata = isDep ? flight?.arrival?.iataCode : flight?.departure?.iataCode;
-  const city = getCityName(otherIata);
+  const flightNo = F.flightNo(flight) || "—";
+  const city = getCityName(F.otherSeg(flight, mode).iataCode);
   const airlineName = flight?.airline?.name || flight?.airline?.iataCode || "—";
-  const airlineCode = flight?.airline?.iataCode || "";
-  const logo = getAirlineLogoUrl(airlineCode);
-  const time = convertToLondonTime(isDep ? flight?.departure?.scheduledTime : flight?.arrival?.scheduledTime);
-  const statusText = getFlightStatusString(isDep ? flight?.departure : flight?.arrival);
-  const tone = statusTone(statusText);
+  const logo = getAirlineLogoUrl(flight?.airline?.iataCode || "");
   const route = isDep ? `Bristol → ${city}` : `${city} → Bristol`;
   const saved = isFlightSaved(flight);
+
+  // Show the live time big, with the scheduled time struck through when it has moved.
+  const s = F.seg(flight, mode);
+  const sched = T.fmtTime(s.scheduledTime);
+  const live = T.fmtTime(s.actualTime || s.estimatedTime);
+  const moved = !!(live && sched && live !== sched);
+  const delay = F.delayMin(flight, mode);
+  const timeCls = moved ? (delay != null && delay < 0 ? " is-early" : " is-late") : "";
+  const main = moved ? live : (sched || live || "—");
+
+  const info = F.statusInfo(flight, mode);
 
   return `
     <article class="flight-card" data-open="1" data-idx="${idx}" role="button" tabindex="0">
       <div class="fc-top">
         <div class="flight-no">${escapeHtml(flightNo)}</div>
-        <div class="time">${escapeHtml(time)}</div>
+        <div class="time-wrap">
+          <span class="time${timeCls}">${escapeHtml(main)}</span>${moved ? `<span class="time-old">${escapeHtml(sched)}</span>` : ""}
+        </div>
       </div>
       <div class="route">${escapeHtml(route)}</div>
       <div class="fc-bottom">
@@ -469,7 +406,7 @@ function flightCardHtml(flight, mode, idx){
           <div class="airline-name">${escapeHtml(airlineName)}</div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
-          <span class="status ${tone}">${escapeHtml(statusText)}</span>
+          <span class="status ${info.tone}">${escapeHtml(info.text)}</span>
           <button class="save-btn ${saved ? "saved" : ""}" data-save="1" data-idx="${idx}" aria-label="Save flight">${saved ? "★" : "☆"}</button>
         </div>
       </div>
@@ -477,53 +414,50 @@ function flightCardHtml(flight, mode, idx){
   `.trim();
 }
 
-function renderList
-(mode){
+function renderList(mode){
   const isDep = mode === "departures";
   const listEl = document.getElementById(isDep ? "departureList" : "arrivalList");
   const emptyEl = document.getElementById(isDep ? "depEmpty" : "arrEmpty");
   if (!listEl || !emptyEl) return;
 
-  const flights = (isDep ? depFlights : arrFlights).slice().sort((a,b)=>scheduledMs(a)-scheduledMs(b));
+  // Until we have data (cache or network), leave the loading skeleton / error banner alone.
+  if (!hasLoadedOnce) return;
+
+  // Sort / filter / group by the time that matters at Bristol (arrivals: landing time, not take-off).
+  const keyMs = (f) => { const d = F.keyTime(f, mode); return d ? d.getTime() : 0; };
+  const visible = filterFlightsByTime(isDep ? depFlights : arrFlights, mode)
+    .slice()
+    .sort((a,b)=>keyMs(a)-keyMs(b));
   const qn = (searchQuery || "").trim().toLowerCase();
   const nowMs = Date.now();
   const fourH = nowMs + 4*60*60*1000;
 
-  const filtered = flights.filter(f => {
-    const seg = isDep ? f?.departure : f?.arrival;
-    const status = getFlightStatusString(seg);
-    const textBlob = `${f?.flight?.iataNumber || f?.flight_iata || f?.flightNumber || ""} ${f?.airline?.name || ""} ${f?.airline?.iataCode || ""} ${getCityName(isDep ? f?.arrival?.iataCode : f?.departure?.iataCode)} ${status}`.toLowerCase();
+  const filtered = visible.filter(f => {
+    const other = F.otherSeg(f, mode).iataCode || "";
+    const info = F.statusInfo(f, mode);
+    const textBlob = `${F.flightNo(f)} ${(f.codeshares || []).join(" ")} ${f?.airline?.name || ""} ${f?.airline?.iataCode || ""} ${other} ${getCityName(other)} ${info.text}`.toLowerCase();
     if (qn && !textBlob.includes(qn)) return false;
 
     if (quickFilter === "next"){
-      const ms = scheduledMs(f);
+      const ms = keyMs(f);
       if (ms && (ms < nowMs || ms > fourH)) return false;
     }
     if (quickFilter === "delayed"){
-      const s = status.toLowerCase();
-      if (!s.includes("delay")) return false;
+      if (info.key !== "delayed") return false;
     }
-    if (quickFilter === "gate"){
-      const s = status.toLowerCase();
-      if (!s.includes("gate")) return false;
+    if (quickFilter === "cancelled"){
+      if (info.key !== "cancelled" && info.key !== "diverted") return false;
     }
     return true;
   });
 
   // Group by London date
   const groups = new Map();
-  const todayKey = LONDON_DATE_KEY_FMT.format(new Date());
-  const tomorrowKey = LONDON_DATE_KEY_FMT.format(new Date(Date.now() + 24*60*60*1000));
-
-  const dayKeyOf = (f) => {
-    const t = f?.departure?.scheduledTime || f?.arrival?.scheduledTime;
-    const d = toDate(t);
-    if (!d) return "unknown";
-    return LONDON_DATE_KEY_FMT.format(d);
-  };
+  const todayKey = T.londonDateKey(new Date());
+  const tomorrowKey = T.londonDateKey(new Date(Date.now() + 24*60*60*1000));
 
   filtered.forEach(f => {
-    const k = dayKeyOf(f);
+    const k = T.londonDateKey(F.keyTime(f, mode)) || "unknown";
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(f);
   });
@@ -534,41 +468,37 @@ function renderList
     if (k === "unknown") return "Other";
     try {
       const d = new Date(`${k}T12:00:00Z`);
-      return d.toLocaleDateString("en-GB", { weekday:"long", day:"2-digit", month:"short" });
+      return d.toLocaleDateString("en-GB", { weekday:"long", day:"2-digit", month:"short", timeZone:"UTC" });
     } catch { return k; }
   };
 
   const orderedKeys = Array.from(groups.keys()).sort((a,b)=>String(a).localeCompare(String(b)));
   let html = "";
   let idx = 0;
+  const ordered = [];
   orderedKeys.forEach(k => {
     html += `<div class="day-sep">${escapeHtml(labelForKey(k))}</div>`;
-    for (const f of groups.get(k)) html += flightCardHtml(f, mode, idx++);
+    for (const f of groups.get(k)) { html += flightCardHtml(f, mode, idx++); ordered.push(f); }
   });
 
   listEl.innerHTML = html;
   emptyEl.style.display = filtered.length ? "none" : "";
 
-  // Events
+  // Events (indexes follow display order, which is grouped by day)
   listEl.querySelectorAll("[data-open]").forEach(card => {
     card.addEventListener("click", (e) => {
       if (e.target && e.target.closest && e.target.closest("[data-save]")) return;
-      const i = Number(card.getAttribute("data-idx"));
-      const flight = filtered[i];
-      if (!flight) return;
-      const apiMode = (mode === "departures") ? "departure" : (mode === "arrivals") ? "arrival" : mode;
-      openFlightDetailsWithStorage(flight, { mode: apiMode, airport: airportIata, day:1, airportPos: window.__brsAirportPos });
-});
+      const flight = ordered[Number(card.getAttribute("data-idx"))];
+      if (flight) openFlightDetails(flight, mode);
+    });
   });
   listEl.querySelectorAll("[data-save]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
-      const i = Number(btn.getAttribute("data-idx"));
-      const flight = filtered[i];
+      const flight = ordered[Number(btn.getAttribute("data-idx"))];
       if (!flight) return;
-      const apiMode = (mode === "departures") ? "departure" : (mode === "arrivals") ? "arrival" : mode;
-      saveFlight(flight, { mode: apiMode, airport: airportIata, day:1, airportPos: window.__brsAirportPos });
-btn.classList.toggle("saved");
+      saveFlight(flight, { mode: F.normMode(mode), airport: airportIata });
+      btn.classList.toggle("saved");
       btn.textContent = btn.classList.contains("saved") ? "★" : "☆";
       toast(btn.classList.contains("saved") ? "Saved" : "Removed");
     });
@@ -576,8 +506,7 @@ btn.classList.toggle("saved");
 
   const meta = document.getElementById("searchMeta");
   if (meta){
-    const total = flights.length;
-    meta.textContent = (qn || quickFilter !== "all") ? `${filtered.length} of ${total} flights` : "";
+    meta.textContent = (qn || quickFilter !== "all") ? `${filtered.length} of ${visible.length} flights` : "";
   }
 }
 
@@ -645,8 +574,9 @@ function ensureErrorBanner(){
     el.innerHTML = `<div class="banner__msg" id="errorBannerMsg"></div>
                     <button class="banner__btn" id="errorBannerRetry" type="button">Retry</button>`;
     document.body.insertBefore(el, document.body.firstChild);
+    // Attach once, when the banner is created (not on every call).
+    el.querySelector("#errorBannerRetry")?.addEventListener("click", () => refreshAll({force:true}));
   }
-  el.querySelector("#errorBannerRetry")?.addEventListener("click", () => refreshAll({force:true}));
   return el;
 }
 function showError(message, {retry=true}={}){
@@ -665,45 +595,24 @@ function hideError(){
 // =======================
 // Cache + fetching
 // =======================
-const CACHE_TTL_MS = 90 * 1000;
-function cacheKey(type){ return `brs_timetable_${type}`; }
-function cacheMetaKey(type){ return `brs_timetable_${type}_meta`; }
+// The last good timetable is kept in localStorage so the app still shows something when opened
+// offline (or while the first request is in flight). It is replaced on every successful fetch.
+function cacheKey(type){ return `brs_timetable_v2_${type}`; }
 
-function hashFlights(list){
-  const reduced = (list || []).map(f => ({
-    iata: f?.flight?.iataNumber || "",
-    airline: f?.airline?.iataCode || "",
-    dep: f?.departure?.iataCode || "",
-    arr: f?.arrival?.iataCode || "",
-    sched: f?.departure?.scheduledTime || f?.arrival?.scheduledTime || ""
-  }));
-  const s = JSON.stringify(reduced);
-  let h = 5381;
-  for (let i=0;i<s.length;i++) h = ((h<<5)+h) + s.charCodeAt(i);
-  return String(h|0);
-}
 function loadCachedTimetable(type){
   try{
-    const meta = JSON.parse(sessionStorage.getItem(cacheMetaKey(type)) || "null");
-    const data = JSON.parse(sessionStorage.getItem(cacheKey(type)) || "null");
-    if (!meta || !Array.isArray(data)) return null;
-    const age = Date.now() - (meta.ts || 0);
-    return { data, ts: meta.ts||0, age, fresh: age < CACHE_TTL_MS, hash: meta.hash||"" };
+    const x = JSON.parse(localStorage.getItem(cacheKey(type)) || "null");
+    return (x && Array.isArray(x.data)) ? { data: x.data, ts: Number(x.ts) || 0 } : null;
   } catch { return null; }
 }
 function saveCachedTimetable(type, list){
-  try{
-    const hash = hashFlights(list);
-    sessionStorage.setItem(cacheKey(type), JSON.stringify(list||[]));
-    sessionStorage.setItem(cacheMetaKey(type), JSON.stringify({ ts: Date.now(), hash }));
-    return hash;
-  } catch { return ""; }
+  try{ localStorage.setItem(cacheKey(type), JSON.stringify({ ts: Date.now(), data: list || [] })); } catch {}
 }
 
-async function fetchTimetable(type, dateISO){
-  const url = new URL(`https://flightapp-workers.chiffers.com/api/timetable`);  url.searchParams.set("iataCode", airportIata);
+async function fetchTimetable(type){
+  const url = new URL(`${window.BrsConfig.API_BASE}/timetable`);
+  url.searchParams.set("iataCode", airportIata);
   url.searchParams.set("type", type);
-  if (dateISO) url.searchParams.set("date", dateISO);
 
   const r = await fetch(url.toString(), { cache:"no-store" });
   if (!r.ok) throw new Error(`Timetable HTTP ${r.status}`);
@@ -711,59 +620,85 @@ async function fetchTimetable(type, dateISO){
   return (Array.isArray(j) && j) || (j && Array.isArray(j.data) && j.data) || (j && Array.isArray(j.result) && j.result) || [];
 }
 
-async function refreshAll({force=false} = {}){
-  const lr = document.getElementById("lastRefreshed");
-  const cachedDep = !force ? loadCachedTimetable("departure") : null;
-  const cachedArr = !force ? loadCachedTimetable("arrival") : null;
+function clearLists(){
+  for (const id of ["departureList","arrivalList"]) { const el = document.getElementById(id); if (el) el.innerHTML = ""; }
+  for (const id of ["depEmpty","arrEmpty"]) { const el = document.getElementById(id); if (el) el.style.display = "none"; }
+}
 
-  let renderedFromCache = false;
-  if (cachedDep?.data && cachedArr?.data){
-    depFlights = filterFlightsByTime(cachedDep.data);
-    arrFlights = filterFlightsByTime(cachedArr.data);
-    renderList(currentTab);
-    renderedFromCache = true;
-    if (lr) lr.textContent = `Updated ${LONDON_TIME_FMT.format(new Date(cachedDep.ts))} (cached)`;
+const AUTO_REFRESH_MS = 120 * 1000;  // matches the worker's edge cache
+const STALE_MS = 60 * 1000;          // refresh straight away on return if data is older than this
+let fetching = false;
+let lastOkAt = 0;
+let autoTimer = null;
+
+/**
+ * force: skip showing cached data first (manual refresh / Retry).
+ * Never blanks an existing list: a failed refresh keeps showing the last data.
+ */
+async function refreshAll({force=false} = {}){
+  if (fetching) return;
+  const lr = document.getElementById("lastRefreshed");
+
+  if (!hasLoadedOnce && !force){
+    const cachedDep = loadCachedTimetable("departure");
+    const cachedArr = loadCachedTimetable("arrival");
+    if (cachedDep && cachedArr){
+      depFlights = cachedDep.data;
+      arrFlights = cachedArr.data;
+      hasLoadedOnce = true;
+      renderList(currentTab);
+      if (lr) lr.textContent = `Updated ${T.fmtTime(cachedDep.ts)} (cached)`;
+    }
   }
 
   if (!navigator.onLine){
-    if (!renderedFromCache) showError("You appear to be offline. Connect to the internet to load flights.", {retry:false});
+    showError(hasLoadedOnce
+      ? "You appear to be offline. Showing the last data we have."
+      : "You appear to be offline. Connect to the internet to load flights.", {retry:false});
     return;
   }
 
+  fetching = true;
   try{
     hideError();
-    if (!renderedFromCache) renderLoadingList(currentTab);
-    // Fetch sequentially — AeroDataBox has a 1 req/sec rate limit and the worker
-    // needs to make 2 calls per request (AM + PM windows). Fetching in parallel
-    // would fire 4 simultaneous upstream calls and hit 429s.
+    if (!hasLoadedOnce) renderLoadingList(currentTab);
+    // Fetch sequentially: the worker makes two upstream calls per timetable (two 12 h windows)
+    // and AeroDataBox allows 1 request/second. The second call is normally served from the
+    // worker's edge cache because departures and arrivals share the same upstream responses.
     const dep = await fetchTimetable("departure");
     const arr = await fetchTimetable("arrival");
-    const depList = Array.isArray(dep) ? dep : [];
-    const arrList = Array.isArray(arr) ? arr : [];
+
+    depFlights = F.dedupe(dep, "departure");
+    arrFlights = F.dedupe(arr, "arrival");
+    saveCachedTimetable("departure", depFlights);
+    saveCachedTimetable("arrival", arrFlights);
+
+    hasLoadedOnce = true;
+    lastOkAt = Date.now();
+    renderList(currentTab);
+    if (lr) lr.textContent = `Updated ${T.fmtTime(new Date())}`;
 
     // Warm the airport geo cache for accurate pins on the details map.
-    prefetchAirportsFromFlights(depList, arrList).catch(()=>{});
-
-    const newDepHash = saveCachedTimetable("departure", depList);
-    const newArrHash = saveCachedTimetable("arrival", arrList);
-
-    const changed =
-      !renderedFromCache ||
-      (cachedDep && cachedDep.hash !== newDepHash) ||
-      (cachedArr && cachedArr.hash !== newArrHash);
-
-    if (changed){
-      depFlights = filterFlightsByTime(depList);
-      arrFlights = filterFlightsByTime(arrList);
-      renderList(currentTab);
-    }
-
-    if (lr) lr.textContent = `Updated ${LONDON_TIME_FMT.format(new Date())}`;
+    prefetchAirportsFromFlights(dep, arr).catch(()=>{});
   } catch (err){
     console.error(err);
-    showError("Couldn’t refresh flight data. Check your connection / API key, then retry.", {retry:true});
-    if (!renderedFromCache) toast("Couldn’t load flight data");
+    if (hasLoadedOnce){
+      showError("Couldn’t update flights — showing the last data we have.", {retry:true});
+    } else {
+      clearLists();
+      showError("Couldn’t load flights. Check your connection and try again.", {retry:true});
+    }
+  } finally {
+    fetching = false;
   }
+}
+
+// Auto-refresh while the page is visible; nothing runs in a hidden tab.
+function stopAutoRefresh(){ if (autoTimer) clearInterval(autoTimer); autoTimer = null; }
+function startAutoRefresh(){
+  stopAutoRefresh();
+  if (document.visibilityState !== "visible") return;
+  autoTimer = setInterval(() => refreshAll(), AUTO_REFRESH_MS);
 }
 
 // =======================
@@ -875,6 +810,15 @@ function initSecurityUI(){
   window.addEventListener("offline", () => showError("You appear to be offline. Showing cached results if available.", {retry:false}));
   window.addEventListener("online", () => { hideError(); refreshAll(); });
 
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible"){
+      if (Date.now() - lastOkAt > STALE_MS) refreshAll();
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
+  });
+
   document.getElementById("refreshBtn")?.addEventListener("click", () => refreshAll({force:true}));
   document.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
   document.querySelectorAll(".chip-btn").forEach(b => b.addEventListener("click", () => setQuickFilter(b.dataset.filter)));
@@ -887,4 +831,5 @@ function initSecurityUI(){
   });
 
   refreshAll();
+  startAutoRefresh();
 })();
