@@ -1,5 +1,5 @@
 // Bump this when you change any app-shell file so users receive updates immediately.
-const CACHE_NAME = "brs-flights-2026-10-02-03";
+const CACHE_NAME = "brs-flights-2026-10-02-04";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -12,6 +12,7 @@ const APP_SHELL = [
   "./assets/bristol-logo.png",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
+  "./shared/utils.js",
   "./shared/config.js",
   "./shared/time.js",
   "./shared/airports.js",

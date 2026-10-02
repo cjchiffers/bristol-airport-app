@@ -15,6 +15,8 @@
   --shadow: 0 12px 34px rgba(0,0,0,.45);
   --radius: 18px;
   --radius2: 14px;
+  --maxw: 720px;   /* content width; wider on desktop (see media query at the bottom) */
+  --gutter: max(14px, calc((100% - var(--maxw)) / 2 + 14px));
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
 }
 
@@ -64,7 +66,7 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding: max(12px, env(safe-area-inset-top)) 14px 12px 14px;
+  padding: max(12px, env(safe-area-inset-top)) var(--gutter) 12px var(--gutter);
   background: color-mix(in srgb, var(--bg) 74%, transparent);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--stroke);
@@ -85,7 +87,7 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
 .app{
   padding: 14px;
   padding-bottom: max(18px, env(safe-area-inset-bottom));
-  max-width: 720px;
+  max-width: var(--maxw);
   margin: 0 auto;
 }
 
@@ -108,7 +110,7 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
 .menu{
   position:absolute;
   top: 64px;
-  right: 14px;
+  right: var(--gutter);
   width: 210px;
   padding: 8px;
   border-radius: 16px;
@@ -179,8 +181,13 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   background: color-mix(in srgb, var(--surface2) 70%, transparent);
 }
 .searchicon{ opacity:.85; font-size: 16px; }
+.searchbox:focus-within{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .searchbox input{
   flex:1;
+  min-width: 0;
   border:0;
   outline: none;
   background: transparent;
@@ -498,5 +505,66 @@ body{ font-size: 16px; }
     width: 38px;
     height: 38px;
     border-radius: 12px;
+  }
+}
+
+
+/* ---------- Accessibility helpers ---------- */
+.sr-only{
+  position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
+:focus-visible{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fc-link{ display:block; color:inherit; text-decoration:none; border-radius: 10px; }
+.fc-link:focus-visible{ outline-offset: 4px; }
+.flight-card:focus-within{ border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
+
+@media (hover: hover){
+  .flight-card:hover{ border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
+  .chip-btn:hover, .seg-btn:hover{ color: var(--text); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Desktop: Departures and Arrivals side by side ---------- */
+@media (min-width: 1024px){
+  :root{ --maxw: 1200px; }
+
+  .segmented{ display:none; }
+
+  .search{
+    display:grid;
+    grid-template-columns: minmax(280px, 1fr) auto;
+    gap: 10px 18px;
+    align-items:center;
+  }
+  .search .searchbox, .search .chips-row{ margin-top: 0; }
+  .search .meta-row{ grid-column: 1 / -1; margin-top: 0; }
+
+  .list-wrap{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items:start;
+  }
+  .tab-panel{ display:block; }
+  .tab-panel .flight-list{
+    max-height: max(420px, calc(100vh - 290px));
+    overflow-y:auto;
+    padding: 2px 6px 2px 2px;
+  }
+
+  .my-flights .flight-list{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   }
 }

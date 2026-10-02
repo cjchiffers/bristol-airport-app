@@ -1183,3 +1183,30 @@ body.is-notfound .details-container > *:not(#notFound):not(#netBanner){ display:
 .hero-countdown{ margin-bottom: 12px; }
 .hero-countdown #heroCountdownText{ font-size: 18px; font-weight: 900; }
 .hero-hint{ margin: -4px 2px 14px; }
+
+
+/* ---- Page frame: padding + width (the container had none), desktop two-column layout ---- */
+body.details-page{ --maxw: 720px; }
+.details-container{
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 8px 14px calc(28px + env(safe-area-inset-bottom));
+}
+.details-col{ min-width: 0; }
+.details-col > *:last-child{ margin-bottom: 0; }
+
+@media (min-width: 1024px){
+  body.details-page{ --maxw: 1100px; }
+  .details-grid{
+    display:grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items:start;
+  }
+  .details-container{ font-size: 13px; }
+  .route-map{ min-height: 340px; }
+}
+
+.details-actions{ display:flex; align-items:center; gap: 8px; flex-shrink: 0; }
+.details-topbar .details-title{ flex: 1; min-width: 0; padding: 0 10px; text-align: center; }
+.details-headline, .details-subhead{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

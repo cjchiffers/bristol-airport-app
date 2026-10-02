@@ -15,9 +15,7 @@ const airportIata = window.BrsConfig.AIRPORT;
 // =======================
 // Small utilities
 // =======================
-function safeGetLocal(key){ try { return localStorage.getItem(key);} catch { return null; } }
-function safeSetLocal(key, value){ try { localStorage.setItem(key,value); return true;} catch { return false; } }
-function escapeHtml(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
+const { escapeHtml, safeGetLocal, safeSetLocal } = window.BrsUtils;
 
 // =======================
 // Airport name lookup (offline-first)
@@ -240,13 +238,7 @@ function renderMyFlights(){
     { share: true, note: (!x.live && hasLoadedOnce) ? "Not in the current timetable" : "" }
   )).join("");
 
-  listEl.querySelectorAll("[data-open]").forEach(card => {
-    card.addEventListener("click", (e) => {
-      if (e.target.closest("[data-save],[data-share]")) return;
-      const x = items[Number(card.getAttribute("data-idx"))];
-      if (x) openFlightDetails(x.live || x.item.flight, x.mode);
-    });
-  });
+  wireCards(listEl, (i) => items[i] && (items[i].live || items[i].item.flight), (card) => items[Number(card.getAttribute("data-idx"))].mode);
   listEl.querySelectorAll("[data-share]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
@@ -260,7 +252,7 @@ function renderMyFlights(){
       const x = items[Number(btn.getAttribute("data-idx"))];
       if (!x) return;
       saveFlight(x.live || x.item.flight, x.item.context || { mode: x.mode, airport: airportIata });  // already saved -> removes it
-      renderList(currentTab);
+      renderLists();
       toast("Removed");
     });
   });
@@ -268,6 +260,25 @@ function renderMyFlights(){
 
 function initSavedUI(){
   renderMyFlights();
+}
+
+/**
+ * Whole-card click opens the flight. The flight is cached first so the details page paints instantly;
+ * the <a> inside the card keeps keyboard, middle-click and "copy link" working.
+ */
+function wireCards(root, flightAt, modeAt){
+  root.querySelectorAll("[data-open]").forEach(card => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("[data-save],[data-share]")) return;
+      const flight = flightAt(Number(card.getAttribute("data-idx")));
+      if (!flight) return;
+      const mode = modeAt(card);
+      const viaLink = !!e.target.closest("a");
+      if (viaLink && (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1)) return;   // new tab/window: plain link
+      e.preventDefault();
+      openFlightDetails(flight, mode);
+    });
+  });
 }
 
 /** Open the details page. The flight is cached locally and the URL carries type/flight/date, so it can be shared and reloaded. */
@@ -297,14 +308,16 @@ function flightCardHtml(flight, mode, idx, opts = {}){
   const info = F.statusInfo(flight, mode);
 
   return `
-    <article class="flight-card" data-open="1" data-idx="${idx}" role="button" tabindex="0">
-      <div class="fc-top">
-        <div class="flight-no">${escapeHtml(flightNo)}</div>
-        <div class="time-wrap">
-          <span class="time${timeCls}">${escapeHtml(main)}</span>${moved ? `<span class="time-old">${escapeHtml(sched)}</span>` : ""}
+    <article class="flight-card" data-open="1" data-idx="${idx}">
+      <a class="fc-link" href="${escapeHtml(F.detailsUrl(flight, mode))}">
+        <div class="fc-top">
+          <div class="flight-no">${escapeHtml(flightNo)}</div>
+          <div class="time-wrap">
+            <span class="time${timeCls}">${escapeHtml(main)}</span>${moved ? `<span class="time-old"><span class="sr-only">scheduled </span>${escapeHtml(sched)}</span>` : ""}
+          </div>
         </div>
-      </div>
-      <div class="route">${escapeHtml(route)}</div>
+        <div class="route">${escapeHtml(route)}</div>
+      </a>
       ${opts.note ? `<div class="fc-note">${escapeHtml(opts.note)}</div>` : ""}
       <div class="fc-bottom">
         <div class="airline">
@@ -314,12 +327,33 @@ function flightCardHtml(flight, mode, idx, opts = {}){
         <div style="display:flex; align-items:center; gap:8px;">
           <span class="status ${info.tone}">${escapeHtml(info.text)}</span>
           ${opts.share ? `<button class="share-btn" data-share="1" data-idx="${idx}" aria-label="Share ${escapeHtml(flightNo)}">↗</button>` : ""}
-          <button class="save-btn ${saved ? "saved" : ""}" data-save="1" data-idx="${idx}" aria-label="Save flight">${saved ? "★" : "☆"}</button>
+          <button class="save-btn ${saved ? "saved" : ""}" data-save="1" data-idx="${idx}" aria-pressed="${saved ? "true" : "false"}" aria-label="${saved ? "Remove" : "Save"} ${escapeHtml(flightNo)}${saved ? " from saved flights" : ""}">${saved ? "★" : "☆"}</button>
         </div>
       </div>
     </article>
   `.trim();
 }
+
+const listCounts = { departures: { shown: 0, total: 0 }, arrivals: { shown: 0, total: 0 } };
+const desktopMQ = window.matchMedia("(min-width: 1024px)");
+
+/** Render both lists: on wide screens they sit side by side; on phones one is hidden behind the tab. */
+function renderLists(){
+  renderList("departures");
+  renderList("arrivals");
+}
+
+function updateMeta(){
+  const meta = document.getElementById("searchMeta");
+  if (!meta) return;
+  const filtering = !!(searchQuery || "").trim() || quickFilter !== "all";
+  if (!filtering) { meta.textContent = ""; return; }
+  const c = listCounts;
+  meta.textContent = desktopMQ.matches
+    ? `Departures ${c.departures.shown} of ${c.departures.total} · Arrivals ${c.arrivals.shown} of ${c.arrivals.total}`
+    : `${c[currentTab].shown} of ${c[currentTab].total} flights`;
+}
+desktopMQ.addEventListener?.("change", updateMeta);
 
 function renderList(mode){
   const isDep = mode === "departures";
@@ -392,29 +426,25 @@ function renderList(mode){
   emptyEl.style.display = filtered.length ? "none" : "";
 
   // Events (indexes follow display order, which is grouped by day)
-  listEl.querySelectorAll("[data-open]").forEach(card => {
-    card.addEventListener("click", (e) => {
-      if (e.target && e.target.closest && e.target.closest("[data-save]")) return;
-      const flight = ordered[Number(card.getAttribute("data-idx"))];
-      if (flight) openFlightDetails(flight, mode);
-    });
-  });
+  wireCards(listEl, (i) => ordered[i], () => mode);
   listEl.querySelectorAll("[data-save]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
       const flight = ordered[Number(btn.getAttribute("data-idx"))];
       if (!flight) return;
       saveFlight(flight, { mode: F.normMode(mode), airport: airportIata });
-      btn.classList.toggle("saved");
-      btn.textContent = btn.classList.contains("saved") ? "★" : "☆";
-      toast(btn.classList.contains("saved") ? "Saved" : "Removed");
+      const on = isFlightSaved(flight);
+      const no = F.flightNo(flight);
+      btn.classList.toggle("saved", on);
+      btn.textContent = on ? "★" : "☆";
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.setAttribute("aria-label", on ? `Remove ${no} from saved flights` : `Save ${no}`);
+      toast(on ? "Saved" : "Removed");
     });
   });
 
-  const meta = document.getElementById("searchMeta");
-  if (meta){
-    meta.textContent = (qn || quickFilter !== "all") ? `${filtered.length} of ${visible.length} flights` : "";
-  }
+  listCounts[mode] = { shown: filtered.length, total: visible.length };
+  updateMeta();
 }
 
 // =======================
@@ -426,15 +456,17 @@ function setTab(name){
     const on = b.dataset.tab === name;
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", on ? "true" : "false");
+    b.tabIndex = on ? 0 : -1;
   });
   document.getElementById("tab-departures")?.classList.toggle("active", name === "departures");
   document.getElementById("tab-arrivals")?.classList.toggle("active", name === "arrivals");
   renderList(name);
+  updateMeta();
 }
 function setQuickFilter(name){
   quickFilter = name;
   document.querySelectorAll(".chip-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === name));
-  renderList(currentTab);
+  renderLists();
 }
 function initSearch(){
   const input = document.getElementById("searchInput");
@@ -447,11 +479,11 @@ function initSearch(){
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
       searchQuery = input.value || ""; 
-      renderList(currentTab);
+      renderLists();
     }, 250); // Wait 250ms after user stops typing
   });
   
-  clear?.addEventListener("click", () => { input.value=""; searchQuery=""; renderList(currentTab); input.focus(); });
+  clear?.addEventListener("click", () => { input.value=""; searchQuery=""; renderLists(); input.focus(); });
 }
 function initOverflowMenu(){
   const btn = document.getElementById("overflowBtn");
@@ -487,6 +519,7 @@ function ensureErrorBanner(){
     el.id="errorBanner";
     el.className="banner";
     el.hidden=true;
+    el.setAttribute("role", "alert");
     el.innerHTML = `<div class="banner__msg" id="errorBannerMsg"></div>
                     <button class="banner__btn" id="errorBannerRetry" type="button">Retry</button>`;
     document.body.insertBefore(el, document.body.firstChild);
@@ -562,7 +595,7 @@ async function refreshAll({force=false} = {}){
       depFlights = cachedDep.data;
       arrFlights = cachedArr.data;
       hasLoadedOnce = true;
-      renderList(currentTab);
+      renderLists();
       renderMyFlights();
       if (lr) lr.textContent = `Updated ${T.fmtTime(cachedDep.ts)} (cached)`;
     }
@@ -593,9 +626,10 @@ async function refreshAll({force=false} = {}){
     hasLoadedOnce = true;
     lastOkAt = Date.now();
     syncSavedFromLive();
-    renderList(currentTab);
+    renderLists();
     renderMyFlights();
     if (lr) lr.textContent = `Updated ${T.fmtTime(new Date())}`;
+    if (force) toast(`Updated ${T.fmtTime(new Date())}`);   // announced via the toast live region
 
   } catch (err){
     console.error(err);
@@ -623,7 +657,7 @@ function startAutoRefresh(){
 // =======================
 (function init(){
   // Load airport index in the background (non-blocking). Once loaded, re-render so missing IATA names fill in.
-  loadAirportIndexBestEffort().then(()=>{ try{ renderList(currentTab); renderMyFlights(); }catch{} }).catch(()=>{});
+  loadAirportIndexBestEffort().then(()=>{ try{ renderLists(); renderMyFlights(); }catch{} }).catch(()=>{});
   // iOS Safari viewport fix
   function updateVH() {
     const vh = window.innerHeight * 0.01;
@@ -651,14 +685,14 @@ function startAutoRefresh(){
 
   document.getElementById("refreshBtn")?.addEventListener("click", () => refreshAll({force:true}));
   document.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
-  document.querySelectorAll(".chip-btn").forEach(b => b.addEventListener("click", () => setQuickFilter(b.dataset.filter)));
-
-  document.addEventListener("keydown", (e) => {
-    const active = document.activeElement;
-    if (active && active.classList && active.classList.contains("flight-card")){
-      if (e.key === "Enter" || e.key === " "){ e.preventDefault(); active.click(); }
-    }
+  document.querySelector(".segmented")?.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
+    e.preventDefault();
+    const next = (e.key === "ArrowLeft" || e.key === "Home") ? "departures" : "arrivals";
+    setTab(next);
+    document.querySelector(`.seg-btn[data-tab="${next}"]`)?.focus();
   });
+  document.querySelectorAll(".chip-btn").forEach(b => b.addEventListener("click", () => setQuickFilter(b.dataset.filter)));
 
   refreshAll();
   startAutoRefresh();

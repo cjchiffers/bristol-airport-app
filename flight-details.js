@@ -223,11 +223,8 @@
     prefersDark: window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null,
   };
 
-  // ---------- Storage helpers ----------
-  function safeGetLocal(key) { try { return localStorage.getItem(key); } catch { return null; } }
-  function safeSetLocal(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
-  function safeGetSession(key) { try { return sessionStorage.getItem(key); } catch { return null; } }
-  function safeSetSession(key, value) { try { sessionStorage.setItem(key, value); return true; } catch { return false; } }
+  // ---------- Shared helpers (shared/utils.js) ----------
+  const { escapeHtml, safeGetLocal, safeSetLocal, safeGetSession, safeSetSession, flattenObject, pickAny } = window.BrsUtils;
 
 
   // OPS_HELPERS_TOP_LEVEL
@@ -261,66 +258,18 @@
 
 
   // ---------- Utilities ----------
-  function escapeHtml(s) {
-    return String(s)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
   // All time parsing/formatting goes through shared/time.js (Safari-safe, Europe/London).
   function toDate(v) { return window.BrsTime.parse(v); }
 
   function fmtTime(v) { return window.BrsTime.fmtTime(v); }
 
-  function flattenObject(obj, prefix = "", out = {}) {
-    if (obj == null) return out;
-    if (typeof obj !== "object") { out[prefix || "value"] = obj; return out; }
-    if (Array.isArray(obj)) {
-      obj.forEach((v, i) => flattenObject(v, prefix ? `${prefix}[${i}]` : `[${i}]`, out));
-      return out;
-    }
-    for (const [k, v] of Object.entries(obj)) {
-      const p = prefix ? `${prefix}.${k}` : k;
-      if (v && typeof v === "object") flattenObject(v, p, out);
-      else out[p] = v;
-    }
-    return out;
-  }
-
-  function pickAny(flat, paths) {
-    for (const p of paths) {
-      const v = flat[p];
-      if (v !== undefined && v !== null && String(v).trim() !== "") return v;
-    }
-    return "";
-  }
-
   function setText(el, text) { if (el) el.textContent = text; }
 
 
 // ---------- Hero airline (logo + initials fallback) ----------
-function likelyAirlineCode(airlineIata, flightNo) {
-  const raw = String(airlineIata || "").trim().toUpperCase();
-  if (/^[A-Z0-9]{2}$/.test(raw)) return raw;
-
-  const f = String(flightNo || "").trim().toUpperCase();
-  const m = f.match(/^([A-Z0-9]{2})\d+/);
-  if (m) return m[1];
-
-  return "";
-}
-
-function airlineInitialsFrom(code, flightNo) {
-  const c = String(code || "").trim().toUpperCase();
-  if (/^[A-Z0-9]{2,3}$/.test(c)) return c.slice(0, 3);
-
-  const f = String(flightNo || "").trim().toUpperCase();
-  if (f.length >= 2) return f.slice(0, 2);
-  return "—";
-}
+// Airline code / initials / logo URLs come from shared/airlines.js.
+const likelyAirlineCode = (airlineIata, flightNo) => window.BrsAirlines.likelyAirlineCode(airlineIata, flightNo);
+const airlineInitialsFrom = (code, flightNo) => window.BrsAirlines.airlineInitialsFrom(code, flightNo);
 
 function setHeroAirline(airlineName, airlineIata, flightNo) {
   if (!els.heroAirline) return;
@@ -796,7 +745,9 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     }
 
     // Aircraft (best effort)
-    const acCode = pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "aircraft.modelCode", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "";
+    // Only a real ICAO/IATA type code (2–4 chars, e.g. A20N, E175). Older worker builds sent the 6-char transponder hex here.
+    let acCode = String(pickAny(flat, ["aircraft.icaoCode", "aircraft.model.code", "aircraft.modelCode", "flight.aircraft.model.code", "aircraftCode", "aircraft.code"]) || "").trim().toUpperCase();
+    if (!/^[A-Z0-9]{2,4}$/.test(acCode)) acCode = "";
     const acText = pickAny(flat, ["aircraft.model.text", "aircraft.modelText", "flight.aircraft.model.text", "aircraftType", "aircraft.text", "aircraft.model"]) || "";
     if (els.aircraftType) {
       els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
@@ -1854,7 +1805,16 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
       state.map.setView([(dep.lat + arr.lat) / 2, (dep.lon + arr.lon) / 2], 8, { animate: false });
     }
 
-    // Animate the path + plane
+    // Animate the path + plane (skipped for people who prefer reduced motion)
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      state.routeLine.setLatLngs(points);
+      const last = points[points.length - 1];
+      const prev = points[points.length - 2] || last;
+      state.planeMarker.setLatLng(last);
+      state.planeMarker.setIcon(makePlaneIcon(bearingDeg(prev[0], prev[1], last[0], last[1])));
+      setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 120);
+      return;
+    }
     const durationMs = 1300;
     const total = points.length;
 
