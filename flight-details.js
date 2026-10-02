@@ -182,6 +182,7 @@
     refreshBtn: document.getElementById("refreshBtn"),
     autoBtn: document.getElementById("autoBtn"),
     shareBtn: document.getElementById("shareBtn"),
+    calendarBtn: document.getElementById("calendarBtn"),
     shareIconBtn: document.getElementById("shareIconBtn"),
 
     overflowBtn: document.getElementById("overflowDetailsBtn"),
@@ -503,6 +504,11 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
   if (els.refreshBtn) els.refreshBtn.addEventListener("click", () => refreshNow(true));
   if (els.notFoundRetry) els.notFoundRetry.addEventListener("click", () => refreshNow(true));
   if (els.shareBtn) els.shareBtn.addEventListener("click", shareCurrent);
+  if (els.calendarBtn) els.calendarBtn.addEventListener("click", () => {
+    if (!state.current || !state.route) return;
+    const ok = window.BrsFlights.downloadIcs(state.current, state.route.type, window.BrsFlights.urlFor(state.route));
+    showToast(ok ? "Calendar event downloaded" : "No time available for this flight");
+  });
   if (els.shareIconBtn) els.shareIconBtn.addEventListener("click", shareCurrent);
   if (els.autoBtn) {
     els.autoBtn.addEventListener("click", () => {
@@ -924,7 +930,7 @@ if (els.arrKv) {
 }
 
 
-    // KPIs (duration, distance, carbon, delay trend)
+    // KPIs (duration, distance, carbon, delay)
     renderKpis(flat, id);
 // Weather
     renderWeatherByCityName(flat).catch((e) => console.warn("Weather render failed:", e));
@@ -1088,7 +1094,7 @@ if (els.arrKv) {
     renderCountdown();
   }
 
-  // ---------- Flight metrics (duration, distance, carbon) + delay trend ----------
+  // ---------- Flight metrics (duration, distance, carbon, delay) ----------
   function minutesBetween(a, b) {
     const d1 = toDate(a);
     const d2 = toDate(b);
@@ -1186,70 +1192,10 @@ if (els.arrKv) {
     };
   }
 
-  function delayTrendKey(id) {
-    const fn = String(id?.flightNo || "").trim().toUpperCase();
-    const dep = String(id?.dep || "").trim().toUpperCase();
-    const arr = String(id?.arr || "").trim().toUpperCase();
-    return `delay_hist_${fn || `${dep}_${arr}` || "unknown"}`;
-  }
-
-  function recordDelaySample(id, delays) {
-    const key = delayTrendKey(id);
-    const now = Date.now();
-
-    // De-dupe: only record if it changes or at least every 10 minutes.
-    const lastKey = `${key}_last`;
-    const lastRaw = safeGetSession(lastKey);
-    const last = lastRaw ? safeParseJson(lastRaw) : null;
-    const hash = `${delays.depDelay ?? "n"}|${delays.arrDelay ?? "n"}`;
-    if (last && last.hash === hash && (now - (last.t || 0)) < 10 * 60 * 1000) return;
-
-    safeSetSession(lastKey, JSON.stringify({ t: now, hash }));
-
-    const raw = safeGetLocal(key);
-    const arr = raw ? safeParseJson(raw) : null;
-    const list = Array.isArray(arr) ? arr : [];
-    list.push({ t: now, dep: delays.depDelay, arr: delays.arrDelay });
-    while (list.length > 30) list.shift();
-    safeSetLocal(key, JSON.stringify(list));
-  }
-
-  function computeDelayTrend(id) {
-    const key = delayTrendKey(id);
-    const raw = safeGetLocal(key);
-    const list = raw ? safeParseJson(raw) : null;
-    if (!Array.isArray(list) || list.length < 6) return null;
-
-    const recent = list.slice(-5);
-    const prev = list.slice(-10, -5);
-
-    const avg = (xs, field) => {
-      const vals = xs.map((x) => Number(x?.[field])).filter((n) => Number.isFinite(n));
-      if (!vals.length) return null;
-      return vals.reduce((a, b) => a + b, 0) / vals.length;
-    };
-
-    const r = avg(recent, "dep");
-    const p = avg(prev, "dep");
-    if (!Number.isFinite(r)) return null;
-
-    let arrow = "→";
-    let delta = null;
-    if (Number.isFinite(p)) {
-      delta = r - p;
-      if (delta > 2) arrow = "↑";
-      else if (delta < -2) arrow = "↓";
-    }
-
-    return { avgDep: r, delta, arrow };
-  }
-
   function renderKpis(flat, id) {
     if (!els.kpis) return;
 
     const delays = getDelays(flat);
-    // record trend best-effort (won't store if all null)
-    if (delays.depDelay !== null || delays.arrDelay !== null) recordDelaySample(id, delays);
 
     // Duration: scheduled (fallback to actual/estimated when needed)
     const dur = minutesBetween(delays.schedDep || delays.actualDep, delays.schedArr || delays.actualArr);
@@ -1270,17 +1216,15 @@ if (els.arrKv) {
 
     const co2 = estimateCarbonKg(km);
 
-    const trend = computeDelayTrend(id);
-
-    const delayLabel = delays.depDelay === null ? "—" : `${delays.depDelay >= 0 ? "+" : ""}${Math.round(delays.depDelay)}m`;
-    const trendLabel = trend ? `${trend.arrow} ${Math.round(trend.avgDep)}m avg` : "—";
+    // Delay at Bristol: departure delay for departures, arrival delay for arrivals.
+    const brsDelay = state.route && state.route.type === "arrival" ? delays.arrDelay : delays.depDelay;
+    const delayLabel = brsDelay === null ? "—" : `${brsDelay >= 0 ? "+" : ""}${Math.round(brsDelay)}m`;
 
     els.kpis.innerHTML = `
       <div class="kpi-chip"><span class="kpi-k">Duration</span><span class="kpi-v">${escapeHtml(fmtDuration(dur))}</span></div>
       <div class="kpi-chip"><span class="kpi-k">Distance</span><span class="kpi-v">${escapeHtml(fmtKm(km))}</span></div>
       <div class="kpi-chip"><span class="kpi-k">CO₂e</span><span class="kpi-v" title="Rough estimate per passenger">${escapeHtml(fmtKg(co2))}</span></div>
-      <div class="kpi-chip"><span class="kpi-k">Dep delay</span><span class="kpi-v">${escapeHtml(delayLabel)}</span></div>
-      <div class="kpi-chip"><span class="kpi-k">Delay trend</span><span class="kpi-v" title="Rolling average of recent samples">${escapeHtml(trendLabel)}</span></div>
+      <div class="kpi-chip"><span class="kpi-k">Delay</span><span class="kpi-v">${escapeHtml(delayLabel)}</span></div>
     `;
   }
 

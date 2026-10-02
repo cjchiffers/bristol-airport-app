@@ -21,7 +21,6 @@
 </head>
 
 <body class="details-page">
-  <div id="ptrIndicator" class="ptr-indicator" aria-hidden="true"><span id="ptrText">Pull down to refresh</span></div>
   <header class="topbar details-topbar">
     <button class="icon-btn" id="backBtn" aria-label="Back">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 19.5 8 12l7.5-7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -43,10 +42,7 @@
     <div class="menu" id="detailsMenu" role="menu" aria-label="Flight actions">
       <button class="menu-item" id="refreshBtn" role="menuitem">Refresh</button>
       <button class="menu-item" id="autoBtn" role="menuitemcheckbox" aria-checked="true">Auto-refresh: On</button>
-      <button class="menu-item" id="compactBtn" role="menuitem">Focus mode</button>
-      <button class="menu-item" id="groupBtn" role="menuitem">Group mode</button>
       <div class="menu-sep" role="separator"></div>
-      <button class="menu-item" id="notifyBtn" role="menuitem">Notify me</button>
       <button class="menu-item" id="calendarBtn" role="menuitem">Add to calendar</button>
       <button class="menu-item" id="shareBtn" role="menuitem">Share</button>
     </div>
@@ -176,27 +172,6 @@
       <div id="weatherBox"></div>
     </section>
   </main>
-
-  <div class="modal-backdrop" id="groupModal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="groupTitle">
-      <div class="modal-header">
-        <div>
-          <div class="modal-title" id="groupTitle">Group mode</div>
-          <div class="small" id="groupSubtitle">—</div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn" id="groupShareBtn" type="button">Share</button>
-          <button class="btn ghost" id="groupCloseBtn" type="button">Close</button>
-        </div>
-      </div>
-      <div class="modal-body">
-        <div class="countdown-big" id="groupCountdown">—</div>
-        <div class="countdown-sub" id="groupNext">—</div>
-        <div class="pills-row" id="groupPills"></div>
-        <div class="small tip">Tip: add this app to your home screen for an app-like experience.</div>
-      </div>
-    </div>
-  </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 

@@ -1,7 +1,6 @@
 // Bristol Airport — flights list page.
 // - Timetable comes from the Cloudflare worker (AeroDataBox): departures / arrivals
 // - Saved (starred) flights stored in localStorage
-// - Install button (optional) + security wait samples
 "use strict";
 
 const T = window.BrsTime;
@@ -550,15 +549,24 @@ function initOverflowMenu(){
   const btn = document.getElementById("overflowBtn");
   const menu = document.getElementById("overflowMenu");
   if (!btn || !menu) return;
-  function close(){ menu.classList.remove("open"); btn.setAttribute("aria-expanded","false"); }
+  function close(returnFocus){
+    const wasOpen = menu.classList.contains("open");
+    menu.classList.remove("open");
+    btn.setAttribute("aria-expanded","false");
+    if (returnFocus && wasOpen) btn.focus();
+  }
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     const open = !menu.classList.contains("open");
     menu.classList.toggle("open", open);
     btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) menu.querySelector(".menu-item")?.focus();
   });
-  document.addEventListener("click", close);
-  window.addEventListener("resize", close);
+  // Close after choosing an item, on outside click, on resize and on Escape.
+  menu.addEventListener("click", (e) => { if (e.target.closest(".menu-item")) close(false); });
+  document.addEventListener("click", () => close(false));
+  window.addEventListener("resize", () => close(false));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(true); });
 }
 
 // =======================
@@ -702,91 +710,6 @@ function startAutoRefresh(){
 }
 
 // =======================
-// Install prompt (optional, no console warning)
-// =======================
-function initInstall(){
-  const btn = document.getElementById("installBtn");
-  if (!btn) return;
-
-  // We intentionally do NOT call preventDefault() to avoid Chrome's console warning.
-  // This means the browser controls when/if the native install prompt is shown.
-  btn.style.display = "none";
-}
-
-// =======================
-// Security wait samples (local-only)
-// =======================
-function getSecuritySamples(){
-  const raw = safeGetLocal("brs_security_samples");
-  if (!raw) return [];
-  try { const x = JSON.parse(raw); return Array.isArray(x) ? x : []; } catch { return []; }
-}
-function addSecuritySample(minutes){
-  const list = getSecuritySamples();
-  list.unshift({ minutes: Number(minutes), when: new Date().toISOString() });
-  safeSetLocal("brs_security_samples", JSON.stringify(list.slice(0, 60)));
-}
-function computeSecurityEstimate(){
-  const list = getSecuritySamples();
-  if (!list.length) return null;
-  const cutoff = Date.now() - 14*24*60*60*1000;
-  const recent = list.filter(s => Date.parse(s.when) >= cutoff);
-  const use = recent.length >= 3 ? recent : list;
-  const avg = use.reduce((a,b)=>a+b.minutes,0)/use.length;
-  return Math.round(avg);
-}
-function renderSecurityPanel(forceOpen){
-  const panel = document.getElementById("securityPanel");
-  if (!panel) return;
-  const est = computeSecurityEstimate();
-  const last = getSecuritySamples()[0];
-
-  panel.innerHTML = `
-    <div class="panel-head">
-      <div class="panel-title">Security wait (local samples)</div>
-      <button class="icon-btn" id="secCloseBtn" aria-label="Close security">×</button>
-    </div>
-    <div style="height:10px"></div>
-    <div style="display:grid; gap:10px;">
-      <div style="padding:12px; border-radius:16px; border:1px solid var(--stroke); background: var(--surface2);">
-        <div class="small">Typical</div>
-        <div style="font-family: var(--mono); font-weight: 950; font-size: 22px; margin-top: 4px;">
-          ${est !== null ? `${est} min` : "—"}
-        </div>
-        <div class="small" style="margin-top:4px;">
-          ${last ? `Last report: ${new Date(last.when).toLocaleString()} (${last.minutes} min)` : "No reports yet — be the first."}
-        </div>
-      </div>
-
-      <div style="padding:12px; border-radius:16px; border:1px solid var(--stroke); background: var(--surface2);">
-        <div class="small">Report your wait</div>
-        <div style="display:flex; gap:10px; margin-top:8px;">
-          <input id="secMinutes" type="number" min="0" max="120" placeholder="Minutes"
-            style="flex:1; border-radius:14px; border:1px solid var(--stroke); background: transparent; color: var(--text); padding: 12px; font-size: 15px;" />
-          <button class="icon-btn" id="secSubmitBtn" type="button" aria-label="Submit wait">✓</button>
-        </div>
-        <div class="small" style="margin-top:6px;">Stored on your device only. No account.</div>
-      </div>
-    </div>
-  `.trim();
-
-  panel.style.display = forceOpen ? "" : panel.style.display;
-
-  panel.querySelector("#secCloseBtn")?.addEventListener("click", () => panel.style.display = "none");
-  panel.querySelector("#secSubmitBtn")?.addEventListener("click", () => {
-    const v = Number(panel.querySelector("#secMinutes")?.value);
-    if (Number.isFinite(v) && v >= 0 && v <= 120){
-      addSecuritySample(v);
-      toast("Thanks — updated");
-      renderSecurityPanel(true);
-    }
-  });
-}
-function initSecurityUI(){
-  document.getElementById("securityBtn")?.addEventListener("click", () => renderSecurityPanel(true));
-}
-
-// =======================
 // Init
 // =======================
 (function init(){
@@ -804,8 +727,6 @@ function initSecurityUI(){
   initOverflowMenu();
   initSearch();
   initSavedUI();
-  initInstall();
-  initSecurityUI();
 
   window.addEventListener("offline", () => showError("You appear to be offline. Showing cached results if available.", {retry:false}));
   window.addEventListener("online", () => { hideError(); refreshAll(); });

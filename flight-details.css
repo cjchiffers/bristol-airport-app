@@ -655,59 +655,6 @@ details.raw pre{
   margin: 6px 6px;
 }
 
-/* Group modal */
-.modal-backdrop{
-  position: fixed;
-  inset: 0;
-  display:none;
-  align-items: flex-end;
-  justify-content:center;
-  background: rgba(0,0,0,.55);
-  z-index: 60;
-  padding: 12px;
-}
-.modal-backdrop.open{ display:flex; }
-.modal-backdrop.show{ display:flex; }
-.modal{
-  width: min(640px, 100%);
-  border-radius: 22px;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(16, 20, 34, .94);
-  backdrop-filter: blur(16px);
-  box-shadow: var(--shadow);
-  overflow:hidden;
-}
-.modal-header{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap: 12px;
-  padding: 14px;
-  border-bottom: 1px solid rgba(255,255,255,.10);
-}
-.modal-title{
-  font-weight: 950;
-  letter-spacing: .2px;
-}
-.modal-actions{ display:flex; gap:8px; }
-.modal-body{ padding: 14px; }
-.countdown-big{
-  font-size: 44px;
-  font-weight: 950;
-  letter-spacing: 0;
-}
-.countdown-sub{ color: var(--muted); margin-top: 2px; }
-.pills-row{ display:flex; flex-wrap:wrap; gap: 8px; margin-top: 12px; }
-.pills-row .pill{
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.08);
-  padding: 8px 10px;
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: 12px;
-}
-.tip{ margin-top: 12px; color: var(--muted); }
-
 /* Buttons (match redesign) */
 .btn{
   border: 1px solid rgba(255,255,255,.14);
@@ -981,27 +928,6 @@ body.leaflet-on #routeSvg{ display:none; }
 
 /* Hide legacy meta line (last updated/source/status) */
 #metaLine,.meta-line,.flight-meta,.status-line,.source-line{display:none!important;}
-
-/* Pull-to-refresh indicator */
-.ptr-indicator{
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 10px;
-  z-index: 9999;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(20,20,20,0.75);
-  color: #fff;
-  font-size: 13px;
-  line-height: 1;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .15s ease, transform .15s ease;
-}
-.ptr-indicator.show{opacity:1;}
-.ptr-indicator.pull{transform: translateX(-50%) translateY(10px);}
-
 
 /* --- App-like flight status card (dep/arr) --- */
 .sb-card .sb-grid{

@@ -309,11 +309,89 @@
     return r;
   }
 
+  // ---------- Calendar (.ics) ----------
+  const ICS_EOL = "\r\n";
+
+  function icsEscape(text){
+    return String(text == null ? "" : text)
+      .replace(/\\/g, "\\\\")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,")
+      .replace(/\r?\n/g, "\\n");
+  }
+
+  // Lines longer than 75 octets are folded: CRLF + one space.
+  function icsFold(line){
+    const enc = new TextEncoder();
+    if (enc.encode(line).length <= 75) return line;
+    const parts = [];
+    let cur = "";
+    for (const ch of Array.from(line)) {
+      const limit = parts.length === 0 ? 75 : 74;   // continuation lines lose one octet to the leading space
+      if (enc.encode(cur + ch).length > limit) { parts.push(cur); cur = ch; } else { cur += ch; }
+    }
+    parts.push(cur);
+    return parts.join(ICS_EOL + " ");
+  }
+
+  function icsUtc(d){
+    return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  }
+
+  /** A one-event calendar file for the Bristol side of the flight (departure or arrival time). */
+  function buildIcs(f, mode, url){
+    const dep = isDep(mode);
+    const no = flightNo(f) || "Flight";
+    const start = keyTime(f, mode) || scheduledTime(f, mode);
+    if (!start) return "";
+    const end = new Date(start.getTime() + 30 * 60000);
+    const place = cityOf(otherSeg(f, mode).iataCode);
+    const sched = T.fmtTime(seg(f, mode).scheduledTime);
+    const route = dep ? `Bristol → ${place}` : `${place} → Bristol`;
+    const info = statusInfo(f, mode);
+    const route2 = routeOf(f, mode);
+
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Bristol Airport Flights//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      `UID:${route2.type}-${route2.flight.replace(/\s+/g, "")}-${route2.date}@flightapp.chiffers.com`,
+      `DTSTAMP:${icsUtc(new Date())}`,
+      `DTSTART:${icsUtc(start)}`,
+      `DTEND:${icsUtc(end)}`,
+      `SUMMARY:${icsEscape(`${no} ${route}`)}`,
+      `LOCATION:${icsEscape("Bristol Airport (BRS)")}`,
+      `DESCRIPTION:${icsEscape(`${shareText(f, mode)}\nStatus: ${info.text}${sched ? `\nScheduled: ${sched}` : ""}${url ? `\n${url}` : ""}`)}`,
+    ];
+    if (url) lines.push(`URL:${url}`);
+    lines.push("END:VEVENT", "END:VCALENDAR");
+    return lines.map(icsFold).join(ICS_EOL) + ICS_EOL;
+  }
+
+  /** Download the .ics (iOS/Android offer to add it to the calendar). Returns false if the flight has no time. */
+  function downloadIcs(f, mode, url){
+    const ics = buildIcs(f, mode, url);
+    if (!ics) return false;
+    const r = routeOf(f, mode);
+    const a = document.createElement("a");
+    const href = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    a.href = href;
+    a.download = `${r.flight.replace(/\s+/g, "")}-${r.date}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 5000);
+    return true;
+  }
+
   window.BrsFlights = {
     isDep, normMode, flightNo, normFlightNo, sameFlightNo,
     seg, otherSeg, scheduledTime, keyTime, delayMin, statusInfo,
     dedupe, dateKey, routeOf, urlFor, detailsUrl,
     cacheKey, saveCached, loadCached, prepareDetails,
-    shareText, shareLink, shareFlight,
+    shareText, shareLink, shareFlight, buildIcs, downloadIcs,
   };
 })();
