@@ -3,15 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
   <title>Bristol Airport — Flights</title>
   <!-- Preconnect to external domains for faster loading -->
   <link rel="preconnect" href="https://flightapp-workers.chiffers.com">
-  <link rel="dns-prefetch" href="https://geocoding-api.open-meteo.com">
-  <link rel="dns-prefetch" href="https://api.open-meteo.com">
+  <meta name="description" content="Live departures and arrivals at Bristol Airport (BRS)." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Bristol Airport Flights" />
+  <meta property="og:title" content="Bristol Airport Flights" />
+  <meta property="og:description" content="Live departures and arrivals at Bristol Airport (BRS)." />
+  <meta property="og:image" content="https://flightapp.chiffers.com/assets/icon-512.png" />
+  <meta name="twitter:card" content="summary" />
   <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#F5F7FB" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#070B14" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" type="image/png" href="assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 
@@ -30,9 +36,6 @@
     </button>
 
     <div class="menu" id="overflowMenu" role="menu" aria-label="More menu">
-      <button class="menu-item" id="savedBtn" role="menuitem">Saved flights</button>
-      <button class="menu-item" id="securityBtn" role="menuitem">Security wait</button>
-      <button class="menu-item" id="installBtn" role="menuitem" style="display:none;">Install app</button>
       <button class="menu-item" id="refreshBtn" role="menuitem">Refresh</button>
     </div>
   </header>
@@ -40,8 +43,8 @@
   <main class="app">
     <section class="search">
       <div class="segmented" role="tablist" aria-label="Departures and arrivals">
-        <button class="seg-btn active" data-tab="departures" type="button" role="tab" aria-selected="true">Departures</button>
-        <button class="seg-btn" data-tab="arrivals" type="button" role="tab" aria-selected="false">Arrivals</button>
+        <button class="seg-btn active" id="seg-departures" data-tab="departures" type="button" role="tab" aria-selected="true" aria-controls="tab-departures" tabindex="0">Departures</button>
+        <button class="seg-btn" id="seg-arrivals" data-tab="arrivals" type="button" role="tab" aria-selected="false" aria-controls="tab-arrivals" tabindex="-1">Arrivals</button>
       </div>
 
       <label class="searchbox" aria-label="Search flights">
@@ -55,7 +58,7 @@
         <button class="chip-btn active" data-filter="all" type="button">All</button>
         <button class="chip-btn" data-filter="next" type="button">Next 4h</button>
         <button class="chip-btn" data-filter="delayed" type="button">Delayed</button>
-        <button class="chip-btn" data-filter="gate" type="button">Gate</button>
+        <button class="chip-btn" data-filter="cancelled" type="button">Cancelled</button>
       </div>
 
       <div class="meta-row">
@@ -64,24 +67,21 @@
       </div>
     </section>
 
-    <section class="panel" id="savedDrawer" style="display:none;">
+    <section class="panel my-flights" id="myFlights" aria-label="My flights" hidden>
       <div class="panel-head">
-        <div class="panel-title">Saved flights</div>
-        <button class="icon-btn" id="savedCloseBtn" aria-label="Close saved">×</button>
+        <div class="panel-title">My flights</div>
+        <div class="small">Saved on this device</div>
       </div>
-      <div class="savedBar" id="savedBar"></div>
-      <div class="panel-hint">Tip: tap a saved flight to open details. Stored on this device.</div>
+      <div class="flight-list" id="myFlightsList"></div>
     </section>
 
-    <section class="panel" id="securityPanel" style="display:none;"></section>
-
     <section class="list-wrap">
-      <div class="tab-panel active" id="tab-departures">
+      <div class="tab-panel active" id="tab-departures" role="tabpanel" aria-labelledby="seg-departures">
         <div class="list-head">
           <h2>Departures</h2>
-          <div class="small">Tap a flight for details</div>
+          <div class="small">Select a flight for details</div>
         </div>
-        <div class="flight-list" id="departureList" aria-live="polite"></div>
+        <div class="flight-list" id="departureList"></div>
         <div class="empty" id="depEmpty" style="display:none;">
           <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -93,12 +93,12 @@
         </div>
       </div>
 
-      <div class="tab-panel" id="tab-arrivals">
+      <div class="tab-panel" id="tab-arrivals" role="tabpanel" aria-labelledby="seg-arrivals">
         <div class="list-head">
           <h2>Arrivals</h2>
-          <div class="small">Tap a flight for details</div>
+          <div class="small">Select a flight for details</div>
         </div>
-        <div class="flight-list" id="arrivalList" aria-live="polite"></div>
+        <div class="flight-list" id="arrivalList"></div>
         <div class="empty" id="arrEmpty" style="display:none;">
           <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -114,8 +114,12 @@
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </main>
 
+  <script src="shared/utils.js"></script>
+  <script src="shared/config.js"></script>
+  <script src="shared/time.js"></script>
   <script src="shared/airports.js"></script>
   <script src="shared/airlines.js"></script>
+  <script src="shared/flights.js"></script>
   <script src="script.js"></script>
   <script>
     // Service workers (and sometimes manifests) will error when opened via file://.

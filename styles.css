@@ -15,6 +15,8 @@
   --shadow: 0 12px 34px rgba(0,0,0,.45);
   --radius: 18px;
   --radius2: 14px;
+  --maxw: 720px;   /* content width; wider on desktop (see media query at the bottom) */
+  --gutter: max(14px, calc((100% - var(--maxw)) / 2 + 14px));
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
 }
 
@@ -31,12 +33,7 @@
 }
 
 *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
-html, body{ height:100%; }
-
-/* iOS Safari viewport fix */
-:root {
-  --vh: 1vh;
-}
+html{ height:100%; }
 
 @supports (-webkit-touch-callout: none) {
   body {
@@ -47,11 +44,22 @@ html, body{ height:100%; }
 body{
   margin:0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100%;
   color: var(--text);
+  background: var(--bg);
+}
+
+/* The soft glow lives on a fixed layer behind the page, so it never tiles or scrolls away
+   (a gradient on the body repeats every screen-height once the page is taller than the screen). */
+body::before{
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background:
     radial-gradient(1000px 600px at 12% 0%, rgba(98,178,255,.22), transparent 55%),
-    radial-gradient(900px 600px at 95% 10%, rgba(56,211,159,.12), transparent 55%),
-    var(--bg);
+    radial-gradient(900px 600px at 95% 10%, rgba(56,211,159,.12), transparent 55%);
 }
 
 h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
@@ -64,7 +72,7 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding: max(12px, env(safe-area-inset-top)) 14px 12px 14px;
+  padding: max(12px, env(safe-area-inset-top)) var(--gutter) 12px var(--gutter);
   background: color-mix(in srgb, var(--bg) 74%, transparent);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--stroke);
@@ -85,7 +93,7 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
 .app{
   padding: 14px;
   padding-bottom: max(18px, env(safe-area-inset-bottom));
-  max-width: 720px;
+  max-width: var(--maxw);
   margin: 0 auto;
 }
 
@@ -108,7 +116,7 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
 .menu{
   position:absolute;
   top: 64px;
-  right: 14px;
+  right: var(--gutter);
   width: 210px;
   padding: 8px;
   border-radius: 16px;
@@ -179,8 +187,13 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   background: color-mix(in srgb, var(--surface2) 70%, transparent);
 }
 .searchicon{ opacity:.85; font-size: 16px; }
+.searchbox:focus-within{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .searchbox input{
   flex:1;
+  min-width: 0;
   border:0;
   outline: none;
   background: transparent;
@@ -244,32 +257,20 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
 .panel-title{ font-weight: 900; }
 .panel-hint{ margin-top: 8px; font-size: 12px; color: var(--muted); }
 
-.savedBar{
-  margin-top: 10px;
-  display:flex;
-  flex-wrap:wrap;
-  gap: 8px;
-}
-.chip{
-  display:flex;
-  gap: 8px;
-  align-items:center;
-  padding: 10px 12px;
-  border-radius: 999px;
+.my-flights[hidden]{ display:none; }
+.my-flights .flight-list{ margin-top: 10px; }
+.fc-note{ margin-top: 6px; font-size: 12px; color: var(--muted); }
+.share-btn{
   border: 1px solid var(--stroke);
-  background: color-mix(in srgb, var(--surface2) 70%, transparent);
-  font-weight: 800;
-  font-size: 12px;
+  background: transparent;
+  color: var(--text);
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  font-size: 18px;
   cursor:pointer;
 }
-.chip .x{
-  width: 22px; height: 22px;
-  display:grid; place-items:center;
-  border-radius: 999px;
-  border: 1px solid var(--stroke);
-  color: var(--muted);
-}
-.chip:active{ transform: translateY(1px); }
+.share-btn:active{ transform: translateY(1px); }
 
 .list-wrap{ margin-top: 12px; }
 .list-head{
@@ -313,6 +314,16 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   font-weight: 950;
   font-size: 18px;
   font-family: var(--mono);
+}
+.time-wrap{ display:flex; align-items:baseline; gap:8px; }
+.time.is-late{ color: var(--warn); }
+.time.is-early{ color: var(--good); }
+.time-old{
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: line-through;
 }
 .route{
   margin-top: 8px;
@@ -482,37 +493,12 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   transform: translateX(-50%) translateY(-4px);
 }
 
-/* Reuse existing flight-details styling */
-.app-header, header.app-header, .container, .card, .btn, .badge, .grid, .kpis, .kv, .callout, .modal-backdrop, .modal,
-.section-title, .hero, .aircraft-image, .map-wrap, details.raw, pre#rawJson, .row, input#secMinutes {}
-
-/* A tiny improvement for flight-details: make its header actions wrap better on mobile */
-@media (max-width: 520px){
-  header.app-header .header-actions{ gap: 8px; }
-  header.app-header .btn{ padding: 10px 10px; }
-}
-
-/* Mobile friendly fonts */
-body {
-    font-family: Arial, sans-serif;
-    font-size: 16px;
-}
-
-h1, h2, h3, h4 {
-    font-family: 'Helvetica Neue', Helvetica, sans-serif;
-}
-
-/* Add responsiveness for smaller screens */
-@media (max-width: 768px) {
-    body {
-        font-size: 14px;
-    }
+body{ font-size: 16px; }
+@media (max-width: 768px){
+  body{ font-size: 14px; }
 }
 
 .day-sep{margin:12px 0 6px; padding:6px 10px; font-weight:700; opacity:.8;}
-
-.star-btn{border:none;background:transparent;font-size:18px;cursor:pointer;opacity:.7}
-.star-btn.is-on{opacity:1}
 
 @media (max-width: 420px){
   .flight-card{
@@ -521,14 +507,69 @@ h1, h2, h3, h4 {
   .fc-bottom{
     align-items:flex-start;
   }
-  .status{
-    max-width: 112px;
-    overflow:hidden;
-    text-overflow: ellipsis;
-  }
   .save-btn{
     width: 38px;
     height: 38px;
     border-radius: 12px;
+  }
+}
+
+/* ---------- Accessibility helpers ---------- */
+.sr-only{
+  position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
+:focus-visible{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fc-link{ display:block; color:inherit; text-decoration:none; border-radius: 10px; }
+.fc-link:focus-visible{ outline-offset: 4px; }
+.flight-card:focus-within{ border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
+
+@media (hover: hover){
+  .flight-card:hover{ border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
+  .chip-btn:hover, .seg-btn:hover{ color: var(--text); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Desktop: Departures and Arrivals side by side ---------- */
+@media (min-width: 1024px){
+  :root{ --maxw: 1200px; }
+
+  .segmented{ display:none; }
+
+  .search{
+    display:grid;
+    grid-template-columns: minmax(280px, 1fr) auto;
+    gap: 10px 18px;
+    align-items:center;
+  }
+  .search .searchbox, .search .chips-row{ margin-top: 0; }
+  .search .meta-row{ grid-column: 1 / -1; margin-top: 0; }
+
+  .list-wrap{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items:start;
+  }
+  .tab-panel{ display:block; }
+  .tab-panel .flight-list{
+    max-height: max(420px, calc(100vh - 290px));
+    overflow-y:auto;
+    padding: 2px 6px 2px 2px;
+  }
+
+  .my-flights .flight-list{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   }
 }

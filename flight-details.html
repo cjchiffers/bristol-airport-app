@@ -4,18 +4,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
   <title>Flight Details</title>
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Bristol Airport Flights" />
+  <meta property="og:title" content="Bristol Airport Flights" />
+  <meta property="og:description" content="Live flight status at Bristol Airport (BRS)." />
+  <meta property="og:image" content="https://flightapp.chiffers.com/assets/icon-512.png" />
+  <meta name="twitter:card" content="summary" />
   <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#F5F7FB" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#070B14" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" type="image/png" href="assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="flight-details.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 
 <body class="details-page">
-  <div id="ptrIndicator" class="ptr-indicator" aria-hidden="true"><span id="ptrText">Pull down to refresh</span></div>
   <header class="topbar details-topbar">
     <button class="icon-btn" id="backBtn" aria-label="Back">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 19.5 8 12l7.5-7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -26,17 +32,20 @@
       <div class="details-subhead" id="subhead">—</div>
     </div>
 
-    <button class="icon-btn" id="overflowDetailsBtn" aria-haspopup="menu" aria-expanded="false" aria-label="More">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.2a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z" fill="currentColor"/></svg>
-    </button>
+    <div class="details-actions">
+      <button class="icon-btn" id="shareIconBtn" aria-label="Share this flight" title="Share">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4M6 12v6.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <button class="icon-btn" id="overflowDetailsBtn" aria-haspopup="menu" aria-expanded="false" aria-label="More">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.2a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Zm0 6.9a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z" fill="currentColor"/></svg>
+      </button>
+    </div>
 
     <div class="menu" id="detailsMenu" role="menu" aria-label="Flight actions">
       <button class="menu-item" id="refreshBtn" role="menuitem">Refresh</button>
       <button class="menu-item" id="autoBtn" role="menuitemcheckbox" aria-checked="true">Auto-refresh: On</button>
-      <button class="menu-item" id="compactBtn" role="menuitem">Focus mode</button>
-      <button class="menu-item" id="groupBtn" role="menuitem">Group mode</button>
       <div class="menu-sep" role="separator"></div>
-      <button class="menu-item" id="notifyBtn" role="menuitem">Notify me</button>
       <button class="menu-item" id="calendarBtn" role="menuitem">Add to calendar</button>
       <button class="menu-item" id="shareBtn" role="menuitem">Share</button>
     </div>
@@ -44,9 +53,20 @@
 
   <main class="container details-container">
     <div id="netBanner" class="net-banner" style="display:none" role="status" aria-live="polite"></div>
-    <div id="statusBanner" class="status-banner" style="display:none" role="status" aria-live="polite"></div>
+    <div class="updated-line small" id="updatedLine" role="status" aria-live="polite"></div>
 
-    <!-- New Hero Card Section -->
+    <section class="card notfound-card" id="notFound" hidden>
+      <h2 id="notFoundTitle">Flight not found</h2>
+      <p id="notFoundMsg"></p>
+      <div class="notfound-actions">
+        <button class="btn" id="notFoundRetry" type="button">Try again</button>
+        <a class="btn ghost" href="index.html">See all flights</a>
+      </div>
+    </section>
+
+    <div class="details-grid">
+    <div class="details-col">
+    <!-- Hero card -->
     <section class="hero-card" id="heroCard" aria-label="Flight overview">
       <div class="hero-card-header">
   <div class="hero-header-left">
@@ -59,6 +79,15 @@
     <div class="hero-flight-number" id="heroFlightNumber">—</div>
   </div>
 </div>
+
+      <div class="hero-countdown" id="heroCountdown">
+        <svg class="hero-countdown-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" opacity="0.3"/>
+          <path d="M12 6v6l4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span id="heroCountdownText">—</span>
+      </div>
+      <div class="hero-hint small" id="heroHint" style="display:none"></div>
 
       <div class="hero-times-grid">
         <div class="hero-time-block">
@@ -83,49 +112,16 @@
       </div>
 
       <div class="hero-info-grid" id="heroInfoGrid">
-        <div class="hero-info-item">
+        <div class="hero-info-item" id="heroGateItem">
           <div class="hero-info-label">Gate</div>
           <div class="hero-info-value pill-gate" id="heroGate">—</div>
         </div>
-        <div class="hero-info-item">
+        <div class="hero-info-item" id="heroBeltItem">
           <div class="hero-info-label">Belt</div>
           <div class="hero-info-value pill-belt" id="heroBaggage">—</div>
         </div>
       </div>
-
-      <div class="hero-countdown" id="heroCountdown">
-        <svg class="hero-countdown-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" opacity="0.3"/>
-          <path d="M12 6v6l4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <span id="heroCountdownText">—</span>
-      </div>
     </section>
-<!-- Flight time hero (original - kept for compatibility) -->
-    <section class="flight-hero" id="flightHero" aria-label="Departure and arrival times" style="display:none">
-      <div class="flight-hero-col">
-        <div class="fh-date" id="depDate">—</div>
-        <div class="fh-airport" id="depAirport">—</div>
-        <div class="fh-time">
-          <span class="fh-time-main" id="depTimeActual">—</span>
-          <span class="fh-time-old" id="depTimeSched"></span>
-        </div>
-        <div class="fh-delay fh-delay-warn" id="depDelay" hidden></div>
-      </div>
-
-      <div class="flight-hero-arrow" aria-hidden="true">→</div>
-
-      <div class="flight-hero-col">
-        <div class="fh-date" id="arrDate">—</div>
-        <div class="fh-airport" id="arrAirport">—</div>
-        <div class="fh-time">
-          <span class="fh-time-main" id="arrTimeActual">—</span>
-          <span class="fh-time-old" id="arrTimeSched"></span>
-        </div>
-        <div class="fh-delay fh-delay-warn" id="arrDelay" hidden></div>
-      </div>
-    </section>
-
     <section class="card details-card details-summary-card" aria-label="Flight essentials">
       <div id="opsBar" class="ops-bar" style="display:none"></div>
       <div id="kpis" class="kpis" aria-label="Flight metrics"></div>
@@ -163,6 +159,8 @@
       </div>
     </section>
 
+    </div>
+    <div class="details-col">
     <section class="card details-card">
       <div class="card-h">
         <div class="h-title">Route</div>
@@ -176,37 +174,24 @@
 
     <section class="card details-card">
       <div class="card-h">
-        <div class="h-title">Weather</div>
+        <div class="h-title" id="wxTitle">Weather</div>
         <div class="h-sub small" id="wxHint">—</div>
       </div>
       <div id="weatherBox"></div>
     </section>
+    </div>
+    </div>
   </main>
 
-  <div class="modal-backdrop" id="groupModal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="groupTitle">
-      <div class="modal-header">
-        <div>
-          <div class="modal-title" id="groupTitle">Group mode</div>
-          <div class="small" id="groupSubtitle">—</div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn" id="groupShareBtn" type="button">Share</button>
-          <button class="btn ghost" id="groupCloseBtn" type="button">Close</button>
-        </div>
-      </div>
-      <div class="modal-body">
-        <div class="countdown-big" id="groupCountdown">—</div>
-        <div class="countdown-sub" id="groupNext">—</div>
-        <div class="pills-row" id="groupPills"></div>
-        <div class="small tip">Tip: add this app to your home screen for an app-like experience.</div>
-      </div>
-    </div>
-  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="shared/airports.js"></script>
+  <script src="shared/utils.js"></script>
+  <script src="shared/config.js"></script>
+  <script src="shared/time.js"></script>
+  <script src="shared/airports.js"></script>
   <script src="shared/airlines.js"></script>
+  <script src="shared/flights.js"></script>
   <script src="flight-details.js"></script>
 
 </body>
