@@ -1,5 +1,5 @@
 // Bump this when you change any app-shell file so users receive updates immediately.
-const CACHE_NAME = "brs-flights-2026-10-02-07";
+const CACHE_NAME = "brs-flights-2026-10-03-01";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -17,7 +17,8 @@ const APP_SHELL = [
   "./shared/time.js",
   "./shared/airports.js",
   "./shared/airlines.js",
-  "./shared/flights.js"
+  "./shared/flights.js",
+  "./shared/aircraft.js"
 ];
 
 self.addEventListener("install", (event) => {

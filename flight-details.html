@@ -145,6 +145,8 @@
         </div>
       </div>
 
+      <div class="aircraft-art" id="aircraftArt" role="img" aria-label="Aircraft illustration" hidden></div>
+
       <div class="aircraft-row">
         <div>
           <div class="aircraft-type" id="aircraftType">—</div>
@@ -159,6 +161,14 @@
       </div>
     </section>
 
+
+    <details class="card details-card history-card" id="historyCard">
+      <summary>
+        <span class="h-title">Recent history</span>
+        <span class="h-sub small">This flight over the last 7 days</span>
+      </summary>
+      <div class="history-body" id="historyBody" aria-live="polite"></div>
+    </details>
     </div>
     <div class="details-col">
     <section class="card details-card">
@@ -192,6 +202,7 @@
   <script src="shared/airports.js"></script>
   <script src="shared/airlines.js"></script>
   <script src="shared/flights.js"></script>
+  <script src="shared/aircraft.js"></script>
   <script src="flight-details.js"></script>
 
 </body>

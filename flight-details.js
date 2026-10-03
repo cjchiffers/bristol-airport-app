@@ -153,6 +153,9 @@
     airlineLogo: document.getElementById("airlineLogo"),
     airlineName: document.getElementById("airlineName"),
     airlineCodeLine: document.getElementById("airlineCodeLine"),
+    aircraftArt: document.getElementById("aircraftArt"),
+    historyCard: document.getElementById("historyCard"),
+    historyBody: document.getElementById("historyBody"),
     aircraftType: document.getElementById("aircraftType"),
     aircraftReg: document.getElementById("aircraftReg"),
     aircraftImageWrap: document.getElementById("aircraftImageWrap"),
@@ -201,6 +204,8 @@
     intervalMs: 60000,
     timer: null,
     countdownTimer: null,
+    aircraftKind: null,
+    history: { loaded: false, loading: false },
     lastOkAt: 0,
     updatedText: "",
 
@@ -752,6 +757,17 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     if (els.aircraftType) {
       els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
     }
+    // Generic side-view illustration chosen from the model name (not a photo of the actual aircraft)
+    if (els.aircraftArt && window.BrsAircraft) {
+      const kind = window.BrsAircraft.kindFor(acText);
+      if (kind !== state.aircraftKind) {
+        state.aircraftKind = kind;
+        els.aircraftArt.innerHTML = window.BrsAircraft.svg(kind);
+        els.aircraftArt.setAttribute("aria-label", `Illustration of a ${window.BrsAircraft.label(kind)}${acText ? ` (${acText})` : ""}`);
+        els.aircraftArt.hidden = false;
+      }
+    }
+
     const reg = pickAny(flat, ["aircraft.regNumber", "flight.aircraft.registration", "aircraft.registration", "registration"]) || "";
     if (els.aircraftReg) {
   els.aircraftReg.textContent = reg
@@ -1125,6 +1141,87 @@ if (els.arrKv) {
       <div class="kpi-chip"><span class="kpi-k">CO₂e</span><span class="kpi-v" title="Rough estimate per passenger">${escapeHtml(fmtKg(co2))}</span></div>
       <div class="kpi-chip"><span class="kpi-k">Delay</span><span class="kpi-v">${escapeHtml(delayLabel)}</span></div>
     `;
+  }
+
+// ---------- Recent history (last 7 days of this flight at Bristol) ----------
+  // Loaded only when the section is opened: the worker uses a pricier upstream endpoint and caches it.
+  function fmtDelta(delay, status) {
+    if (status === "cancelled") return { text: "Cancelled", tone: "bad" };
+    const n = Number(delay);
+    if (delay === "" || delay == null || !Number.isFinite(n)) return { text: "—", tone: "neutral" };
+    if (n === 0) return { text: "On time", tone: "good" };
+    if (n < 0) return { text: `${Math.abs(n)} min early`, tone: "good" };
+    return { text: `+${n} min`, tone: n > 15 ? "warn" : (n <= 5 ? "good" : "neutral") };
+  }
+
+  function renderHistory(data) {
+    const T = window.BrsTime;
+    const body = els.historyBody;
+    const rows = (data && Array.isArray(data.rows)) ? data.rows : [];
+    const arrival = state.route && state.route.type === "arrival";
+
+    if (!rows.length) {
+      body.innerHTML = `<p class="small">No recent history found for this flight.</p>`;
+      return;
+    }
+
+    const st = data.stats || {};
+    const parts = [];
+    if (st.avgDelay !== null && st.avgDelay !== undefined) {
+      const a = st.avgDelay;
+      parts.push(`Average ${a === 0 ? "on time" : a > 0 ? `${a} min late` : `${Math.abs(a)} min early`}`);
+      parts.push(`${st.onTime} of ${st.measured} within 15 min`);
+    }
+    if (st.cancelled) parts.push(`${st.cancelled} cancelled`);
+
+    const trs = rows.map((r) => {
+      const d = fmtDelta(r.delay, r.status);
+      const sched = T.fmtTime(r.scheduled) || "—";
+      const actual = r.status === "cancelled" ? "—" : (T.fmtTime(r.actual) || "—");
+      return `<tr>
+        <td>${escapeHtml(T.fmtDay(r.scheduled) || r.date || "—")}</td>
+        <td>${escapeHtml(sched)}</td>
+        <td>${escapeHtml(actual)}</td>
+        <td class="num"><span class="hist-chip ${d.tone}">${escapeHtml(d.text)}</span></td>
+      </tr>`;
+    }).join("");
+
+    body.innerHTML = `
+      ${parts.length ? `<p class="history-summary">${escapeHtml(parts.join(" · "))}</p>` : ""}
+      <table class="history-table">
+        <caption class="sr-only">Scheduled and actual ${arrival ? "arrival" : "departure"} times at Bristol, most recent first</caption>
+        <thead><tr><th scope="col">Date</th><th scope="col">Scheduled</th><th scope="col">${arrival ? "Landed" : "Departed"}</th><th scope="col" class="num">Difference</th></tr></thead>
+        <tbody>${trs}</tbody>
+      </table>
+      <p class="small history-note">UK times. Differences within 15 minutes count as on time.</p>`;
+  }
+
+  async function loadHistory() {
+    const h = state.history;
+    if (!state.route || h.loading || h.loaded || !els.historyBody) return;
+    h.loading = true;
+    els.historyBody.textContent = "Loading…";
+    try {
+      const url = new URL(`${window.BrsConfig.API_BASE}/history`);
+      url.searchParams.set("flight_iata", state.route.flight);
+      url.searchParams.set(state.route.type === "departure" ? "dep_iata" : "arr_iata", window.BrsConfig.AIRPORT);
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`History HTTP ${res.status}`);
+      renderHistory(await res.json());
+      h.loaded = true;
+    } catch (e) {
+      console.warn("History unavailable:", e);
+      els.historyBody.innerHTML = `
+        <p class="small">Flight history isn’t available right now.</p>
+        <button class="btn history-retry" id="historyRetry" type="button">Try again</button>`;
+      document.getElementById("historyRetry")?.addEventListener("click", loadHistory);
+    } finally {
+      h.loading = false;
+    }
+  }
+
+  if (els.historyCard) {
+    els.historyCard.addEventListener("toggle", () => { if (els.historyCard.open) loadHistory(); });
   }
 
 // ---------- Weather (5-day one-card + icons + local time + extras) ----------
