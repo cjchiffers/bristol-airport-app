@@ -1567,42 +1567,51 @@ if (els.arrKv) {
 
     L.control.zoom({ position: "bottomright" }).addTo(state.map);
 
-    state.tileLight = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      subdomains: "abc",
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
-    });
+    // Map tiles come from our worker (/api/tiles/...), which adds the CARTO API key server-side so the
+    // key never reaches the browser. If the worker can't serve tiles (not deployed yet, secret missing,
+    // CARTO down) we fall back to plain OpenStreetMap tiles so the map never goes blank.
+    const tileBase = `${window.BrsConfig.API_BASE}/tiles`;
+    const cartoAttr = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+    const osmAttr = '&copy; OpenStreetMap contributors';
 
-    state.tileDark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      subdomains: "abcd",
+    state.tileLight = L.tileLayer(`${tileBase}/rastertiles/voyager/{z}/{x}/{y}{r}.png`, {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      attribution: cartoAttr,
+    });
+    state.tileDark = L.tileLayer(`${tileBase}/dark_all/{z}/{x}/{y}{r}.png`, {
+      maxZoom: 19,
+      attribution: cartoAttr,
       className: "tiles-dark",
     });
 
-    // Fallback if CARTO tiles are blocked: use OSM tiles with a dark filter.
-    const tileDarkFallback = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const osmLight = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       subdomains: "abc",
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
+      attribution: osmAttr,
+    });
+    // OSM with a CSS dark filter (see .tiles-dark-fallback)
+    const osmDark = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      subdomains: "abc",
+      maxZoom: 19,
+      attribution: osmAttr,
       className: "tiles-dark-fallback",
     });
 
-    // If tiles fail to load (common on some networks), switch to a fallback layer.
-    state.tileLight.on("tileerror", () => {
-      // OSM is already state.tileLight, so nothing to do here.
-    });
-
-    state.tileDark.on("tileerror", () => {
-      // Swap dark layer to the fallback once, then re-apply the current theme.
-      if (state.tileDark === tileDarkFallback) return;
-      try {
-        if (state.mapTheme === "dark") state.map.removeLayer(state.tileDark);
-      } catch {}
-      state.tileDark = tileDarkFallback;
-      state.mapTheme = null; // reset so applyTheme doesn't short-circuit
-      applyTheme("dark");
-    });
+    // After a few failed tiles (one stray failure is normal), swap that theme's layer for its fallback.
+    const guardTiles = (which, theme, fallback) => {
+      let failures = 0;
+      state[which].on("tileerror", () => {
+        if (++failures < 3 || state[which] === fallback) return;
+        try { state.map.removeLayer(state[which]); } catch {}
+        state[which] = fallback;
+        if (state.mapTheme === theme) {
+          state.mapTheme = null;   // so applyTheme doesn't short-circuit
+          applyTheme(theme);
+        }
+      });
+    };
+    guardTiles("tileLight", "light", osmLight);
+    guardTiles("tileDark", "dark", osmDark);
 
     // initial theme
     const initial = state.prefersDark && state.prefersDark.matches ? "dark" : "light";
