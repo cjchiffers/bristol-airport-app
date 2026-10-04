@@ -2,11 +2,14 @@ import { test, describe, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { workerExists, loadWorker, installCaches, installUpstream, call, board, APP_ORIGIN } from "./helpers.mjs";
 
+// A timestamp near now, at the given minute past the (UTC) hour.
+const atMinute = (m) => { const d = new Date(); d.setUTCMinutes(m, 0, 0); return d.getTime(); };
+
 describe("worker: access control, resilience, quota", { skip: !workerExists && "CloudFlare/ is git-ignored here" }, () => {
   let worker, up, store;
   beforeEach(async () => {
     mock.timers.reset();
-    mock.timers.enable({ apis: ["Date"], now: Date.now() });
+    mock.timers.enable({ apis: ["Date"], now: atMinute(10) });   // fixed point inside an hour keeps these tests deterministic
     store = installCaches();
     up = installUpstream();
     worker = await loadWorker();
@@ -56,6 +59,30 @@ describe("worker: access control, resilience, quota", { skip: !workerExists && "
     assert.ok(Date.parse(r.headers.get("X-Data-Updated")) < Date.now() - 9 * 60 * 1000, "reports when the data is from");
     assert.deepEqual((await r.json()).map((f) => f.flight.number), live.map((f) => f.flight.number));
     assert.ok(up.calls.length > before, "it did try the provider first");
+  });
+
+  test("outage during the hourly window rollover still serves the last good board", async () => {
+    // The timetable is fetched as rolling hour-aligned windows, so its cache key changes on the hour.
+    mock.timers.reset();
+    mock.timers.enable({ apis: ["Date"], now: atMinute(55) });
+    installCaches(); up = installUpstream(); worker = await loadWorker();
+    const live = await (await call(worker, "/api/timetable?type=departure")).json();
+    mock.timers.tick(10 * 60 * 1000);                          // now 5 minutes into the next hour
+    up.state.status = 429;
+    const r = await call(worker, "/api/timetable?type=departure");
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get("X-Data-Stale"), "1");
+    assert.deepEqual((await r.json()).map((f) => f.flight.number), live.map((f) => f.flight.number));
+  });
+
+  test("a fresh board is never overwritten by stale data", async () => {
+    const live = await (await call(worker, "/api/timetable?type=arrival")).json();
+    mock.timers.tick(10 * 60 * 1000);
+    up.state.status = 429;
+    await call(worker, "/api/timetable?type=arrival");           // served stale
+    mock.timers.tick(10 * 60 * 1000);
+    const again = await (await call(worker, "/api/timetable?type=arrival")).json();
+    assert.deepEqual(again.map((f) => f.flight.number), live.map((f) => f.flight.number));
   });
 
   test("stale data is not served forever: after 6 h the error comes through", async () => {
