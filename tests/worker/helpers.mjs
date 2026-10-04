@@ -77,10 +77,17 @@ export function installUpstream() {
     headers: {},                 // e.g. x-ratelimit-requests-remaining
     byNumber: null,              // fn(numberPath) -> array | null
     carto: "ok",
+    pushes: [],                   // every Web Push message "sent"
+    pushStatus: () => 201,        // fn(endpointUrl) -> HTTP status from the push service
   };
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input);
     calls.push(url);
+    // Web Push services (FCM, Mozilla, Apple, Windows): record the message and answer with a controllable status.
+    if (/(^|\.)(fcm\.googleapis\.com|push\.services\.mozilla\.com|web\.push\.apple\.com|notify\.windows\.com)$/.test(new URL(url).hostname)) {
+      state.pushes.push({ url, headers: Object.fromEntries(new Headers(init.headers)), body: new Uint8Array(await new Response(init.body).arrayBuffer()) });
+      return new Response(null, { status: state.pushStatus(url) });
+    }
     if (url.includes("basemaps.cartocdn.com")) {
       if (state.carto === "ok") return new Response("PNGDATA", { status: 200, headers: { "Content-Type": "image/png" } });
       return new Response("nope", { status: 403, headers: { "Content-Type": "text/plain" } });
@@ -112,4 +119,64 @@ export async function call(worker, pathAndQuery, { headers = {}, env = {}, origi
   const res = await worker.fetch(req, { RAPIDAPI_KEY: "test-key", ...env }, { waitUntil: (p) => pending.push(p) });
   await Promise.all(pending);
   return res;
+}
+
+
+// ---------------------------------------------------------------------------------------- Web Push helpers
+export function makeKV() {
+  const m = new Map();
+  const live = () => { const t = Math.floor(Date.now() / 1000); for (const [k, v] of m) if (v.exp && v.exp <= t) m.delete(k); };
+  return {
+    _m: m,
+    async get(k) { live(); return m.has(k) ? m.get(k).value : null; },
+    async put(k, value, opts = {}) { m.set(k, { value, exp: opts.expiration || (opts.expirationTtl ? Math.floor(Date.now() / 1000) + opts.expirationTtl : 0) }); },
+    async delete(k) { m.delete(k); },
+    async list({ prefix = "", limit = 1000, cursor } = {}) {
+      live();
+      const all = [...m.keys()].filter((k) => k.startsWith(prefix)).sort();
+      const start = cursor ? Number(cursor) : 0;
+      const page = all.slice(start, start + limit);
+      const done = start + limit >= all.length;
+      return { keys: page.map((name) => ({ name })), list_complete: done, cursor: done ? undefined : String(start + limit) };
+    },
+  };
+}
+
+const b64u = (bytes) => Buffer.from(bytes).toString("base64url");
+
+/** The owner's VAPID key pair + a push-enabled env (KV store included). */
+export async function makePushEnv(extra = {}) {
+  const k = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const jwk = await crypto.subtle.exportKey("jwk", k.privateKey);
+  const pub = new Uint8Array(await crypto.subtle.exportKey("raw", k.publicKey));
+  return { VAPID_PUBLIC_KEY: b64u(pub), VAPID_PRIVATE_KEY: jwk.d, VAPID_SUBJECT: "mailto:owner@example.com", PUSH_SUBS: makeKV(), _vapidPublicKey: k.publicKey, ...extra };
+}
+
+/** A pretend browser: what PushManager.subscribe() returns, plus the ability to decrypt what the server sends (RFC 8291). */
+export async function makeBrowser(endpoint = `https://fcm.googleapis.com/fcm/send/${Math.random().toString(36).slice(2)}`) {
+  const kp = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const uaPublic = new Uint8Array(await crypto.subtle.exportKey("raw", kp.publicKey));
+  const auth = crypto.getRandomValues(new Uint8Array(16));
+  const hkdf = async (ikm, salt, info, len) => new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]), len * 8));
+  const enc = new TextEncoder();
+  return {
+    subscription: { endpoint, keys: { p256dh: b64u(uaPublic), auth: b64u(auth) } },
+    async decrypt(body) {
+      const salt = body.slice(0, 16);
+      const idlen = body[20];
+      const asPublic = body.slice(21, 21 + idlen);
+      const record = body.slice(21 + idlen);
+      const server = await crypto.subtle.importKey("raw", asPublic, { name: "ECDH", namedCurve: "P-256" }, false, []);
+      const ecdh = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: server }, kp.privateKey, 256));
+      const cat = (...a) => Uint8Array.from(a.flatMap((x) => [...x]));
+      const ikm = await hkdf(ecdh, auth, cat(enc.encode("WebPush: info\0"), uaPublic, asPublic), 32);
+      const cek = await hkdf(ikm, salt, enc.encode("Content-Encoding: aes128gcm\0"), 16);
+      const nonce = await hkdf(ikm, salt, enc.encode("Content-Encoding: nonce\0"), 12);
+      const plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["decrypt"]), record));
+      let end = plain.length - 1;
+      while (end >= 0 && plain[end] === 0) end--;                 // strip padding
+      if (plain[end] !== 2) throw new Error("missing record delimiter");
+      return JSON.parse(new TextDecoder().decode(plain.slice(0, end)));
+    },
+  };
 }

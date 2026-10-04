@@ -145,6 +145,7 @@
     shareBtn: document.getElementById("shareBtn"),
     calendarBtn: document.getElementById("calendarBtn"),
     shareIconBtn: document.getElementById("shareIconBtn"),
+    notifyBtn: document.getElementById("notifyIconBtn"),
 
     overflowBtn: document.getElementById("overflowDetailsBtn"),
     menu: document.getElementById("detailsMenu"),
@@ -207,6 +208,7 @@
     aircraftKind: null,
     history: { loaded: false, loading: false },
     inbound: { at: 0, loading: false },
+    notify: { available: false, iosNeedsInstall: false },
     livePosition: null,
     routePoints: null,
     liveRequested: false,   // has a request with the live option been made yet?
@@ -536,6 +538,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
       setText(els.subhead, "Loading…");
     }
 
+    initNotify();
     refreshNow(false);
     startAuto();
   }
@@ -756,6 +759,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     renderHeroCard(flight, flat, id);
     renderOpsBar(flight);
     applyLivePosition(flight);
+    updateNotifyButton();
 
     if (state.route) document.title = `${displayNo} ${route.replace(" → ", "→")} · BRS Flights`;
 
@@ -1311,6 +1315,69 @@ if (els.arrKv) {
     if (state.routeLine && state.routePoints) state.routeLine.setLatLngs(state.routePoints);
     state.planeMarker.setLatLng([p.lat, p.lon]);
     state.planeMarker.setIcon(makePlaneIcon(Number.isFinite(p.trackDeg) ? p.trackDeg : 0));
+  }
+
+// ---------- Notifications (Web Push): follow this flight ----------
+  // When there is nothing left to tell them about. For an arrival, "departed/en route" still means it is on its way here.
+  const NOTIFY_DONE = {
+    arrival: new Set(["landed", "cancelled", "diverted"]),
+    departure: new Set(["departed", "enroute", "approaching", "landed", "cancelled", "diverted"]),
+  };
+
+  async function initNotify() {
+    const btn = els.notifyBtn;
+    if (!btn || !window.BrsPush) return;
+    try { await window.BrsConfig.featuresReady; } catch { /* ignore */ }
+    if (!window.BrsConfig.features.push) return;               // worker without notifications set up
+
+    const I = window.BrsInstall;
+    state.notify.iosNeedsInstall = !!(I && I.isIosSafari() && !I.isStandalone());
+    if (!window.BrsPush.supported() && !state.notify.iosNeedsInstall) return;   // nothing this browser can do
+    state.notify.available = true;
+    btn.addEventListener("click", onNotifyClick);
+    updateNotifyButton();
+  }
+
+  /** Bell visible only while it can still help: before landing (arrivals) / departure (departures). */
+  function updateNotifyButton() {
+    const btn = els.notifyBtn;
+    if (!btn || !state.notify.available || !state.route) return;
+    const status = String(state.current && (state.current.status || state.current.flight_status) || "").toLowerCase();
+    const finished = NOTIFY_DONE[state.route.type].has(status);
+    const on = window.BrsPush.isFollowing(state.route);
+    btn.hidden = finished && !on;
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    const blocked = !state.notify.iosNeedsInstall && window.BrsPush.permission() === "denied" && !on;
+    btn.title = on ? "Notifications are on — tap to turn off" : (blocked ? "Notifications are blocked in your browser settings" : "Notify me about this flight");
+    btn.setAttribute("aria-label", btn.title);
+  }
+
+  async function onNotifyClick() {
+    const route = state.route;
+    if (!route) return;
+    if (state.notify.iosNeedsInstall) { await window.BrsInstall.install(); return; }     // shows the Add to Home Screen steps
+
+    const name = route.flight;
+    if (window.BrsPush.isFollowing(route)) {
+      await window.BrsPush.unfollow(route);
+      showToast(`Notifications off for ${name}`);
+    } else {
+      const F = window.BrsFlights;
+      const other = state.current ? F.otherSeg(state.current, route.type).iataCode : "";
+      try {
+        await window.BrsPush.follow(route, other ? F.cityOf(other) : "");
+        showToast(`We’ll notify you about ${name}`);
+      } catch (e) {
+        const msg = {
+          denied: "Notifications are blocked — allow them in your browser settings",
+          limit: "You can follow up to 10 flights",
+          disabled: "Notifications aren’t available right now",
+          unsupported: "This browser can’t show notifications",
+        }[e && e.code] || "Couldn’t turn on notifications — try again";
+        showToast(msg);
+      }
+    }
+    updateNotifyButton();
   }
 
 // ---------- Keep screen on while waiting (Screen Wake Lock API) ----------

@@ -1034,3 +1034,11 @@ body.details-page{ --maxw: 720px; }
 .inbound-card.is-warn{ border-color: color-mix(in srgb, var(--warn) 55%, var(--stroke)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
 .inbound-card.is-bad{ border-color: color-mix(in srgb, var(--bad) 55%, var(--stroke)); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
 .inbound-card.is-warn .inbound-effect, .inbound-card.is-bad .inbound-effect{ color: var(--text); font-weight: 700; }
+
+/* ---- Notify bell ---- */
+.icon-btn[hidden]{ display:none; }
+#notifyIconBtn[aria-pressed="true"]{
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--stroke));
+}
+#notifyIconBtn[aria-pressed="true"] .bell{ fill: currentColor; fill-opacity: .25; }

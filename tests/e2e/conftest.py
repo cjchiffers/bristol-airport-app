@@ -3,8 +3,10 @@ use times relative to "now" — fixtures can never go stale.
 
 Run:  pip install -r tests/e2e/requirements.txt && playwright install chromium && pytest tests/e2e
 """
+import base64
 import functools
 import http.server
+import os
 import io
 import json
 import socketserver
@@ -33,6 +35,8 @@ def base_url():
     handler = functools.partial(_Quiet, directory=str(ROOT))
     class QuietServer(socketserver.ThreadingTCPServer):
         allow_reuse_address = True
+        daemon_threads = True
+        request_queue_size = 256      # the default (5) drops connections when a page loads many scripts at once on a busy machine
 
         def handle_error(self, request, client_address):   # browsers abort connections mid-test; that's not an error
             pass
@@ -119,7 +123,9 @@ class FakeApi:
         self.flights_status = 200
         self.history = None               # dict, or None -> 502
         self.tiles_ok = True
-        self.extra = {}                   # per-feature stubs (inbound, push, ...)
+        self.extra = {}                   # per-feature stubs (inbound, ...)
+        self.push = {"enabled": True, "status": 200, "posts": [],
+                     "publicKey": base64.urlsafe_b64encode(b"\x04" + os.urandom(64)).decode().rstrip("=")}
         self.calls = {"timetable": 0, "flights": 0, "flights_queries": [], "history": 0, "tiles": [], "health": 0, "other": []}
 
     # ---- helpers
@@ -181,6 +187,11 @@ class FakeApi:
             """Feature routes (inbound, push, share preview…) are stubbed by tests through api.extra."""
             path = urllib.parse.urlparse(route.request.url).path
             self.calls["other"].append((route.request.method, path))
+            if path == "/api/push/config":
+                return json_resp(route, {"enabled": self.push["enabled"], "publicKey": self.push["publicKey"] if self.push["enabled"] else None})
+            if path in ("/api/push/subscribe", "/api/push/unsubscribe"):
+                self.push["posts"].append((path, json.loads(route.request.post_data or "{}")))
+                return json_resp(route, {"ok": self.push["status"] == 200} if self.push["status"] == 200 else {"error": "x"}, self.push["status"])
             for prefix, handler in self.extra.items():
                 if path.startswith(prefix):
                     return handler(route, json_resp)
@@ -226,14 +237,18 @@ def browser():
 
 @pytest.fixture
 def new_context(browser, api):
-    """Factory: new_context(width=390, height=844, scheme='light', dsf=1, **kw) -> (context, page-factory)."""
+    """Factory: new_context(width=390, height=844, scheme='light', dsf=1, sw=False, **kw).
+    The service worker is blocked unless sw=True: most tests don't need it, and installing its offline cache in every
+    fresh browser context only adds work (and flakiness on a busy machine)."""
     made = []
 
-    def make(width=390, height=844, scheme="light", dsf=1, **kw):
+    def make(width=390, height=844, scheme="light", dsf=1, sw=False, **kw):
         ctx = browser.new_context(viewport={"width": width, "height": height}, device_scale_factor=dsf,
-                                  color_scheme=scheme, locale="en-GB", **kw)
+                                  color_scheme=scheme, locale="en-GB",
+                                  service_workers="allow" if sw else "block", **kw)
         api.install(ctx)
         made.append(ctx)
+        ctx.on("page", _attach_logging)
         return ctx
 
     yield make
@@ -241,13 +256,43 @@ def new_context(browser, api):
         c.close()
 
 
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    rep = outcome.get_result()
+    setattr(item, "rep_" + rep.when, rep)
+
+
+_logged_pages = []
+
+
+@pytest.fixture(autouse=True)
+def _dump_browser_log_on_failure(request):
+    """When a browser test fails, print what the page said (console + JS errors): the quickest way to see why."""
+    _logged_pages.clear()
+    yield
+    rep = getattr(request.node, "rep_call", None)
+    if rep is not None and rep.failed:
+        for i, pg in enumerate(_logged_pages):
+            lines = getattr(pg, "console_log", [])
+            if lines:
+                print(f"\n--- browser log (page {i + 1}, {pg.url}) ---")
+                print("\n".join(lines[-40:]))
+
+
+def _attach_logging(pg):
+    pg.errors = []
+    pg.console_log = []
+    pg.on("pageerror", lambda e: (pg.errors.append(str(e)), pg.console_log.append(f"PAGEERROR {e}")))
+    pg.on("console", lambda m: pg.console_log.append(f"{m.type}: {m.text}"))
+    pg.on("requestfailed", lambda r: pg.console_log.append(f"REQUEST FAILED {r.url} {r.failure}"))
+    _logged_pages.append(pg)
+    return pg
+
+
 @pytest.fixture
 def page(new_context):
-    ctx = new_context()
-    pg = ctx.new_page()
-    pg.errors = []
-    pg.on("pageerror", lambda e: pg.errors.append(str(e)))
-    return pg
+    return new_context().new_page()         # logging is attached by the context's "page" event
 
 
 def wait_list(pg, fresh=True):

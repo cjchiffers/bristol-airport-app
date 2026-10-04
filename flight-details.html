@@ -33,6 +33,10 @@
     </div>
 
     <div class="details-actions">
+      <button class="icon-btn" id="notifyIconBtn" aria-label="Notify me about this flight" aria-pressed="false" title="Notify me" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="bell" d="M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16l-2-2Z M10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
       <button class="icon-btn" id="shareIconBtn" aria-label="Share this flight" title="Share">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4M6 12v6.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -202,6 +206,17 @@
     </div>
   </main>
 
+  <dialog class="sheet" id="iosInstall" aria-labelledby="iosInstallTitle">
+    <h2 id="iosInstallTitle">Add to Home Screen first</h2>
+    <p class="small">On iPhone, flight notifications only work once the app is on your Home Screen.</p>
+    <ol>
+      <li>Tap the <strong>Share</strong> button <span aria-hidden="true">⎙</span> in Safari’s toolbar.</li>
+      <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+      <li>Open Bristol Flights from your Home Screen and tap the bell again.</li>
+    </ol>
+    <form method="dialog"><button class="btn" type="submit">Got it</button></form>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script src="assets/vendor/leaflet/leaflet.js"></script>
@@ -211,8 +226,16 @@
   <script src="shared/airports.js"></script>
   <script src="shared/airlines.js"></script>
   <script src="shared/flights.js"></script>
+  <script src="shared/install.js"></script>
+  <script src="shared/push.js"></script>
   <script src="shared/aircraft.js"></script>
   <script src="flight-details.js"></script>
+  <script>
+    // The service worker shows push notifications, so register it here too (a shared link may be the first page opened).
+    if (location.protocol !== "file:" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js").catch(console.warn);
+    }
+  </script>
 
 </body>
 </html>

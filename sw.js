@@ -1,5 +1,5 @@
 // Bump this when you change any app-shell file so users receive updates immediately.
-const CACHE_NAME = "brs-flights-2026-10-04-07";
+const CACHE_NAME = "brs-flights-2026-10-04-09";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -22,6 +22,7 @@ const APP_SHELL = [
   "./shared/airports.js",
   "./shared/airlines.js",
   "./shared/flights.js",
+  "./shared/push.js",
   "./shared/aircraft.js"
 ];
 
@@ -83,4 +84,42 @@ self.addEventListener("fetch", (event) => {
       });
     })
   );
+});
+
+
+// ---------------------------------------------------------------------------
+// Web Push: show the notification the worker sent, and open the flight when tapped.
+// (Browsers — iOS especially — require every push to show a notification.)
+// ---------------------------------------------------------------------------
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; }
+  catch { data = { body: event.data ? event.data.text() : "" }; }
+
+  const title = data.title || "Bristol Flights";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "",
+      tag: data.tag || undefined,          // a newer message about the same thing replaces the older one
+      renotify: !!data.tag,
+      icon: "assets/icon-192.png",
+      badge: "assets/icon-192.png",
+      data: { url: data.url || "./" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "./";
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const w of wins) {
+      if (new URL(w.url).origin === new URL(url, self.location.href).origin && "focus" in w) {
+        try { await w.navigate(url); } catch { /* cross-origin or unsupported: just focus */ }
+        return w.focus();
+      }
+    }
+    return self.clients.openWindow(url);
+  })());
 });

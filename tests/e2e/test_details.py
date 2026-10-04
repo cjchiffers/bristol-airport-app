@@ -163,7 +163,7 @@ def test_back_button_goes_to_the_list_when_opened_from_a_shared_link(page, base_
 
 
 def test_deep_link_reloads_offline_via_the_service_worker(new_context, base_url, api):
-    ctx = new_context()
+    ctx = new_context(sw=True)
     pg = ctx.new_page()
     pg.goto(base_url + "/index.html")
     wait_list(pg)
