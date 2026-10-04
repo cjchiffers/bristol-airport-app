@@ -184,169 +184,171 @@
 
   function lerp(a, b, t){ return a + (b - a) * t; }
 
-  /** The nacelle (engine pod) with pylon, inlet and a highlight. (cx, cy) is its centre; style changes the shape. */
-  function nacelle(cx, cy, w, h, style, liv, wingUnderY){
+  /** Engine pod: pylon, rounded body, a dark intake ring at the front and a soft highlight. (cx, cy) is its centre. */
+  function nacelle(cx, cy, w, h, style, liv, uid){
     const x = cx - w / 2, y = cy - h / 2;
-    const col = liv.engine ? `style="fill:${liv.engine}"` : "";
-    // pylon: from the wing's underside down to the top of the pod
-    const pylon = `<path class="ac-pylon" d="M${n1(x + w * .30)} ${n1(Math.min(wingUnderY, y))} L${n1(x + w * .78)} ${n1(Math.min(wingUnderY, y))} L${n1(x + w * .70)} ${n1(y + h * .35)} L${n1(x + w * .36)} ${n1(y + h * .35)} Z"/>`;
-    let body, inlet, hi;
-    if (style === "b737") {                                   // 737: flattened underside, sits tight under the wing
-      body = `<path class="ac-engine" ${col} d="M${n1(x + h * .5)} ${n1(y)} L${n1(x + w - h * .45)} ${n1(y)} Q${n1(x + w)} ${n1(y)} ${n1(x + w)} ${n1(y + h * .5)} Q${n1(x + w)} ${n1(y + h)} ${n1(x + w - h * .45)} ${n1(y + h)} L${n1(x + h * .5)} ${n1(y + h * .92)} Q${n1(x)} ${n1(y + h * .8)} ${n1(x)} ${n1(y + h * .5)} Q${n1(x)} ${n1(y)} ${n1(x + h * .5)} ${n1(y)} Z"/>`;
-    } else if (style === "gtf") {                             // big fan, short pod
-      body = `<rect class="ac-engine" ${col} x="${n1(x)}" y="${n1(y)}" width="${n1(w)}" height="${n1(h)}" rx="${n1(h * .46)}"/>`;
-    } else {                                                  // turbofan / big
-      body = `<rect class="ac-engine" ${col} x="${n1(x)}" y="${n1(y)}" width="${n1(w)}" height="${n1(h)}" rx="${n1(h * .5)}"/>`;
-    }
-    inlet = `<ellipse class="ac-dark" cx="${n1(x + w - h * .22)}" cy="${n1(cy)}" rx="${n1(h * .2)}" ry="${n1(h * .36)}"/>`;
-    hi = `<path class="ac-shine" d="M${n1(x + h * .5)} ${n1(y + h * .22)} L${n1(x + w - h * .6)} ${n1(y + h * .22)}"/>`;
+    const bodyFill = liv.engine ? `style="fill:${liv.engine}"` : `style="fill:url(#ace${uid})"`;
+    const r = style === "b737" ? h * .42 : h * .5;
+    const pylon = `<path class="ac-pylon" d="M${n1(x + w * .34)} ${n1(y - h * .30)} L${n1(x + w * .74)} ${n1(y - h * .30)} L${n1(x + w * .70)} ${n1(y + h * .40)} L${n1(x + w * .38)} ${n1(y + h * .40)} Z"/>`;
+    const body = `<rect class="ac-engine" ${bodyFill} x="${n1(x)}" y="${n1(y)}" width="${n1(w)}" height="${n1(h)}" rx="${n1(r)}"/>`;
+    const fan = style === "gtf" || style === "big" ? .50 : .44;
+    const inlet = `<ellipse class="ac-inlet" cx="${n1(x + w - h * .20)}" cy="${n1(cy)}" rx="${n1(h * .22)}" ry="${n1(h * fan)}"/>`
+                + `<ellipse class="ac-dark" cx="${n1(x + w - h * .17)}" cy="${n1(cy)}" rx="${n1(h * .12)}" ry="${n1(h * (fan - .12))}"/>`;
+    const hi = `<path class="ac-shine" d="M${n1(x + h * .55)} ${n1(y + h * .24)} L${n1(x + w - h * .62)} ${n1(y + h * .24)}"/>`;
     return pylon + body + inlet + hi;
   }
 
   function winglet(kind, T1, T2, liv){
-    // T1 = tip leading edge, T2 = tip trailing edge (the wing tip chord)
+    // T1 = tip leading edge, T2 = tip trailing edge. Winglets rise from the tip in the airline's colour.
     const fill = `style="fill:${liv.tail}"`;
     const x1 = T1.x, x2 = T2.x, y = T1.y;
     switch (kind) {
       case "sharklet":
-        return `<path class="ac-winglet" ${fill} d="M${n1(x2 + 1)} ${n1(y)} L${n1(x1)} ${n1(y)} Q${n1(x1 - 3)} ${n1(y - 6)} ${n1(x1 - 6)} ${n1(y - 12)} L${n1(x1 - 10)} ${n1(y - 12)} Q${n1(x2 + 3)} ${n1(y - 5)} ${n1(x2 + 1)} ${n1(y)} Z"/>`;
       case "blended":
-        return `<path class="ac-winglet" ${fill} d="M${n1(x2 + 2)} ${n1(y)} L${n1(x1)} ${n1(y)} Q${n1(x1 - 4)} ${n1(y - 5)} ${n1(x1 - 7)} ${n1(y - 11)} L${n1(x1 - 11)} ${n1(y - 11)} Q${n1(x2 + 4)} ${n1(y - 6)} ${n1(x2 + 2)} ${n1(y)} Z"/>`;
+        return `<path class="ac-winglet" ${fill} d="M${n1(x2 + 3)} ${n1(y + 1)} L${n1(x1 + 1)} ${n1(y)} Q${n1(x1 - 2)} ${n1(y - 5)} ${n1(x1 - 5)} ${n1(y - 10)} L${n1(x1 - 8)} ${n1(y - 10)} Q${n1(x2 + 3)} ${n1(y - 4)} ${n1(x2 + 3)} ${n1(y + 1)} Z"/>`;
       case "split":
-        return `<path class="ac-winglet" ${fill} d="M${n1(x2 + 1)} ${n1(y)} L${n1(x1)} ${n1(y)} L${n1(x1 - 6)} ${n1(y - 13)} L${n1(x1 - 10)} ${n1(y - 13)} Z"/>`
-             + `<path class="ac-winglet" ${fill} d="M${n1(x2 + 3)} ${n1(y)} L${n1(x1 - 2)} ${n1(y)} L${n1(x1 - 6)} ${n1(y + 6)} L${n1(x2 + 6)} ${n1(y + 5)} Z"/>`;
-      case "raked":
-        return `<path class="ac-wing" d="M${n1(x2)} ${n1(y)} L${n1(x1)} ${n1(y)} L${n1(x2 - 16)} ${n1(y + 3)} L${n1(x2 - 14)} ${n1(y + 4)} Z"/>`;
+        return `<path class="ac-winglet" ${fill} d="M${n1(x2 + 2)} ${n1(y + 1)} L${n1(x1 + 1)} ${n1(y)} L${n1(x1 - 5)} ${n1(y - 11)} L${n1(x1 - 9)} ${n1(y - 11)} Z"/>`
+             + `<path class="ac-winglet" ${fill} d="M${n1(x2 + 4)} ${n1(y + 1)} L${n1(x1 - 1)} ${n1(y + 1)} L${n1(x1 - 5)} ${n1(y + 7)} L${n1(x2 + 7)} ${n1(y + 6)} Z"/>`;
       case "fence":
-        return `<path class="ac-winglet" ${fill} d="M${n1(x2 + 3)} ${n1(y)} L${n1(x1 - 1)} ${n1(y)} L${n1(x1 - 3)} ${n1(y - 6)} L${n1(x1 - 7)} ${n1(y - 6)} Z"/>`;
+        return `<path class="ac-winglet" ${fill} d="M${n1(x2 + 3)} ${n1(y + 1)} L${n1(x1 - 1)} ${n1(y)} L${n1(x1 - 3)} ${n1(y - 6)} L${n1(x1 - 7)} ${n1(y - 6)} Z"/>`;
+      case "raked":                                           // 787/777/A350: the tip itself is swept, no separate winglet
+        return `<path class="ac-wing" d="M${n1(x2 + 1)} ${n1(y + 1)} L${n1(x1)} ${n1(y)} L${n1(x2 - 14)} ${n1(y + 4)} Q${n1(x2 - 12)} ${n1(y + 6)} ${n1(x2 - 6)} ${n1(y + 5)} Z"/>`;
       default:
         return "";
     }
   }
 
-  function windowsRow(xFrom, xTo, y, step, r){
+  function windowsRow(xFrom, xTo, y, step, w, hgt){
     let out = "";
-    for (let x = xFrom; x <= xTo; x += step) out += `<circle cx="${n1(x)}" cy="${n1(y)}" r="${r}"/>`;
+    for (let x = xFrom; x <= xTo; x += step) out += `<rect x="${n1(x - w / 2)}" y="${n1(y - hgt / 2)}" width="${w}" height="${hgt}" rx="${n1(w * .45)}"/>`;
     return out;
   }
 
-  /** Draw one aircraft. spec = a SPECS entry (already tweaked), liv = livery, uid = unique id suffix for gradients. */
+  /** Draw one aircraft. fam = a family (from familyFor), liv = livery, uid = unique id suffix for the gradients. */
   function drawAircraft(fam, liv, uid){
     const base = SPECS[fam.key] || SPECS.a320;
     const S = { ...base };
     if (fam.engines) S.engines = fam.engines;
     S.wing = { ...base.wing, ...(fam.winglet ? { winglet: fam.winglet } : {}) };
     const scale = fam.scale || 1;
-    const L = base.L * scale, d = L / base.fine, h = d / 2;
-    const cx = 200, yc = base.high ? 74 : 70;
+    const L = base.L * scale, d = L / base.fine * 1.1, h = d / 2;     // a touch chunkier than life: friendlier
+    const cx = 200, yc = 100;                                        // positioned and fitted into the box afterwards
     const x0 = cx - L / 2, x1 = cx + L / 2;
     const top = yc - h, bot = yc + h;
     const noseLen = S.nose, tailLen = S.tail;
+    let minY = top, maxY = bot;
 
-    // ---- fuselage
-    // Nose: a rounded bluff cone. Tail: the top line stays level to near the end, the underside sweeps up in the
-    // last stretch, and the very end is blunt (the APU exhaust) rather than a needle.
-    const tailEndTop = yc - h * .66, tailEndBot = yc - h * .20;
-    const upStart = x0 + tailLen;                          // where the underside starts rising
+    // ---- fuselage: rounded nose, level back, underside sweeping up into a blunt tail cone
+    const tailEndTop = yc - h * .62, tailEndBot = yc - h * .16;
+    const upStart = x0 + tailLen;
     const fuselage =
       `M${n1(x0)} ${n1(tailEndTop)} ` +
-      `C${n1(x0 + tailLen * .30)} ${n1(yc - h * .84)} ${n1(x0 + tailLen * .62)} ${n1(top)} ${n1(x0 + tailLen * .95)} ${n1(top)} ` +
+      `C${n1(x0 + tailLen * .30)} ${n1(yc - h * .86)} ${n1(x0 + tailLen * .62)} ${n1(top)} ${n1(x0 + tailLen * .95)} ${n1(top)} ` +
       `L${n1(x1 - noseLen)} ${n1(top)} ` +
-      `C${n1(x1 - noseLen * .38)} ${n1(top)} ${n1(x1)} ${n1(yc - h * .52)} ${n1(x1)} ${n1(yc + h * S.drop - h * .12)} ` +
-      `C${n1(x1)} ${n1(yc + h * .52)} ${n1(x1 - noseLen * .30)} ${n1(bot)} ${n1(x1 - noseLen * .82)} ${n1(bot)} ` +
+      `C${n1(x1 - noseLen * .30)} ${n1(top)} ${n1(x1)} ${n1(yc - h * .50)} ${n1(x1)} ${n1(yc + h * S.drop - h * .10)} ` +
+      `C${n1(x1)} ${n1(yc + h * .58)} ${n1(x1 - noseLen * .28)} ${n1(bot)} ${n1(x1 - noseLen * .80)} ${n1(bot)} ` +
       `L${n1(upStart)} ${n1(bot)} ` +
-      `C${n1(x0 + tailLen * .55)} ${n1(bot)} ${n1(x0 + tailLen * .16)} ${n1(yc + h * .30)} ${n1(x0)} ${n1(tailEndBot)} Z`;
+      `C${n1(x0 + tailLen * .55)} ${n1(bot)} ${n1(x0 + tailLen * .16)} ${n1(yc + h * .30)} ${n1(x0)} ${n1(tailEndBot)} ` +
+      `Q${n1(x0 - 3)} ${n1((tailEndTop + tailEndBot) / 2)} ${n1(x0)} ${n1(tailEndTop)} Z`;
 
     let hump = "";
-    if (S.hump) {                                             // 747: the upper deck bulge behind the cockpit
-      const hx0 = x1 - noseLen - 70, hx1 = x1 - noseLen + 14;
-      hump = `<path class="ac-fuse" d="M${n1(hx0)} ${n1(top + 1)} C${n1(hx0 + 12)} ${n1(top - 9)} ${n1(hx1 - 28)} ${n1(top - 11)} ${n1(hx1 - 8)} ${n1(top - 8)} C${n1(hx1 + 4)} ${n1(top - 5)} ${n1(hx1 + 8)} ${n1(top + 1)} ${n1(hx1 + 12)} ${n1(top + 4)} L${n1(hx0)} ${n1(top + 4)} Z"/>`;
+    if (S.hump) {                                             // 747: the upper-deck bulge behind the cockpit
+      const hx0 = x1 - noseLen - 76, hx1 = x1 - noseLen + 16;
+      hump = `<path class="ac-fuse" style="fill:url(#acf${uid})" d="M${n1(hx0)} ${n1(top + 2)} C${n1(hx0 + 14)} ${n1(top - 10)} ${n1(hx1 - 30)} ${n1(top - 13)} ${n1(hx1 - 8)} ${n1(top - 9)} C${n1(hx1 + 6)} ${n1(top - 6)} ${n1(hx1 + 10)} ${n1(top)} ${n1(hx1 + 14)} ${n1(top + 4)} L${n1(hx0)} ${n1(top + 4)} Z"/>`;
+      minY = top - 13;
     }
 
-    // ---- tail
-    const finBase2 = x0 + tailLen * .12, finBase1 = finBase2 + S.fin.base;
+    // ---- tail fin: swept, rounded corners, tinted in the airline colour
+    const fb2 = x0 + tailLen * .10, fb1 = fb2 + S.fin.base;
     const finTop = top - S.fin.h;
-    const tipFront = finBase1 - S.fin.sweep, tipRear = tipFront - S.fin.tip;
-    const fin = `M${n1(finBase1)} ${n1(top + 1)} L${n1(tipFront)} ${n1(finTop)} L${n1(tipRear)} ${n1(finTop)} L${n1(finBase2)} ${n1(yc - h * .86)} Z`;
-    const stabY = S.ttail ? finTop : yc - h * .62;
+    const tipFront = fb1 - S.fin.sweep, tipRear = tipFront - S.fin.tip;
+    minY = Math.min(minY, finTop - (S.ttail ? 6 : 1));
+    const fin = `M${n1(fb1)} ${n1(top + 4)} L${n1(tipFront + 3)} ${n1(finTop + 6)} Q${n1(tipFront + 1)} ${n1(finTop)} ${n1(tipFront - 5)} ${n1(finTop)} L${n1(tipRear + 2)} ${n1(finTop)} Q${n1(tipRear - 2)} ${n1(finTop)} ${n1(tipRear - 2.5)} ${n1(finTop + 5)} L${n1(fb2)} ${n1(yc - h * .80)} Z`;
+    const rudder = `M${n1(tipRear - 2.5)} ${n1(finTop + 5)} L${n1(tipRear + 7)} ${n1(finTop + 1)} L${n1(fb2 + 11)} ${n1(top + 3)} L${n1(fb2)} ${n1(yc - h * .80)} Z`;
+    // horizontal stabiliser: a small swept slab peeking out behind the fin base (a T-tail sits up on the fin instead)
     const stab = S.ttail
-      ? `<path class="ac-wing" d="M${n1(tipFront + 8)} ${n1(finTop - 2)} L${n1(tipRear - 14)} ${n1(finTop - 2)} L${n1(tipRear - 12)} ${n1(finTop + 4)} L${n1(tipFront + 4)} ${n1(finTop + 4)} Z"/>`
-      : `<path class="ac-wing" d="M${n1(x0 + tailLen * .92)} ${n1(stabY + 4)} L${n1(x0 + tailLen * 1.02)} ${n1(stabY + 8)} L${n1(x0 + tailLen * .5)} ${n1(stabY + 20)} L${n1(x0 + tailLen * .2)} ${n1(stabY + 18)} Z"/>`;
-    // the logo goes on the middle of the fin
-    const fcx = (finBase1 + tipFront + tipRear + finBase2) / 4, fcy = (top + finTop) / 2 + 3;
-    const badgeR = Math.min(13.5, S.fin.h * .3);
+      ? `<path class="ac-wing" d="M${n1(tipFront + 10)} ${n1(finTop - 3)} L${n1(tipRear - 16)} ${n1(finTop - 3)} Q${n1(tipRear - 19)} ${n1(finTop + 1)} ${n1(tipRear - 14)} ${n1(finTop + 5)} L${n1(tipFront + 4)} ${n1(finTop + 5)} Z"/>`
+      : `<path class="ac-wing" d="M${n1(x0 + tailLen * .80)} ${n1(yc - h * .52)} L${n1(x0 + tailLen * .96)} ${n1(yc - h * .40)} L${n1(x0 + tailLen * .22)} ${n1(yc + h * .10)} Q${n1(x0 - 4)} ${n1(yc + h * .08)} ${n1(x0 - 2)} ${n1(yc - h * .06)} Z"/>`;
+    const fcx = (fb1 + tipFront + tipRear + fb2) / 4 + 1, fcy = (top + finTop) / 2 + 4;
+    const badgeR = Math.min(15, S.fin.h * .36);
 
     // ---- wing + engines
-    let wingSvg = "", engineSvg = "", wingletSvg = "";
+    let wingSvg = "", engineSvg = "", wingletSvg = "", wingTop = "";
     const W = S.wing;
-    if (base.high) {                                          // high-wing turboprop: wing and engines sit along the top of the fuselage
-      const xle = x1 - W.le * L, yr = top - 2;
-      wingSvg = `<path class="ac-wing" d="M${n1(xle)} ${n1(yr + 5)} L${n1(xle - W.root)} ${n1(yr + 5)} L${n1(xle - W.root - W.sweep)} ${n1(yr - 4)} L${n1(xle - W.sweep)} ${n1(yr - 4)} Z"/>`;
+    if (base.high) {                                          // high-wing turboprop: wing and engines along the top of the fuselage
+      const xle = x1 - W.le * L, yr = top - 1;
+      wingSvg = `<path class="ac-wing" d="M${n1(xle)} ${n1(yr + 6)} L${n1(xle - W.root)} ${n1(yr + 6)} L${n1(xle - W.root - W.sweep)} ${n1(yr - 5)} Q${n1(xle - W.root - W.sweep + 4)} ${n1(yr - 8)} ${n1(xle - W.sweep + 4)} ${n1(yr - 6)} Z"/>`;
+      minY = Math.min(minY, yr - 8);
       for (const e of S.engines) {
-        const ex = xle + 14 - e.w / 2, ey = yr - 2;                        // nacelle on the wing, reaching well forward
-        const px = ex + e.w + 3;
-        engineSvg += `<rect class="ac-engine" x="${n1(ex)}" y="${n1(ey - e.h / 2)}" width="${n1(e.w)}" height="${n1(e.h)}" rx="${n1(e.h * .45)}"/>`
-          + `<ellipse class="ac-dark" cx="${n1(ex + e.w - 3)}" cy="${n1(ey)}" rx="2" ry="${n1(e.h * .30)}"/>`
-          + `<ellipse class="ac-prop" cx="${n1(px)}" cy="${n1(ey)}" rx="3.2" ry="${n1(h + 8)}"/>`;
+        const ex = xle + 14 - e.w / 2, ey = yr - 3;
+        const px = ex + e.w + 3, pr = h + 8;
+        engineSvg += `<rect class="ac-engine" style="fill:url(#ace${uid})" x="${n1(ex)}" y="${n1(ey - e.h / 2)}" width="${n1(e.w)}" height="${n1(e.h)}" rx="${n1(e.h * .5)}"/>`
+          + `<path class="ac-shine" d="M${n1(ex + 8)} ${n1(ey - e.h * .22)} L${n1(ex + e.w - 10)} ${n1(ey - e.h * .22)}"/>`
+          + `<ellipse class="ac-prop" cx="${n1(px)}" cy="${n1(ey)}" rx="3.4" ry="${n1(pr)}"/>`;
         const blades = base.props || 4;
         for (let i = 0; i < blades; i++) {
           const a = (i / blades) * Math.PI - Math.PI / 2 + .28;
-          engineSvg += `<path class="ac-blade" d="M${n1(px)} ${n1(ey)} L${n1(px + Math.cos(a) * 1.4)} ${n1(ey + Math.sin(a) * (h + 8))}"/>`
-                     + `<path class="ac-blade" d="M${n1(px)} ${n1(ey)} L${n1(px - Math.cos(a) * 1.4)} ${n1(ey - Math.sin(a) * (h + 8))}"/>`;
+          engineSvg += `<path class="ac-blade" d="M${n1(px)} ${n1(ey)} L${n1(px + Math.cos(a) * 1.4)} ${n1(ey + Math.sin(a) * pr)}"/>`
+                     + `<path class="ac-blade" d="M${n1(px)} ${n1(ey)} L${n1(px - Math.cos(a) * 1.4)} ${n1(ey - Math.sin(a) * pr)}"/>`;
         }
-        engineSvg += `<ellipse class="ac-hub" cx="${n1(px)}" cy="${n1(ey)}" rx="2.4" ry="2.4"/>`;
+        engineSvg += `<ellipse class="ac-hub" cx="${n1(px)}" cy="${n1(ey)}" rx="2.6" ry="2.6"/>`;
+        minY = Math.min(minY, ey - pr); maxY = Math.max(maxY, ey + pr);
       }
     } else {
-      // The root sits well up inside the fuselage so a decent amount of wing shows below it, swept back and down to the tip.
-      const xle = x1 - W.le * L, yr = yc + h * .22;
-      const R1 = { x: xle, y: yr }, R2 = { x: xle - W.root * 1.12, y: yr + 10 };
-      const T1 = { x: xle - W.sweep, y: yc + h * .5 + W.drop * 1.12 }, T2 = { x: xle - W.sweep - W.tip * 1.25, y: yc + h * .5 + W.drop * 1.12 + 2 };
-      wingSvg = `<path class="ac-wing" d="M${n1(R1.x)} ${n1(R1.y)} L${n1(R2.x)} ${n1(R2.y)} L${n1(T2.x)} ${n1(T2.y)} L${n1(T1.x)} ${n1(T1.y)} Z"/>`
-              + `<path class="ac-flap" d="M${n1(lerp(R2.x, T2.x, .08))} ${n1(lerp(R2.y, T2.y, .08))} L${n1(lerp(R2.x, T2.x, .85))} ${n1(lerp(R2.y, T2.y, .85))}"/>`;
+      // The wing sits in front of the fuselage's lower half and sweeps back and down to a rounded tip.
+      const xle = x1 - W.le * L, yr = yc + h * .42;
+      const R1 = { x: xle, y: yr }, R2 = { x: xle - W.root * 1.15, y: yr + 7 };
+      const T1 = { x: xle - W.sweep * 1.05, y: bot + W.drop * .95 }, T2 = { x: xle - W.sweep * 1.05 - W.tip * 1.5, y: bot + W.drop * .95 + 3 };
+      wingSvg = `<path class="ac-wing" style="fill:url(#acw${uid})" d="M${n1(R1.x)} ${n1(R1.y)} L${n1(T1.x)} ${n1(T1.y)} Q${n1(T1.x - 3)} ${n1(T1.y + 4)} ${n1(T2.x)} ${n1(T2.y)} L${n1(R2.x)} ${n1(R2.y)} Z"/>`
+              + `<path class="ac-flap" d="M${n1(lerp(R2.x, T2.x, .10))} ${n1(lerp(R2.y, T2.y, .10) - 1)} L${n1(lerp(R2.x, T2.x, .86))} ${n1(lerp(R2.y, T2.y, .86) - 1)}"/>`;
       wingletSvg = winglet(W.winglet, T1, T2, liv);
+      maxY = Math.max(maxY, T2.y + 3);
       for (const e of S.engines) {
         if (e.rear) {                                           // engine pod on the rear fuselage
-          const ex = x0 + tailLen * .78, ey = yc - h * .08;
-          engineSvg += `<path class="ac-pylon" d="M${n1(ex - e.w * .1)} ${n1(ey - e.h * .1)} L${n1(ex + e.w * .6)} ${n1(ey - e.h * .1)} L${n1(ex + e.w * .5)} ${n1(ey - e.h * .6)} L${n1(ex + e.w * .05)} ${n1(ey - e.h * .5)} Z"/>`
-            + `<rect class="ac-engine" x="${n1(ex - e.w / 2 + 4)}" y="${n1(ey - e.h / 2)}" width="${n1(e.w)}" height="${n1(e.h)}" rx="${n1(e.h / 2)}"/>`
-            + `<ellipse class="ac-dark" cx="${n1(ex + e.w / 2 + 1)}" cy="${n1(ey)}" rx="${n1(e.h * .2)}" ry="${n1(e.h * .36)}"/>`;
+          const ex = x0 + tailLen * .80, ey = yc - h * .12;
+          engineSvg += nacelle(ex, ey, e.w, e.h, "turbofan", liv, uid);
           continue;
         }
         const ex = lerp(R1.x, T1.x, e.t), ey = lerp(R1.y, T1.y, e.t);
-        const wingUnder = ey + 2;
-        const style = e.style;
-        // the pod hangs below and ahead of the leading edge; 737-style pods sit tighter to the wing
-        const cxE = ex + e.w * .10 + 4, cyE = ey + e.h * (style === "b737" ? .30 : .38) + 2;
-        engineSvg += nacelle(cxE, cyE, e.w, e.h, style, liv, wingUnder);
+        const cxE = ex + e.w * .16, cyE = ey + e.h * .72;       // hangs below and ahead of the leading edge
+        engineSvg += nacelle(cxE, cyE, e.w, e.h, e.style, liv, uid);
+        maxY = Math.max(maxY, cyE + e.h / 2);
       }
     }
 
-    // ---- details: windows, cockpit, doors, livery lines
-    const winY = yc - h * .30;
-    const wFrom = x0 + tailLen * .95, wTo = x1 - noseLen * 1.02, wr = d > 34 ? 1.7 : 1.45;
-    let windows = windowsRow(wFrom, wTo, winY, S.win, wr);
-    if (S.double) windows += windowsRow(wFrom + 6, wTo - 10, winY - h * .5, S.win, wr) ;
-    const cockpit = `<path class="ac-cockpit${S.mask ? " ac-mask" : ""}" d="M${n1(x1 - noseLen * .50)} ${n1(yc - h * .62)} L${n1(x1 - noseLen * .22)} ${n1(yc - h * .55)} Q${n1(x1 - noseLen * .09)} ${n1(yc - h * .40)} ${n1(x1 - noseLen * .07)} ${n1(yc - h * .16)} L${n1(x1 - noseLen * .26)} ${n1(yc - h * .24)} Z"/>`;
-    const door = (x) => `<rect class="ac-door" x="${n1(x)}" y="${n1(yc - h * .62)}" width="3.4" height="${n1(h * .78)}" rx="1.2"/>`;
-    const doors = door(x1 - noseLen - 8) + door(x0 + tailLen * .9);
-    const stripeY = yc + h * .22;
-    const stripe = `<path class="ac-stripe" style="stroke:${liv.stripe}" d="M${n1(x0 + tailLen * .7)} ${n1(stripeY + 1)} L${n1(x1 - noseLen * .55)} ${n1(stripeY)}"/>`;
+    // ---- details: windows, cockpit, doors, cheatline
+    const winY = yc - h * .28;
+    const wFrom = x0 + tailLen * .95, wTo = x1 - noseLen * 1.0, ww = d > 34 ? 2.8 : 2.4, wh = d > 34 ? 3.6 : 3.1;
+    let windows = windowsRow(wFrom, wTo, winY, S.win, ww, wh);
+    if (S.double) windows += windowsRow(wFrom + 6, wTo - 10, winY - h * .5, S.win, ww, wh);
+    const cockpit = `<path class="ac-cockpit" d="M${n1(x1 - noseLen * .52)} ${n1(yc - h * .60)} L${n1(x1 - noseLen * .24)} ${n1(yc - h * .54)} Q${n1(x1 - noseLen * .08)} ${n1(yc - h * .40)} ${n1(x1 - noseLen * .06)} ${n1(yc - h * .14)} L${n1(x1 - noseLen * .28)} ${n1(yc - h * .22)} Q${n1(x1 - noseLen * .44)} ${n1(yc - h * .30)} ${n1(x1 - noseLen * .52)} ${n1(yc - h * .60)} Z"/>`
+                  + `<path class="ac-shine" d="M${n1(x1 - noseLen * .46)} ${n1(yc - h * .52)} L${n1(x1 - noseLen * .26)} ${n1(yc - h * .47)}"/>`;
+    const door = (x) => `<rect class="ac-door" x="${n1(x)}" y="${n1(yc - h * .64)}" width="4" height="${n1(h * .82)}" rx="2"/>`;
+    const doors = door(x1 - noseLen - 9) + door(x0 + tailLen * .88);
+    const sY = yc + h * .26;
+    const stripe = `<path class="ac-stripe" style="stroke:${liv.stripe}" d="M${n1(x0 + tailLen * .62)} ${n1(sY + 2)} Q${n1(cx)} ${n1(sY - 1)} ${n1(x1 - noseLen * .62)} ${n1(sY - 4)}"/>`;
 
-    // ---- livery: tail colour, logo badge on the fin
-    const tailFill = liv.tail;
-    const finSvg = `<path class="ac-tail" style="fill:${tailFill}" d="${fin}"/>`
-      + `<path class="ac-tail-shade" d="M${n1(finBase2 + 6)} ${n1(yc - h * .8)} L${n1(tipRear + 3)} ${n1(finTop + 2)}"/>`;
+    const finSvg = `<path class="ac-tail" style="fill:${liv.tail}" d="${fin}"/><path class="ac-rudder" d="${rudder}"/>`
+      + `<path class="ac-tail-shade" d="M${n1(fb2 + 9)} ${n1(yc - h * .78)} L${n1(tipRear + 6)} ${n1(finTop + 4)}"/>`;
     const badge = `<g class="ac-logo-group">`
       + `<circle class="ac-logo-badge" cx="${n1(fcx)}" cy="${n1(fcy)}" r="${n1(badgeR)}"/>`
-      + `<text class="ac-logo-text" x="${n1(fcx)}" y="${n1(fcy + 3.6)}" text-anchor="middle" font-size="${n1(badgeR * .78)}"></text>`
-      + `<image class="ac-logo" x="${n1(fcx - badgeR * .72)}" y="${n1(fcy - badgeR * .72)}" width="${n1(badgeR * 1.44)}" height="${n1(badgeR * 1.44)}" preserveAspectRatio="xMidYMid meet" opacity="0"/>`
+      + `<text class="ac-logo-text" x="${n1(fcx)}" y="${n1(fcy + badgeR * .28)}" text-anchor="middle" font-size="${n1(badgeR * .78)}"></text>`
+      + `<image class="ac-logo" x="${n1(fcx - badgeR * .74)}" y="${n1(fcy - badgeR * .74)}" width="${n1(badgeR * 1.48)}" height="${n1(badgeR * 1.48)}" preserveAspectRatio="xMidYMid meet" opacity="0"/>`
       + `</g>`;
 
-    const grad = `<defs><linearGradient id="acf${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".62" stop-color="#eef2f8"/><stop offset="1" stop-color="#cfd8e6"/></linearGradient></defs>`;
+    const defs = `<defs>`
+      + `<linearGradient id="acf${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#f1f5fb"/><stop offset="1" stop-color="#d3dcea"/></linearGradient>`
+      + `<linearGradient id="acw${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dbe3ef"/><stop offset="1" stop-color="#bac7da"/></linearGradient>`
+      + `<linearGradient id="ace${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f7fc"/><stop offset="1" stop-color="#c3cfe1"/></linearGradient>`
+      + `</defs>`;
 
-    return `${grad}
-      <ellipse class="ac-shadow" cx="${n1(cx + 4)}" cy="121" rx="${n1(L * .38)}" ry="4"/>
-      ${wingSvg}${wingletSvg}
+    // fit the whole aircraft (tall tails, big wings) inside the 400 x 128 box, centred
+    const hgt = (maxY - minY) + 10, wid = L + 12;
+    const k = Math.min(1, 394 / wid, 112 / hgt);
+    const tx = cx - cx * k, ty = (128 - hgt * k) / 2 - (minY - 1) * k;
+    return `${defs}
+      <g transform="translate(${n1(tx)} ${n1(ty)}) scale(${n1(k * 1000) / 1000})">
+      <ellipse class="ac-shadow" cx="${n1(cx + 4)}" cy="${n1(maxY + 6)}" rx="${n1(L * .38)}" ry="3.6"/>
       ${stab}
       ${finSvg}
       ${hump}
@@ -354,7 +356,8 @@
       ${stripe}
       ${windows ? `<g class="ac-win">${windows}</g>` : ""}${doors}${cockpit}
       ${badge}
-      ${engineSvg}`;
+      ${wingSvg}${wingletSvg}${engineSvg}
+      </g>`;
   }
 
   // ------------------------------------------------------------------------------------------------ public API
