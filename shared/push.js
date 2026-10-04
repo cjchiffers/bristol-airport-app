@@ -49,7 +49,7 @@
   const fail = (code, msg) => Object.assign(new Error(msg || code), { code });
 
   /** Start following. Throws an Error with .code: "unsupported" | "denied" | "disabled" | "limit" | "server". */
-  async function follow(route, place){
+  async function follow(route, place, scheduled){
     if (!supported()) throw fail("unsupported");
     // The permission prompt must be the first thing after the tap.
     const perm = await Notification.requestPermission();
@@ -67,7 +67,8 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         subscription: typeof sub.toJSON === "function" ? sub.toJSON() : sub,
-        flight: { type: route.type, number: route.flight, date: route.date, place: place || "" },
+        // `scheduled` (when it is due at Bristol) lets the server check this flight often when it matters and rarely otherwise
+        flight: { type: route.type, number: route.flight, date: route.date, place: place || "", scheduled: scheduled || "" },
       }),
     });
     if (!res.ok) throw fail(res.status === 429 ? "limit" : "server", `subscribe HTTP ${res.status}`);

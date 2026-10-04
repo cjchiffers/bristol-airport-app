@@ -94,7 +94,10 @@ def test_following_a_flight_asks_permission_subscribes_and_tells_the_worker(ctx,
     assert path == "/api/push/subscribe"
     assert body["subscription"]["endpoint"].startswith("https://fcm.googleapis.com/")
     f = enabled.find("U2 2806", "arrival")[0]
+    sched = body["flight"].pop("scheduled")
     assert body["flight"] == {"type": "arrival", "number": "U2 2806", "date": f["arrival"]["scheduledTime"][:10], "place": "Kos"}
+    assert datetime.fromisoformat(sched.replace("Z", "+00:00")) == datetime.fromisoformat(f["arrival"]["scheduledTime"].replace(" ", "T")), \
+        "tells the server when the flight is due at Bristol (drives how often it is checked)"
     assert pg.inner_text("#toast") == "We’ll notify you about U2 2806"
     assert "Notifications are on" in pg.get_attribute("#notifyIconBtn", "title")
 

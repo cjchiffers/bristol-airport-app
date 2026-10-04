@@ -12,6 +12,10 @@ Implementation brief for an AI coding agent. Work through the phases in order. E
 > - `airports.min.json` is 0.5 MB (was 1.75 MB), loaded lazily and cached by the service worker rather than precached.
 > - Extra fixes found along the way: saved-flight identity bug (every star looked saved), `init()` running before later `const`s (TDZ), Open-Meteo sunrise/sunset shown in the wrong timezone, `hidden` badges ignored because of `display:inline-flex`, details container had no padding.
 >
+> **Follow-up work also done (Oct 2026):** worker hardening (own-site-only data routes, last-good-copy fallback, failure memory, quota logging),
+> pickup helper (likely-out window, keep-screen-on), Install app, Getting here, share previews, incoming-aircraft warning, live aircraft position,
+> flight history, Web Push notifications with an adaptive check schedule, airport names, self-hosted Leaflet, and a test suite (unit, worker, browser) with CI.
+>
 > **Still needs the owner:** revoke the old Aviation Edge key; deploy the worker (`CloudFlare/`, then delete the `AVIATION_EDGE_KEY` secret); real iPhone/Android test; review the uncommitted `index.html` change (see below).
 
 ---

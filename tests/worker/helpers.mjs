@@ -129,9 +129,15 @@ export function makeKV() {
   return {
     _m: m,
     async get(k) { live(); return m.has(k) ? m.get(k).value : null; },
-    async put(k, value, opts = {}) { m.set(k, { value, exp: opts.expiration || (opts.expirationTtl ? Math.floor(Date.now() / 1000) + opts.expirationTtl : 0) }); },
+    async put(k, value, opts = {}) {
+      // real Workers KV rules: an absolute expiry must be at least 60 s in the future
+      const exp = opts.expiration || (opts.expirationTtl ? Math.floor(Date.now() / 1000) + opts.expirationTtl : 0);
+      if (opts.expiration && opts.expiration < Math.floor(Date.now() / 1000) + 60) throw new Error("KV PUT failed: 400 Invalid expiration");
+      if (opts.expirationTtl && opts.expirationTtl < 60) throw new Error("KV PUT failed: 400 Invalid expiration_ttl");
+      m.set(k, { value, exp: opts.expiration || (opts.expirationTtl ? Math.floor(Date.now() / 1000) + opts.expirationTtl : 0) }); },
     async delete(k) { m.delete(k); },
     async list({ prefix = "", limit = 1000, cursor } = {}) {
+      if (limit > 1000) throw new Error("KV list failed: 400 limit must be <= 1000");    // real KV maximum
       live();
       const all = [...m.keys()].filter((k) => k.startsWith(prefix)).sort();
       const start = cursor ? Number(cursor) : 0;

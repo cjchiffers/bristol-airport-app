@@ -277,9 +277,9 @@ describe("worker: scheduled job", { skip: !workerExists && "CloudFlare/ is git-i
     up.state.flight = { sched: now + 30 * MIN };
     up.state.byNumber = () => [adbFlight({ number: "U2 2806", sched: now + 30 * MIN, ...(up.state.flightOver || {}) })];
   });
-  const post = (flight, browser = br) => call(worker, "/api/push/subscribe", { method: "POST", env, body: JSON.stringify({ subscription: browser.subscription, flight: { type: "arrival", number: "U2 2806", date: today(), place: "Kos", ...flight } }), headers: { "Content-Type": "application/json" } });
+  const post = (flight, browser = br) => call(worker, "/api/push/subscribe", { method: "POST", env, body: JSON.stringify({ subscription: browser.subscription, flight: { type: "arrival", number: "U2 2806", date: today(), place: "Kos", scheduled: new Date(now + 30 * MIN).toISOString(), ...flight } }), headers: { "Content-Type": "application/json" } });
   const cron = async () => { const pending = []; await worker.scheduled({}, env, { waitUntil: (p) => pending.push(p) }); await Promise.all(pending); };
-  const job = () => worker._internals.runPushJob(env, { waitUntil: () => {} });
+  const job = () => worker._internals.runPushJob(env, { waitUntil: () => {} }, { force: true });   // force = ignore the adaptive cadence (tested separately)
   const tick = (min) => mock.timers.tick(min * MIN);
 
   test("without configuration the job does nothing", async () => {
@@ -389,6 +389,95 @@ describe("worker: scheduled job", { skip: !workerExists && "CloudFlare/ is git-i
     const s = await job();
     assert.equal(up.calls.filter((u) => u.includes("/flights/number/")).length, 40);
     assert.equal(s.subscriptions, 45);
+  });
+
+  test("a record about to expire is released instead of crashing the job (KV rejects expiry < 60 s away)", async () => {
+    await post(); await job();
+    const key = (await env.PUSH_SUBS.list({ prefix: "s:" })).keys[0].name;
+    const rec = JSON.parse(await env.PUSH_SUBS.get(key));
+    await env.PUSH_SUBS._m.set(key, { value: JSON.stringify({ ...rec, exp: Math.floor(Date.now() / 1000) + 30 }), exp: 0 });
+    tick(10); up.state.flightOver = { sched: now + 30 * MIN, status: "Canceled" };
+    const s = await job();                                         // would throw "Invalid expiration" if it tried to re-save
+    assert.equal(s.sent, 1, "they still get the last message");
+    assert.equal(await env.PUSH_SUBS.get(key), null);
+  });
+
+  test("a corrupt record is cleaned up and one bad subscription never stops everyone else's", async () => {
+    const good = await makeBrowser();
+    await post({}, good); await job();                                           // baseline for the good one
+    await env.PUSH_SUBS.put(`s:${"0".repeat(32)}:arrival:U22806:${today()}`, "{not json", { expirationTtl: 3600 });
+    const broken = { subscription: { endpoint: "https://fcm.googleapis.com/fcm/send/broken", keys: { p256dh: "AAAA", auth: "AAAA" } } };
+    await env.PUSH_SUBS.put(`s:${"1".repeat(32)}:arrival:U22806:${today()}`, JSON.stringify({
+      endpoint: broken.subscription.endpoint, keys: broken.subscription.keys, type: "arrival", number: "U2 2806", date: today(), place: "Kos",
+      state: { init: true }, exp: Math.floor(Date.now() / 1000) + 3600,
+    }), { expirationTtl: 3600 });
+    tick(10); up.state.flightOver = { sched: now + 30 * MIN, status: "Canceled" };
+    const s = await job();
+    assert.equal(s.sent, 1, "the healthy subscriber was still notified");
+    assert.equal(up.state.pushes.at(-1).url, good.subscription.endpoint);
+    assert.equal(await env.PUSH_SUBS.get(`s:${"0".repeat(32)}:arrival:U22806:${today()}`), null, "corrupt entry removed");
+    assert.ok(s.failed >= 1, "the broken subscription is counted, not fatal");
+  });
+
+  test("the service refuses new followers once the store is full (KV lists at most 1000 keys)", async () => {
+    for (let i = 0; i < 1000; i++) await env.PUSH_SUBS.put(`s:${String(i).padStart(32, "0")}:arrival:X${i}:${today()}`, "{}", { expirationTtl: 3600 });
+    const r = await post();
+    assert.equal(r.status, 503);
+  });
+
+  test("adaptive schedule: dense around the flight, sparse far from it", async () => {
+    const { checkIntervalSlots: slots } = worker._internals;
+    const at = (deltaMin) => slots(now + deltaMin * MIN, now);
+    assert.equal(at(8 * 60), 12, "8 h before: hourly");
+    assert.equal(at(3 * 60), 3, "3 h before: every 15 min");
+    assert.equal(at(60), 1, "1 h before: every 5 min");
+    assert.equal(at(-10), 1, "just after: every 5 min");
+    assert.equal(at(-60), 3, "1 h after: every 15 min");
+    assert.equal(at(-3 * 60), 12, "3 h after: hourly");
+    assert.equal(slots(NaN, now), 3, "unknown time: every 15 min");
+  });
+
+  test("a far-off flight is checked about once an hour, a near one every run (provider calls over an hour)", async () => {
+    const lookups = () => up.calls.filter((u) => u.includes("/flights/number/")).length;
+    const farPost = await post({ number: "U2 3001", scheduled: new Date(now + 10 * 60 * MIN).toISOString() }, await makeBrowser());
+    const nearPost = await post({ number: "U2 3002", scheduled: new Date(now + 40 * MIN).toISOString() }, await makeBrowser());
+    assert.equal(farPost.status, 200); assert.equal(nearPost.status, 200);
+    const run = () => worker._internals.runPushJob(env, { waitUntil: () => {} });     // real cadence, no force
+    await run();                                                                       // first run: baselines both
+    up.calls.length = 0;
+    for (let i = 0; i < 12; i++) { tick(5); await run(); }                             // one hour of 5-minute runs
+    const far = up.calls.filter((u) => u.includes("/flights/number/U23001")).length;
+    const near = up.calls.filter((u) => u.includes("/flights/number/U23002")).length;
+    assert.equal(far, 1, `far-off flight looked up ${far} times in an hour (expected 1)`);
+    assert.ok(near >= 6, `near flight looked up ${near} times (it moves into the dense window; expected many)`);
+    assert.ok(lookups() < 12 * 2, "far fewer provider calls than checking everything every run");
+  });
+
+  test("a flight nobody has been checked for yet is always due (so subscribers get a baseline within 5 minutes)", async () => {
+    const { groupDue } = worker._internals;
+    assert.equal(groupDue("arrival:U22806:x", [{ state: null, sched: now + 20 * 60 * 60e3 }], now), true);
+    const hits = (id) => { let n = 0; for (let i = 0; i < 12; i++) if (groupDue(id, [{ state: {}, sched: now + 20 * 60 * 60e3 }], now + i * 5 * MIN)) n++; return n; };
+    assert.equal(hits("arrival:U22806:2026-10-04"), 1, "exactly one slot in twelve for a far flight");
+    assert.equal(hits("departure:LS1889:2026-10-04"), 1);
+    const near = (id) => { let n = 0; for (let i = 0; i < 12; i++) if (groupDue(id, [{ state: {}, sched: now + 12 * 60 * 60e3 + i * 5 * MIN }], now + 12 * 60 * 60e3 + i * 5 * MIN - 20 * MIN)) n++; return n; };
+    assert.equal(near("arrival:U22806:2026-10-04"), 12, "every slot when due within 30 minutes");
+  });
+
+  test("subscribe stores the scheduled time, but ignores an absurd one", async () => {
+    const recordFor = async (browser) => {
+      for (const k of (await env.PUSH_SUBS.list({ prefix: "s:" })).keys) {
+        const rec = JSON.parse(await env.PUSH_SUBS.get(k.name));
+        if (rec.endpoint === browser.subscription.endpoint) return rec;
+      }
+    };
+    const good = new Date(now + 2 * 3600e3).toISOString();
+    await post({ scheduled: good });
+    assert.equal((await recordFor(br)).sched, Date.parse(good));
+    for (const bad of ["1999-01-01T00:00:00Z", "not a date", "", null, 12]) {
+      const b = await makeBrowser();
+      assert.equal((await post({ scheduled: bad }, b)).status, 200, "a bad scheduled time must not reject the subscription");
+      assert.equal((await recordFor(b)).sched, null, `ignored: ${JSON.stringify(bad)}`);
+    }
   });
 
   test("a flight that does not operate to Bristol is ignored quietly", async () => {

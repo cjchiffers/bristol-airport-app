@@ -1364,8 +1364,9 @@ if (els.arrKv) {
     } else {
       const F = window.BrsFlights;
       const other = state.current ? F.otherSeg(state.current, route.type).iataCode : "";
+      const due = state.current ? F.scheduledTime(state.current, route.type) : null;
       try {
-        await window.BrsPush.follow(route, other ? F.cityOf(other) : "");
+        await window.BrsPush.follow(route, other ? F.cityOf(other) : "", due ? due.toISOString() : "");
         showToast(`We’ll notify you about ${name}`);
       } catch (e) {
         const msg = {
