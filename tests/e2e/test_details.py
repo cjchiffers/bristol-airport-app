@@ -378,3 +378,26 @@ def test_background_glow_does_not_tile_when_scrolling(new_context, base_url, api
         im = Image.open(io.BytesIO(pg.screenshot())).convert("RGB")
         samples.append(im.getpixel((2, 120)))               # page edge near the top of the viewport
     assert len(set(samples)) == 1, f"background changes while scrolling (tiling): {samples}"
+
+
+# ----------------------------------------------------------------------------- share previews
+def test_share_link_uses_the_preview_address_when_the_worker_supports_it(page, base_url, api):
+    api.features = {"tiles": True, "history": True, "preview": True}
+    open_flight(page, base_url, api, "U2 2806", "arrival")
+    page.wait_for_function("window.BrsConfig.features.preview === true")
+    page.evaluate("window.__shared=null; navigator.share = (d) => { window.__shared = d; return Promise.resolve(); }")
+    page.click("#shareIconBtn")
+    url = page.evaluate("window.__shared.url")
+    f = api.find("U2 2806", "arrival")[0]
+    date = f["arrival"]["scheduledTime"][:10]
+    assert url == f"https://flightapp-workers.chiffers.com/s/arrival/U2%202806/{date}?p=Kos", url
+
+
+def test_share_link_falls_back_to_the_app_url_with_an_older_worker(page, base_url, api):
+    api.features = {}                                           # an older worker: no preview support
+    open_flight(page, base_url, api, "U2 2806", "arrival")
+    page.wait_for_function("window.BrsConfig.featuresReady !== null")
+    page.evaluate("window.BrsConfig.featuresReady")
+    page.evaluate("window.__shared=null; navigator.share = (d) => { window.__shared = d; return Promise.resolve(); }")
+    page.click("#shareIconBtn")
+    assert page.evaluate("window.__shared.url") == page.url

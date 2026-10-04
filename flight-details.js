@@ -412,8 +412,10 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
 
   function shareCurrent() {
     if (!state.current || !state.route) return;
-    // Share exactly the URL being viewed (type/flight/date) so the link always resolves.
-    window.BrsFlights.shareFlight(state.current, state.route.type, showToast, window.BrsFlights.urlFor(state.route));
+    // The link carries type/flight/date, so it always resolves (via the worker's preview page when available).
+    const F = window.BrsFlights;
+    const other = F.otherSeg(state.current, state.route.type).iataCode;
+    F.shareFlight(state.current, state.route.type, showToast, F.shareUrl(state.route, F.cityOf(other)));
   }
 
   if (els.backBtn) els.backBtn.addEventListener("click", goBack);

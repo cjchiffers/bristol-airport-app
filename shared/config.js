@@ -8,6 +8,7 @@
 
 window.BrsConfig = {
   API_BASE: "https://flightapp-workers.chiffers.com/api",
+  WORKER_ORIGIN: "https://flightapp-workers.chiffers.com",   // for /s/… share-preview links
   AIRPORT: "BRS",
   features: {},
   featuresReady: null,

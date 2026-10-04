@@ -137,6 +137,20 @@ describe("flights.js: shareable URLs, cache, share text, calendar", () => {
   });
 });
 
+describe("flights.js: share URL", () => {
+  const route = { type: "arrival", flight: "U2 2806", date: "2026-10-03" };
+  const cfg = (features) => loadShared(["shared/time.js", "shared/flights.js"], { BrsConfig: { WORKER_ORIGIN: "https://w.example", features } }).BrsFlights;
+  test("uses the worker's preview address when it supports it, with the place name", () => {
+    assert.equal(cfg({ preview: true }).shareUrl(route, "Kos"), "https://w.example/s/arrival/U2%202806/2026-10-03?p=Kos");
+    assert.equal(cfg({ preview: true }).shareUrl(route, "São Paulo & Co"), "https://w.example/s/arrival/U2%202806/2026-10-03?p=S%C3%A3o%20Paulo%20%26%20Co");
+  });
+  test("falls back to the app URL for an older worker (never a broken link)", () => {
+    for (const features of [{}, undefined, { preview: false }]) {
+      assert.equal(cfg(features).shareUrl(route, "Kos"), "https://flightapp.chiffers.com/flight-details.html?type=arrival&flight=U2%202806&date=2026-10-03");
+    }
+  });
+});
+
 describe("aircraft.js", () => {
   const cases = {
     narrowbody: ["Airbus A320", "Boeing 737-800", "Airbus A319", "Boeing 737 MAX 8", "Airbus A321 NEO", "Airbus A320 (Sharklets)", "Airbus A220-300", "Boeing 757-200", "Airbus A319 (Sharklets)", ""],
