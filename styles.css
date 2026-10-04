@@ -70,7 +70,7 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
 .topbar{
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 1100; /* above Leaflet (controls reach 1000) so the header menu overlays the map */
   display:flex;
   align-items:center;
   justify-content:space-between;

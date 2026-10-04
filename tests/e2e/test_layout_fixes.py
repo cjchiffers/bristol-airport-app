@@ -133,3 +133,47 @@ def test_long_airline_names_do_not_break_the_row(new_context, base_url, api):
     name = pg.locator("#heroAirlineName").bounding_box()
     card = pg.locator("#heroCard").bounding_box()
     assert name["x"] + name["width"] <= card["x"] + card["width"] + 0.5
+
+
+# ------------------------------------------------------------------------------------------------- stacking
+@pytest.mark.parametrize("width,height", [(375, 700), (1440, 900)])
+def test_menu_opens_on_top_of_the_map(new_context, base_url, api, width, height):
+    """Leaflet gives its panes/controls z-index up to 1000, which used to put the map's zoom buttons, attribution and
+    tiles in front of the header menu once the map had scrolled underneath it."""
+    pg = new_context(width=width, height=height).new_page()
+    open_details(pg, base_url, moved_flight(api))
+    pg.wait_for_selector("#routeMap .leaflet-control-zoom", timeout=10000)
+    # scroll until the map fills the area directly under the open menu
+    pg.evaluate("""() => { const r = document.getElementById('routeMap').getBoundingClientRect(); window.scrollBy(0, r.top - 70); }""")
+    pg.wait_for_timeout(300)
+    pg.click("#overflowDetailsBtn")
+    pg.wait_for_selector("#detailsMenu.open")
+    map_box = pg.locator("#routeMap").bounding_box()
+    menu_box = pg.locator("#detailsMenu").bounding_box()
+    overlap = min(map_box["y"] + map_box["height"], menu_box["y"] + menu_box["height"]) - max(map_box["y"], menu_box["y"])
+    assert overlap > 40, f"test setup: the map must be under the menu (overlap {overlap}px)"
+    items = pg.locator("#detailsMenu .menu-item")
+    assert items.count() >= 3
+    for i in range(items.count()):
+        b = items.nth(i).bounding_box()
+        for fx in (.15, .5, .85):                                   # left, middle and right of each item
+            x, y = b["x"] + b["width"] * fx, b["y"] + b["height"] / 2
+            top = pg.evaluate(f"(() => {{ const e = document.elementFromPoint({x}, {y}); return e && e.closest('#detailsMenu') !== null; }})()")
+            assert top, f"menu item {i} is covered by something else at ({x:.0f},{y:.0f})"
+    # corners of the menu panel itself, where the map's zoom control / attribution used to poke through
+    for (x, y) in ((menu_box["x"] + 6, menu_box["y"] + 6), (menu_box["x"] + menu_box["width"] - 6, menu_box["y"] + 6),
+                   (menu_box["x"] + 6, menu_box["y"] + menu_box["height"] - 6), (menu_box["x"] + menu_box["width"] - 6, menu_box["y"] + menu_box["height"] - 6)):
+        assert pg.evaluate(f"document.elementFromPoint({x}, {y}).closest('#detailsMenu') !== null"), f"covered at ({x:.0f},{y:.0f})"
+    # and it can actually be used: clicking an item inside the map's area triggers the item, not the map
+    pg.click("#shareBtn")
+    pg.wait_for_function("document.getElementById('toast').textContent !== ''")
+
+
+def test_header_stays_above_everything_while_scrolling(new_context, base_url, api):
+    pg = new_context(width=375, height=700).new_page()
+    open_details(pg, base_url, moved_flight(api))
+    pg.wait_for_selector("#routeMap .leaflet-control-zoom", timeout=10000)
+    pg.evaluate("""() => { const r = document.getElementById('routeMap').getBoundingClientRect(); window.scrollBy(0, r.top - 90); }""")
+    pg.wait_for_timeout(300)
+    b = pg.locator("#backBtn").bounding_box()
+    assert pg.evaluate(f"document.elementFromPoint({b['x'] + b['width'] / 2}, {b['y'] + b['height'] / 2}).closest('header') !== null"), "map is painting over the header"
