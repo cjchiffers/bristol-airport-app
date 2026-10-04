@@ -16,35 +16,6 @@
   box-shadow: var(--shadow);
 }
 
-.hero-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.hero-flight-number {
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  font-family: var(--mono);
-}
-
-.hero-times-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--stroke);
-}
-
-.hero-time-block {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 .hero-date {
   font-size: 13px;
   font-weight: 700;
@@ -56,29 +27,6 @@
   font-weight: 800;
   letter-spacing: 0.3px;
   margin-bottom: 2px;
-}
-
-.hero-time-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.hero-time-main {
-  font-size: 36px;
-  font-weight: 950;
-  line-height: 1;
-  font-family: var(--mono);
-  letter-spacing: 0;
-}
-
-.hero-time-old {
-  font-size: 18px;
-  font-weight: 700;
-  font-family: var(--mono);
-  color: var(--muted);
-  text-decoration: line-through;
-  opacity: 0.6;
 }
 
 .hero-delay-badge {
@@ -211,16 +159,8 @@
 
 /* Responsive adjustments */
 @media (max-width: 380px) {
-  .hero-time-main {
-    font-size: 32px;
-  }
-  
   .hero-info-grid {
     grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .hero-times-grid {
-    gap: 16px;
   }
 }
 
@@ -485,43 +425,6 @@ details.raw pre{
   border: 1px solid var(--stroke);
   background: rgba(0,0,0,.25);
   padding: 12px;
-}
-
-/* Menu (same behavior as index, but keep local fallbacks) */
-.menu{
-  display:none;
-  position:absolute;
-  right: 12px;
-  top: 54px;
-  min-width: 220px;
-  background: rgba(16, 20, 34, .92);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,.14);
-  border-radius: 16px;
-  padding: 8px;
-  box-shadow: var(--shadow);
-}
-.menu.open{ display:block; }
-.menu-item{
-  width:100%;
-  text-align:left;
-  border:0;
-  background: transparent;
-  color: var(--text);
-  padding: 10px 10px;
-  border-radius: 12px;
-  font-weight: 750;
-  font-size: 14px;
-}
-.menu-item:hover,
-.menu-item:focus{
-  outline:none;
-  background: rgba(255,255,255,.08);
-}
-.menu-sep{
-  height:1px;
-  background: rgba(255,255,255,.10);
-  margin: 6px 6px;
 }
 
 /* Buttons (match redesign) */
@@ -789,125 +692,11 @@ body.leaflet-on #routeSvg{ display:none; }
   animation: opsFlash 900ms ease-in-out 1;
 }
 
-/* Hero airline (logo + name + initials fallback) */
-/* 
-  Hero airline row sits above the flight number.
-  - Logo is shown if it loads successfully.
-  - Otherwise we show a small initials tile (e.g. U2 / KL / FR).
-  - Name is always shown when available.
-*/
-.hero-airline{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin-bottom:6px; /* Keeps hierarchy: airline -> flight number */
-  min-height:28px;   /* Avoid layout jump while logo loads */
-}
-
-/* Slightly larger hero logo (still subtle) */
-.airline-logo--hero{
-  width:34px;
-  height:34px;
-  border-radius:10px;
-  object-fit:contain;
-  background:#fff;
-  display:block;
-  opacity:0;
-  transition: opacity 120ms ease;
-}
-
-/* Initials fallback occupies the same footprint as the logo */
-.airline-initials--hero{
-  width:34px;
-  height:34px;
-  border-radius:10px;
-  background:#e5e7eb;
-  color:#374151;
-  font-weight:900;
-  font-size:13px;
-  line-height:34px;
-  text-align:center;
-  display:block;
-  opacity:0;
-  transition: opacity 120ms ease;
-}
-
-/* Airline name next to the logo/initials */
-.airline-name--hero{
-  font-weight:800;
-  font-size:14px;
-  opacity:0.9;
-  white-space:nowrap;
-}
-
-/* Hero header: airline above flight number (single source of truth) */
-.hero-card-header{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:6px;
-}
-
 /* Remove unused 3-dots menu button on hero */
 #heroMenuBtn{ display:none !important; }
 
 /* Hide legacy airline card (airline now lives in hero header) */
 .airline-row{ display:none !important; }
-
-/* Hero airline visuals: allow JS to reveal via opacity */
-.airline-logo--hero{ display:block; opacity:0; }
-.airline-initials--hero{ display:block; opacity:0; }
-
-/* --- Fixes: hero airline placement + belt alignment + hide legacy airline row --- */
-
-/* Hero header should stack airline above flight number */
-.hero-card-header{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:8px;
-}
-
-/* Hero airline row */
-.hero-airline{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  min-height:40px;
-}
-
-/* Allow JS to reveal via opacity */
-.airline-logo--hero{
-  width:34px;
-  height:34px;
-  border-radius:10px;
-  object-fit:contain;
-  background:#fff;
-  display:block;
-  opacity:0;
-  transition:opacity 120ms ease;
-}
-
-.airline-initials--hero{
-  width:34px;
-  height:34px;
-  border-radius:10px;
-  background:#e5e7eb;
-  color:#374151;
-  font-weight:900;
-  font-size:13px;
-  line-height:34px;
-  text-align:center;
-  display:block;
-  opacity:0;
-  transition:opacity 120ms ease;
-}
-
-.airline-name--hero{
-  font-weight:800;
-  letter-spacing:.2px;
-  opacity:.85;
-}
 
 /* Hide the legacy airline card lower down (we now show airline in the hero) */
 .airline-row{ display:none !important; }
@@ -961,7 +750,7 @@ body.details-page{ --maxw: 720px; }
 .details-topbar .details-title{ flex: 1; min-width: 0; padding: 0 10px; text-align: center; }
 .details-headline, .details-subhead{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- Aircraft illustration (generic side view, see shared/aircraft.js) ---- */
+
 .aircraft-art{
   margin: 0 0 12px;
   padding: 14px 10px 4px;
@@ -972,18 +761,6 @@ body.details-page{ --maxw: 720px; }
   .aircraft-art{ background: linear-gradient(180deg, #12203a 0%, #2c4f7c 100%); }
 }
 .aircraft-art[hidden]{ display:none; }
-.ac-svg{ display:block; width:100%; max-width:480px; height:auto; margin:0 auto; overflow:visible; }
-.ac-fuse{ fill:#f8fafd; stroke:#9fb0c7; stroke-width:1; }
-.ac-wing{ fill:#dce4ef; stroke:#9fb0c7; stroke-width:1; }
-.ac-engine{ fill:#cbd5e4; stroke:#8fa1ba; stroke-width:1; }
-.ac-pylon{ fill:#b9c5d7; }
-.ac-dark{ fill:#4d5c75; }
-.ac-tail{ fill: var(--accent); stroke:#5b9fdc; stroke-width:1; }
-.ac-stripe{ stroke: var(--accent); stroke-width:3; fill:none; stroke-linecap:round; }
-.ac-win, .ac-cockpit{ fill:#51627e; }
-.ac-prop{ fill: rgba(255,255,255,.38); }
-.ac-prop-blade{ stroke:#51627e; stroke-width:2; opacity:.55; }
-.ac-shadow{ fill: rgba(0,0,0,.10); }
 
 /* ---- Recent history (loaded when opened) ---- */
 .history-card summary{
@@ -1042,3 +819,137 @@ body.details-page{ --maxw: 720px; }
   border-color: color-mix(in srgb, var(--accent) 55%, var(--stroke));
 }
 #notifyIconBtn[aria-pressed="true"] .bell{ fill: currentColor; fill-opacity: .25; }
+
+
+/* ---- Hero: airline row — [logo] [airline] [flight number] on ONE line ---- */
+.hero-card-header{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap: 4px 14px;
+  margin-bottom: 16px;
+}
+.hero-airline{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  min-width: 0;
+}
+.hero-logo{
+  position: relative;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+}
+/* logo and the initials fallback sit on top of each other; the script fades whichever applies in */
+.airline-logo--hero,
+.airline-initials--hero{
+  position:absolute;
+  inset:0;
+  width:48px;
+  height:48px;
+  border-radius: 13px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.airline-logo--hero{
+  object-fit: contain;
+  padding: 5px;
+  background:#fff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.08);
+}
+.airline-initials--hero{
+  display:grid;
+  place-items:center;
+  background:#e5e7eb;
+  color:#374151;
+  font-weight: 900;
+  font-size: 16px;
+}
+.airline-name--hero{
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: .1px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hero-flight-number{
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---- Hero: times. Never wider than the card, however late the flight is ---- */
+.hero-times-grid{
+  display:grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--stroke);
+}
+.hero-time-block{
+  display:flex;
+  flex-direction:column;
+  gap: 6px;
+  min-width: 0;
+}
+/* The new time is big; the scheduled time that was struck through wraps underneath if the column is too narrow
+   (it used to run off the right-hand edge of the card on phones). */
+.hero-time-row{
+  display:flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+}
+.hero-time-main{
+  font-size: clamp(28px, 9.6vw, 36px);
+  font-weight: 950;
+  line-height: 1;
+  font-family: var(--mono);
+  letter-spacing: 0;
+}
+.hero-time-old{
+  font-size: clamp(14px, 4.4vw, 18px);
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--muted);
+  text-decoration: line-through;
+  opacity: .75;
+}
+.hero-delay-badge{ max-width: 100%; white-space: normal; }
+
+/* list cards: same guard — the pair of times may wrap rather than overflow */
+.time-wrap{ flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+
+
+/* ---- Aircraft illustration (shared/aircraft.js): model-specific shape, airline tail colour + logo ---- */
+.ac-svg{ display:block; width:100%; max-width:520px; height:auto; margin:0 auto; overflow:visible; }
+.ac-fuse{ fill:#f6f8fc; stroke:#a8b6cb; stroke-width:.9; }
+.ac-belly{ fill:#9fb0c8; opacity:.28; }
+.ac-wing{ fill:#dfe6f0; stroke:#9fb0c7; stroke-width:.9; }
+.ac-flap{ stroke:#9fb0c7; stroke-width:.8; fill:none; opacity:.8; }
+.ac-winglet{ stroke:rgba(0,0,0,.18); stroke-width:.7; }
+.ac-engine{ fill:#d3dbe8; stroke:#8fa1ba; stroke-width:.9; }
+.ac-pylon{ fill:#b4c1d4; }
+.ac-shine{ stroke:rgba(255,255,255,.75); stroke-width:1.2; stroke-linecap:round; fill:none; }
+.ac-dark{ fill:#46556e; }
+.ac-tail{ stroke:rgba(0,0,0,.2); stroke-width:.8; }
+.ac-tail-shade{ stroke:rgba(255,255,255,.28); stroke-width:1.4; fill:none; stroke-linecap:round; }
+.ac-stripe{ stroke-width:2.2; fill:none; stroke-linecap:round; opacity:.95; }
+.ac-win{ fill:#4f6080; }
+.ac-door{ fill:none; stroke:#9aa9bf; stroke-width:.8; }
+.ac-cockpit{ fill:#4a5a78; }
+.ac-mask{ fill:#2c3a54; }
+.ac-logo-badge{ fill:#fff; stroke:rgba(0,0,0,.22); stroke-width:.8; }
+.ac-logo-text{ fill:#33415a; font-weight:900; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; letter-spacing:.2px; }
+.ac-prop{ fill: rgba(255,255,255,.30); stroke: rgba(70,85,110,.35); stroke-width:.5; }
+.ac-blade{ stroke:#46556e; stroke-width:2.3; stroke-linecap:round; opacity:.55; }
+.ac-hub{ fill:#46556e; }
+.ac-shadow{ fill: rgba(0,0,0,.10); }

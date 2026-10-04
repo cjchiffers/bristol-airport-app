@@ -15,6 +15,7 @@
   --shadow: 0 12px 34px rgba(0,0,0,.45);
   --radius: 18px;
   --radius2: 14px;
+  --menu-bg: #151a2b;      /* popup menus are opaque so nothing shows through them */
   --maxw: 720px;   /* content width; wider on desktop (see media query at the bottom) */
   --gutter: max(14px, calc((100% - var(--maxw)) / 2 + 14px));
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
@@ -29,6 +30,7 @@
     --text:#0D1324;
     --muted: rgba(13,19,36,.62);
     --shadow: 0 10px 30px rgba(13,19,36,.14);
+    --menu-bg: #ffffff;
   }
 }
 
@@ -83,8 +85,9 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   width: 34px; height: 34px;
   object-fit: contain;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
-  padding: 6px;
+  background: #fff;                 /* the logo is navy on transparent: needs a light tile in dark mode too */
+  padding: 5px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.08);
 }
 .brand-text{ min-width:0; }
 .brand-name{ font-weight: 800; font-size: 14px; line-height: 1.1; }
@@ -117,17 +120,19 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   position:absolute;
   top: 64px;
   right: var(--gutter);
-  width: 210px;
+  min-width: 210px;
   padding: 8px;
   border-radius: 16px;
   border: 1px solid var(--stroke);
-  background: color-mix(in srgb, var(--bg) 80%, transparent);
-  backdrop-filter: blur(12px);
+  background: var(--menu-bg);
+  color: var(--text);
   box-shadow: var(--shadow);
   display:none;
+  z-index: 40;
 }
 .menu.open{ display:block; }
 .menu-item{
+  display:block;
   width:100%;
   text-align:left;
   appearance:none;
@@ -136,10 +141,21 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
   color: var(--text);
   padding: 12px 12px;
   border-radius: 12px;
+  font: inherit;
   font-weight: 700;
+  font-size: 14px;
   cursor:pointer;
 }
-.menu-item:hover{ background: var(--surface); }
+.menu-item:hover,
+.menu-item:focus-visible{
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.menu-sep{
+  height:1px;
+  background: var(--stroke);
+  margin: 6px 6px;
+}
 
 .search{
   background: var(--surface);
@@ -595,3 +611,5 @@ body{ font-size: 16px; }
 .menu-item[hidden]{ display:none; }
 
 a.menu-item{ display:block; text-decoration:none; }
+
+.fc-top{ flex-wrap: wrap; }

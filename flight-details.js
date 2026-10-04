@@ -205,7 +205,7 @@
     intervalMs: 60000,
     timer: null,
     countdownTimer: null,
-    aircraftKind: null,
+    aircraftSig: null,
     history: { loaded: false, loading: false },
     inbound: { at: 0, loading: false },
     notify: { available: false, iosNeedsInstall: false },
@@ -791,13 +791,18 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     if (els.aircraftType) {
       els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
     }
-    // Generic side-view illustration chosen from the model name (not a photo of the actual aircraft)
+    // Side-view illustration: the shape of the aircraft MODEL, painted in the AIRLINE's tail colour with its logo
+    // (an illustration, not a photo of the actual aircraft). Redrawn only when the model or airline changes.
     if (els.aircraftArt && window.BrsAircraft) {
-      const kind = window.BrsAircraft.kindFor(acText);
-      if (kind !== state.aircraftKind) {
-        state.aircraftKind = kind;
-        els.aircraftArt.innerHTML = window.BrsAircraft.svg(kind);
-        els.aircraftArt.setAttribute("aria-label", `Illustration of a ${window.BrsAircraft.label(kind)}${acText ? ` (${acText})` : ""}`);
+      const A = window.BrsAircraft;
+      const code = String(airlineIata || (displayNo !== "—" ? String(displayNo).slice(0, 2) : "")).trim().toUpperCase();
+      const sig = `${acText}|${code}|${airlineNameVal}`;
+      if (sig !== state.aircraftSig) {
+        state.aircraftSig = sig;
+        const fam = A.render(els.aircraftArt, { modelText: acText, iata: code, name: airlineNameVal === "—" ? "" : airlineNameVal });
+        const known = A.liveryFor(code, airlineNameVal).known && airlineNameVal && airlineNameVal !== "—";
+        els.aircraftArt.setAttribute("aria-label",
+          `Illustration of a ${A.label(fam.kind)}${acText ? ` (${acText})` : ""}${known ? ` in ${airlineNameVal} colours` : ""}`);
         els.aircraftArt.hidden = false;
       }
     }

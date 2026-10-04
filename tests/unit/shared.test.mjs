@@ -167,10 +167,73 @@ describe("aircraft.js", () => {
   test("every kind renders a well-formed decorative svg", () => {
     for (const k of Object.keys(cases)) {
       const s = A.svg(k);
-      assert.match(s, /^<svg [^>]*viewBox="0 0 400 140"[^>]*aria-hidden="true">/);
+      assert.match(s, /^<svg [^>]*viewBox="0 0 400 128"[^>]*aria-hidden="true">/);
       assert.equal((s.match(/<svg/g) || []).length, 1); assert.ok(s.trim().endsWith("</svg>"));
       assert.ok(A.label(k));
     }
+  });
+});
+
+describe("aircraft.js: model families and airline liveries", () => {
+  const fam = (m) => A.familyFor(m).key;
+  test("each model gets its own shape, with variants", () => {
+    const want = {
+      "Airbus A320": "a320", "Airbus A320 NEO": "a320", "Airbus A320 (Sharklets)": "a320", "Airbus A319": "a320", "Airbus A321 NEO": "a320",
+      "Boeing 737-800": "b737", "Boeing 737": "b737", "Boeing 737 MAX 8": "b737", "Boeing 737-700": "b737",
+      "ATR 72": "atr", "Bombardier Dash 8 Q400": "q400", "De Havilland DHC-8-400": "q400",
+      "Embraer 175": "ejet", "Embraer 190": "ejet", "Embraer RJ145": "erj", "Bombardier CRJ900": "crj",
+      "Boeing 787-9": "b787", "Boeing 777-300": "b777", "Boeing 767-300": "b767", "Boeing 757-200": "b757", "Airbus A330-200": "a330",
+      "Airbus A350-900": "a350", "Boeing 747-400": "b747", "Airbus A380": "a380", "Airbus A340-600": "a340", "Airbus A220-300": "a220",
+      "": "a320", "Some Unknown Jet": "a320",
+    };
+    for (const [m, key] of Object.entries(want)) assert.equal(fam(m), key, m || "(blank)");
+  });
+  test("variants change length and winglets", () => {
+    assert.ok(A.familyFor("Airbus A319").scale < 1 && A.familyFor("Airbus A321").scale > 1);
+    assert.equal(A.familyFor("Airbus A320").winglet, "fence");
+    assert.equal(A.familyFor("Airbus A320 NEO").winglet, "sharklet");
+    assert.equal(A.familyFor("Airbus A320 (Sharklets)").winglet, "sharklet");
+    assert.equal(A.familyFor("Boeing 737 MAX 8").winglet, "split");
+    assert.equal(A.familyFor("Boeing 737-800").winglet, "blended");
+    assert.ok(A.familyFor("Airbus A320 NEO").engines[0].w > 40, "NEO engines are bigger");
+  });
+  test("family kind stays consistent with the coarse classification", () => {
+    for (const m of ["Airbus A320", "ATR 72", "Embraer 175", "Boeing 787-9", "Boeing 747-400", "Airbus A220-300"]) assert.equal(A.familyFor(m).kind, A.kindFor(m), m);
+  });
+  test("airline tail colours: known brands, matched by code or by name; unknown = neutral", () => {
+    assert.equal(A.liveryFor("U2", "easyJet").tail, "#FF6600");
+    assert.equal(A.liveryFor("FR", "Ryanair").tail, "#073590");
+    assert.equal(A.liveryFor("", "Jet2").tail, "#E4002B", "falls back to the airline name");
+    assert.equal(A.liveryFor("KL", "").known, true);
+    const unknown = A.liveryFor("ZZ", "Mystery Air");
+    assert.equal(unknown.known, false);
+    assert.match(unknown.tail, /^#[0-9A-F]{6}$/i);
+    assert.equal(A.liveryFor(undefined, undefined).known, false);
+  });
+  test("the drawing carries the livery: tail colour, stripe, a logo slot and a code fallback", () => {
+    const s = A.svg(A.familyFor("Airbus A320 NEO"), { livery: A.liveryFor("U2", "easyJet") });
+    assert.ok(s.includes("fill:#FF6600"), "tail painted in the airline colour");
+    assert.ok(s.includes("stroke:#FF6600"), "cheatline in the airline colour");
+    assert.match(s, /<image class="ac-logo"/);
+    assert.match(s, /class="ac-logo-text"/);
+  });
+  test("every family draws a complete, well-formed drawing (no NaN, balanced tags, unique gradient ids)", () => {
+    const keys = Object.keys(A.SPECS);
+    assert.ok(keys.length >= 18);
+    const ids = new Set();
+    for (const k of keys) {
+      const s = A.svg({ key: k, kind: "narrowbody" }, { livery: A.liveryFor("U2", "easyJet") });
+      assert.ok(!/NaN|undefined|Infinity/.test(s), `${k} has a bad number`);
+      assert.equal((s.match(/<svg/g) || []).length, 1); assert.ok(s.trim().endsWith("</svg>"));
+      const id = /id="(acf\d+)"/.exec(s)[1];
+      assert.ok(!ids.has(id), "gradient ids must be unique per drawing"); ids.add(id);
+      assert.ok((s.match(/<path/g) || []).length >= 8, `${k} looks empty`);
+    }
+  });
+  test("different models do not produce identical drawings", () => {
+    const strip = (s) => s.replace(/acf\d+/g, "acf");
+    const shapes = new Set(["Airbus A320", "Boeing 737-800", "ATR 72", "Embraer 175", "Boeing 787-9", "Boeing 747-400", "Airbus A380", "Bombardier CRJ900"].map((m) => strip(A.svg(A.familyFor(m)))));
+    assert.equal(shapes.size, 8);
   });
 });
 
