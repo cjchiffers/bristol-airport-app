@@ -750,7 +750,7 @@ body.details-page{ --maxw: 720px; }
 .details-topbar .details-title{ flex: 1; min-width: 0; padding: 0 10px; text-align: center; }
 .details-headline, .details-subhead{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- Aircraft illustration (generic side view, see shared/aircraft.js) ---- */
+
 .aircraft-art{
   margin: 0 0 12px;
   padding: 14px 10px 4px;
@@ -761,18 +761,6 @@ body.details-page{ --maxw: 720px; }
   .aircraft-art{ background: linear-gradient(180deg, #12203a 0%, #2c4f7c 100%); }
 }
 .aircraft-art[hidden]{ display:none; }
-.ac-svg{ display:block; width:100%; max-width:480px; height:auto; margin:0 auto; overflow:visible; }
-.ac-fuse{ fill:#f8fafd; stroke:#9fb0c7; stroke-width:1; }
-.ac-wing{ fill:#dce4ef; stroke:#9fb0c7; stroke-width:1; }
-.ac-engine{ fill:#cbd5e4; stroke:#8fa1ba; stroke-width:1; }
-.ac-pylon{ fill:#b9c5d7; }
-.ac-dark{ fill:#4d5c75; }
-.ac-tail{ fill: var(--accent); stroke:#5b9fdc; stroke-width:1; }
-.ac-stripe{ stroke: var(--accent); stroke-width:3; fill:none; stroke-linecap:round; }
-.ac-win, .ac-cockpit{ fill:#51627e; }
-.ac-prop{ fill: rgba(255,255,255,.38); }
-.ac-prop-blade{ stroke:#51627e; stroke-width:2; opacity:.55; }
-.ac-shadow{ fill: rgba(0,0,0,.10); }
 
 /* ---- Recent history (loaded when opened) ---- */
 .history-card summary{
@@ -939,3 +927,29 @@ body.details-page{ --maxw: 720px; }
 
 /* list cards: same guard — the pair of times may wrap rather than overflow */
 .time-wrap{ flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+
+
+/* ---- Aircraft illustration (shared/aircraft.js): model-specific shape, airline tail colour + logo ---- */
+.ac-svg{ display:block; width:100%; max-width:520px; height:auto; margin:0 auto; overflow:visible; }
+.ac-fuse{ fill:#f6f8fc; stroke:#a8b6cb; stroke-width:.9; }
+.ac-belly{ fill:#9fb0c8; opacity:.28; }
+.ac-wing{ fill:#dfe6f0; stroke:#9fb0c7; stroke-width:.9; }
+.ac-flap{ stroke:#9fb0c7; stroke-width:.8; fill:none; opacity:.8; }
+.ac-winglet{ stroke:rgba(0,0,0,.18); stroke-width:.7; }
+.ac-engine{ fill:#d3dbe8; stroke:#8fa1ba; stroke-width:.9; }
+.ac-pylon{ fill:#b4c1d4; }
+.ac-shine{ stroke:rgba(255,255,255,.75); stroke-width:1.2; stroke-linecap:round; fill:none; }
+.ac-dark{ fill:#46556e; }
+.ac-tail{ stroke:rgba(0,0,0,.2); stroke-width:.8; }
+.ac-tail-shade{ stroke:rgba(255,255,255,.28); stroke-width:1.4; fill:none; stroke-linecap:round; }
+.ac-stripe{ stroke-width:2.2; fill:none; stroke-linecap:round; opacity:.95; }
+.ac-win{ fill:#4f6080; }
+.ac-door{ fill:none; stroke:#9aa9bf; stroke-width:.8; }
+.ac-cockpit{ fill:#4a5a78; }
+.ac-mask{ fill:#2c3a54; }
+.ac-logo-badge{ fill:#fff; stroke:rgba(0,0,0,.22); stroke-width:.8; }
+.ac-logo-text{ fill:#33415a; font-weight:900; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; letter-spacing:.2px; }
+.ac-prop{ fill: rgba(255,255,255,.30); stroke: rgba(70,85,110,.35); stroke-width:.5; }
+.ac-blade{ stroke:#46556e; stroke-width:2.3; stroke-linecap:round; opacity:.55; }
+.ac-hub{ fill:#46556e; }
+.ac-shadow{ fill: rgba(0,0,0,.10); }

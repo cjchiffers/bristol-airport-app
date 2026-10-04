@@ -572,3 +572,69 @@ def test_missing_altitude_and_speed_are_left_out_of_the_line(page, base_url, api
     open_flight(page, base_url, api, "FR 750", "arrival")
     page.wait_for_selector("#liveInfo:not([hidden])", timeout=8000)
     assert page.inner_text("#liveInfo") == "In flight · position 2 min ago"
+
+
+# ----------------------------------------------------------------------------- aircraft livery
+def kiwi_logo(ctx):
+    from conftest import png_bytes
+    ctx.route("https://images.kiwi.com/**", lambda r: r.fulfill(status=200, content_type="image/png", body=png_bytes((255, 102, 0))))
+
+
+def test_tail_is_painted_in_the_airlines_colours_with_its_logo(new_context, base_url, api):
+    ctx = new_context()
+    kiwi_logo(ctx)
+    pg = ctx.new_page()
+    open_flight(pg, base_url, api, "U2 2806", "arrival")                    # easyJet
+    pg.wait_for_function("document.querySelector('#aircraftArt image.ac-logo').getAttribute('opacity') === '1'")
+    art = "#aircraftArt"
+    assert pg.get_attribute(art, "data-livery") == "U2"
+    assert "#FF6600" in pg.get_attribute(f"{art} path.ac-tail", "style"), "easyJet orange tail"
+    href = pg.get_attribute(f"{art} image.ac-logo", "href")
+    assert href.startswith("https://images.kiwi.com/airlines/"), href
+    assert pg.text_content(f"{art} text.ac-logo-text") == "", "the code fallback is hidden once the logo has loaded"
+    assert "in easyJet colours" in pg.get_attribute(art, "aria-label")
+
+
+def test_without_a_logo_the_tail_shows_the_airline_code(page, base_url, api):
+    open_flight(page, base_url, api, "FR 750", "arrival")                    # Ryanair; every logo request 404s in the fake backend
+    page.wait_for_timeout(600)
+    assert page.get_attribute("#aircraftArt", "data-livery") == "FR"
+    assert "#073590" in page.get_attribute("#aircraftArt path.ac-tail", "style")
+    assert page.text_content("#aircraftArt text.ac-logo-text") == "FR"
+    assert page.get_attribute("#aircraftArt image.ac-logo", "opacity") == "0"
+
+
+def test_unknown_airline_gets_a_neutral_tail_and_no_false_claim(page, base_url, api):
+    f = api.find("U2 2806", "arrival")[0]
+    f["airline"] = {"iataCode": "ZZ", "icaoCode": "", "name": "Mystery Air"}
+    open_flight(page, base_url, api, "U2 2806", "arrival")
+    assert page.get_attribute("#aircraftArt", "data-livery") == ""
+    assert "colours" not in page.get_attribute("#aircraftArt", "aria-label")
+    assert page.text_content("#aircraftArt text.ac-logo-text") == "ZZ"
+
+
+def test_different_models_look_different_on_the_page(new_context, base_url, api):
+    pg = new_context().new_page()
+    shapes = {}
+    for number, side in (("U2 2806", "arrival"), ("EZY 51", "arrival"), ("KL 1083", "arrival"), ("TOM 77", "arrival")):    # A320, ATR 72, E175, 787
+        open_flight(pg, base_url, api, number, side)
+        shapes[number] = (pg.get_attribute("#aircraftArt", "data-aircraft-family"), pg.inner_html("#aircraftArt svg").replace("acf", "").__len__())
+    assert [v[0] for v in shapes.values()] == ["a320", "atr", "ejet", "b787"]
+
+
+def test_the_drawing_is_not_rebuilt_on_every_refresh(new_context, base_url, api):
+    pg = new_context().new_page()
+    pg.clock.install()
+    open_flight(pg, base_url, api, "U2 2806", "arrival")
+    pg.evaluate("document.querySelector('#aircraftArt svg').setAttribute('data-marker', 'same-node')")
+    pg.clock.run_for(61_000)                                                 # a background refresh happens
+    pg.wait_for_timeout(300)
+    assert pg.get_attribute("#aircraftArt svg", "data-marker") == "same-node", "svg was redrawn although nothing changed (logo would flicker)"
+
+
+def test_airline_icon_and_aircraft_art_are_visible_in_both_themes(new_context, base_url, api):
+    for scheme in ("light", "dark"):
+        pg = new_context(scheme=scheme).new_page()
+        open_flight(pg, base_url, api, "U2 2806", "arrival")
+        box = pg.locator("#aircraftArt svg").bounding_box()
+        assert box["width"] > 250 and box["height"] > 80, (scheme, box)
