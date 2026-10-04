@@ -1007,13 +1007,24 @@ if (els.arrKv) {
       els.heroBaggage.textContent = belt || "TBC";
     }
 
-    // Pickup tip: passengers need time to get through the terminal after landing.
+    // Pickup helper: passengers usually reach the arrivals hall 20–30 minutes after landing.
     const hint = document.getElementById("heroHint");
+    const meeting = !atDeparture && info.key !== "cancelled" && info.key !== "diverted";
     if (hint) {
-      const show = !atDeparture && info.key !== "cancelled" && info.key !== "diverted";
-      hint.textContent = show ? "Passengers usually reach the arrivals hall 20–30 minutes after landing." : "";
-      setShown(hint, show);
+      const land = meeting ? F.keyTime(flight, mode) : null;
+      if (land) {
+        const T = window.BrsTime;
+        const from = T.fmtTime(new Date(land.getTime() + 20 * 60000));
+        const to = T.fmtTime(new Date(land.getTime() + 30 * 60000));
+        hint.innerHTML = `<strong>Likely out ${escapeHtml(from)}–${escapeHtml(to)}</strong> · passengers usually take 20–30 minutes after landing`;
+      } else if (meeting) {
+        hint.textContent = "Passengers usually reach the arrivals hall 20–30 minutes after landing.";
+      } else {
+        hint.textContent = "";
+      }
+      setShown(hint, meeting);
     }
+    updateWakeButton(meeting);
 
     renderCountdown();
   }
@@ -1150,6 +1161,54 @@ if (els.arrKv) {
       <div class="kpi-chip"><span class="kpi-k">CO₂e</span><span class="kpi-v" title="Rough estimate per passenger">${escapeHtml(fmtKg(co2))}</span></div>
       <div class="kpi-chip"><span class="kpi-k">Delay</span><span class="kpi-v">${escapeHtml(delayLabel)}</span></div>
     `;
+  }
+
+// ---------- Keep screen on while waiting (Screen Wake Lock API) ----------
+  // Only offered when someone is meeting a flight and the browser supports it. The lock is released by the
+  // browser whenever the tab is hidden, so it is re-requested when the page becomes visible again.
+  let wakeLock = null;
+  let wakeWanted = false;
+
+  async function acquireWake() {
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+      return true;
+    } catch {
+      wakeLock = null;
+      return false;
+    }
+  }
+
+  async function setWake(on) {
+    const btn = document.getElementById("wakeBtn");
+    wakeWanted = on;
+    if (on) {
+      const ok = await acquireWake();
+      if (!ok) { wakeWanted = false; showToast("Couldn’t keep the screen on"); }
+    } else if (wakeLock) {
+      try { await wakeLock.release(); } catch { /* already released */ }
+      wakeLock = null;
+    }
+    if (btn) {
+      btn.setAttribute("aria-pressed", wakeWanted ? "true" : "false");
+      btn.textContent = wakeWanted ? "Screen will stay on — tap to turn off" : "Keep screen on while I wait";
+    }
+  }
+
+  function updateWakeButton(meeting) {
+    const btn = document.getElementById("wakeBtn");
+    if (!btn) return;
+    const supported = !!(navigator.wakeLock && typeof navigator.wakeLock.request === "function");
+    btn.hidden = !(meeting && supported);
+    if (!btn.dataset.bound) {
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => setWake(!wakeWanted));
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && wakeWanted && !wakeLock) acquireWake();
+      });
+    }
+    if (!meeting && wakeWanted) setWake(false);   // flight cancelled / not a pickup any more
   }
 
 // ---------- Recent history (last 7 days of this flight at Bristol) ----------

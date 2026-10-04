@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="flight-details.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css" />
 </head>
 
 <body class="details-page">
@@ -88,6 +88,7 @@
         <span id="heroCountdownText">—</span>
       </div>
       <div class="hero-hint small" id="heroHint" style="display:none"></div>
+      <button class="btn wake-btn" id="wakeBtn" type="button" aria-pressed="false" hidden>Keep screen on while I wait</button>
 
       <div class="hero-times-grid">
         <div class="hero-time-block">
@@ -195,7 +196,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="assets/vendor/leaflet/leaflet.js"></script>
   <script src="shared/utils.js"></script>
   <script src="shared/config.js"></script>
   <script src="shared/time.js"></script>
