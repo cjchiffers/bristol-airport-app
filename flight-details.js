@@ -207,6 +207,7 @@
     aircraftKind: null,
     history: { loaded: false, loading: false },
     lastOkAt: 0,
+    staleFrom: null,   // set when the worker served a last-good copy (ISO time of that data)
     updatedText: "",
 
     fetching: false,
@@ -595,8 +596,14 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
       state.lastOkAt = Date.now();
       render(state.current, prev);
       setNetBanner(false);
-      setUpdated(Date.now(), false);
-      if (forceFeedback) showToast("Updated");
+      if (state.staleFrom !== null) {
+        const t = window.BrsTime.fmtTime(state.staleFrom);
+        state.updatedText = `Live feed delayed — showing data from ${t || "earlier"}`;
+        setText(els.updatedLine, state.updatedText);
+      } else {
+        setUpdated(Date.now(), false);
+      }
+      if (forceFeedback) showToast(state.staleFrom !== null ? "Live feed delayed — showing recent data" : "Updated");
     } catch (e) {
       console.error(e);
       if (!state.current) showNotFound("network");
@@ -670,6 +677,8 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
 
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) throw new Error(`Flight HTTP ${res.status}`);
+    // The worker serves its last good copy (and says so) when the flight data provider is unavailable.
+    state.staleFrom = res.headers.get("X-Data-Stale") === "1" ? (res.headers.get("X-Data-Updated") || "") : null;
 
     const data = await res.json();
     const list = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);

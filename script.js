@@ -566,7 +566,9 @@ async function fetchTimetable(type){
   const r = await fetch(url.toString(), { cache:"no-store" });
   if (!r.ok) throw new Error(`Timetable HTTP ${r.status}`);
   const j = await r.json();
-  return (Array.isArray(j) && j) || (j && Array.isArray(j.data) && j.data) || (j && Array.isArray(j.result) && j.result) || [];
+  const list = (Array.isArray(j) && j) || (j && Array.isArray(j.data) && j.data) || (j && Array.isArray(j.result) && j.result) || [];
+  // The worker flags a last-good copy (flight data provider is down / rate-limited) with X-Data-Stale.
+  return { list, stale: r.headers.get("X-Data-Stale") === "1", updated: r.headers.get("X-Data-Updated") || "" };
 }
 
 function clearLists(){
@@ -618,8 +620,8 @@ async function refreshAll({force=false} = {}){
     const dep = await fetchTimetable("departure");
     const arr = await fetchTimetable("arrival");
 
-    depFlights = F.dedupe(dep, "departure");
-    arrFlights = F.dedupe(arr, "arrival");
+    depFlights = F.dedupe(dep.list, "departure");
+    arrFlights = F.dedupe(arr.list, "arrival");
     saveCachedTimetable("departure", depFlights);
     saveCachedTimetable("arrival", arrFlights);
 
@@ -628,8 +630,15 @@ async function refreshAll({force=false} = {}){
     syncSavedFromLive();
     renderLists();
     renderMyFlights();
-    if (lr) lr.textContent = `Updated ${T.fmtTime(new Date())}`;
-    if (force) toast(`Updated ${T.fmtTime(new Date())}`);   // announced via the toast live region
+    const stale = dep.stale || arr.stale;
+    const dataFrom = T.fmtTime(dep.updated || arr.updated);
+    if (lr) {
+      lr.textContent = stale
+        ? `Live feed delayed — data from ${dataFrom || "earlier"}`
+        : `Updated ${T.fmtTime(new Date())}`;
+      lr.classList.toggle("is-stale", stale);
+    }
+    if (force) toast(stale ? "Live feed delayed — showing recent data" : `Updated ${T.fmtTime(new Date())}`);   // announced via the toast live region
 
   } catch (err){
     console.error(err);

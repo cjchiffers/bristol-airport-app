@@ -239,6 +239,7 @@ h2{ margin:0; font-size: 16px; letter-spacing:.2px; }
 
 .meta-row{ margin-top: 10px; display:flex; justify-content:space-between; gap: 10px; }
 .meta{ font-size: 12px; color: var(--muted); }
+.meta.is-stale{ color: var(--warn); font-weight: 700; }
 
 .panel{
   margin-top: 12px;
