@@ -207,6 +207,10 @@
     aircraftKind: null,
     history: { loaded: false, loading: false },
     inbound: { at: 0, loading: false },
+    livePosition: null,
+    routePoints: null,
+    liveRequested: false,   // has a request with the live option been made yet?
+    liveRetried: false,
     lastOkAt: 0,
     staleFrom: null,   // set when the worker served a last-good copy (ISO time of that data)
     updatedText: "",
@@ -599,6 +603,12 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
       state.lastOkAt = Date.now();
       render(state.current, prev);
       maybeLoadInbound(state.current);
+      // A shared link has no cached status, so the first fetch couldn't know to ask for the position:
+      // once we see the flight is airborne, ask again straight away (once).
+      if (isAirborne(state.current) && !state.liveRequested && !state.liveRetried) {
+        state.liveRetried = true;
+        setTimeout(() => refreshNow(false), 0);
+      }
       setNetBanner(false);
       if (state.staleFrom !== null) {
         const t = window.BrsTime.fmtTime(state.staleFrom);
@@ -669,6 +679,11 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     return m === null ? null : Math.abs(m);
   }
 
+  const AIRBORNE = new Set(["departed", "enroute", "approaching", "active"]);   // "active" = older worker's word
+  function isAirborne(flight) {
+    return !!flight && AIRBORNE.has(String(flight.status || flight.flight_status || "").toLowerCase());
+  }
+
   /** Ask the worker for this flight; returns the best matching record, null if not listed. Throws on network/HTTP errors. */
   async function fetchBestEffortUpdate(route, current) {
     const F = window.BrsFlights;
@@ -678,6 +693,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     url.searchParams.set("flight_iata", route.flight);
     url.searchParams.set(route.type === "departure" ? "dep_iata" : "arr_iata", home);
     url.searchParams.set("date", route.date);
+    if (isAirborne(current)) { url.searchParams.set("live", "1"); state.liveRequested = true; }   // real-time position, only worth asking for in the air
 
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) throw new Error(`Flight HTTP ${res.status}`);
@@ -739,6 +755,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     // Hero card (app-style flight overview) + operational info
     renderHeroCard(flight, flat, id);
     renderOpsBar(flight);
+    applyLivePosition(flight);
 
     if (state.route) document.title = `${displayNo} ${route.replace(" → ", "→")} · BRS Flights`;
 
@@ -1254,6 +1271,46 @@ if (els.arrKv) {
     card.classList.toggle("is-warn", tone === "warn");
     card.classList.toggle("is-bad", tone === "bad");
     card.hidden = false;
+  }
+
+// ---------- Live position: plane on its real position + "In flight" line ----------
+  const POSITION_FRESH_MS = 15 * 60 * 1000;
+
+  function applyLivePosition(flight) {
+    const info = document.getElementById("liveInfo");
+    const p = flight && flight.position;
+    const ts = p ? Date.parse(p.reportedAt) : NaN;
+    const fresh = !!p && Number.isFinite(p.lat) && Number.isFinite(p.lon) && (!Number.isFinite(ts) || Date.now() - ts < POSITION_FRESH_MS);
+    if (!fresh || !isAirborne(flight)) {
+      state.livePosition = null;
+      if (info) info.hidden = true;
+      return;
+    }
+    state.livePosition = p;
+
+    if (info) {
+      const bits = ["In flight"];
+      if (Number.isFinite(p.altitudeFt)) bits.push(`${(Math.round(p.altitudeFt / 100) * 100).toLocaleString("en-GB")} ft`);
+      if (Number.isFinite(p.speedKt)) bits.push(`${Math.round(p.speedKt)} kt`);
+      if (Number.isFinite(ts)) {
+        const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+        bits.push(mins < 1 ? "position just now" : `position ${mins} min ago`);
+      }
+      info.textContent = bits.join(" · ");
+      info.hidden = false;
+    }
+    placePlaneAtLivePosition();
+  }
+
+  // Put the plane marker on the aircraft's real position (rotated to its track). The route animation may still be
+  // running or the map may not exist yet; this is called again when the animation finishes.
+  function placePlaneAtLivePosition() {
+    const p = state.livePosition;
+    if (!p || !state.map || !state.planeMarker || !window.L) return;
+    if (state.animRaf) { cancelAnimationFrame(state.animRaf); state.animRaf = null; }
+    if (state.routeLine && state.routePoints) state.routeLine.setLatLngs(state.routePoints);
+    state.planeMarker.setLatLng([p.lat, p.lon]);
+    state.planeMarker.setIcon(makePlaneIcon(Number.isFinite(p.trackDeg) ? p.trackDeg : 0));
   }
 
 // ---------- Keep screen on while waiting (Screen Wake Lock API) ----------
@@ -2015,6 +2072,7 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
     if (!dep || !arr) return;
 
     const points = greatCirclePoints(dep.lat, dep.lon, arr.lat, arr.lon, 84);
+    state.routePoints = points;
     const bounds = L.latLngBounds(points.map((p) => L.latLng(p[0], p[1])));
 
     // Clear previous layers
@@ -2062,6 +2120,7 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
       const prev = points[points.length - 2] || last;
       state.planeMarker.setLatLng(last);
       state.planeMarker.setIcon(makePlaneIcon(bearingDeg(prev[0], prev[1], last[0], last[1])));
+      placePlaneAtLivePosition();
       setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 120);
       return;
     }
@@ -2082,7 +2141,7 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
       state.planeMarker.setIcon(makePlaneIcon(brg));
 
       if (t < 1) state.animRaf = requestAnimationFrame(step);
-      else state.animRaf = null;
+      else { state.animRaf = null; placePlaneAtLivePosition(); }
     };
 
     state.animRaf = requestAnimationFrame(step);

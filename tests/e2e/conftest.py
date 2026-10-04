@@ -120,7 +120,7 @@ class FakeApi:
         self.history = None               # dict, or None -> 502
         self.tiles_ok = True
         self.extra = {}                   # per-feature stubs (inbound, push, ...)
-        self.calls = {"timetable": 0, "flights": 0, "history": 0, "tiles": [], "health": 0, "other": []}
+        self.calls = {"timetable": 0, "flights": 0, "flights_queries": [], "history": 0, "tiles": [], "health": 0, "other": []}
 
     # ---- helpers
     def all_flights(self):
@@ -157,6 +157,7 @@ class FakeApi:
             if self.flights_status != 200:
                 return json_resp(route, {"error": "upstream"}, 502)
             q = urllib.parse.parse_qs(urllib.parse.urlparse(route.request.url).query)
+            self.calls["flights_queries"].append(q)
             side = "arrival" if "arr_iata" in q else "departure"
             extra = {}
             if self.stale_from:

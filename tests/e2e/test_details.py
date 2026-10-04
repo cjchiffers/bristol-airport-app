@@ -489,3 +489,86 @@ def test_inbound_failure_is_silent(page, base_url, api):
     page.wait_for_timeout(600)
     assert page.is_hidden("#inboundCard") and page.inner_text("#heroFlightNumber") == "U2 7075"
     assert not page.errors
+
+
+# ----------------------------------------------------------------------------- live aircraft position
+MARKER_SPY = """
+(() => { let real; Object.defineProperty(window, 'L', { configurable: true, get() { return real; }, set(v) {
+  real = v;
+  if (v && v.marker && !v.__spied) { v.__spied = true; const orig = v.marker;
+    v.marker = function (...a) { const m = orig.apply(this, a); (window.__markers = window.__markers || []).push(m); return m; }; } } }); })();
+"""
+
+
+def with_position(api, number="FR 750", minutes_ago=2, **over):
+    f = api.find(number, "arrival")[0]
+    reported = (datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    f["position"] = {"lat": 49.5, "lon": -4.25, "altitudeFt": 36012, "speedKt": 441, "trackDeg": 128.4, "vsiFpm": 0, "reportedAt": reported, **over}
+    return f
+
+
+def plane_latlng(pg):
+    return pg.evaluate("""() => { const m = (window.__markers || []).filter(x => x.options && x.options.interactive === false).pop();
+                                  if (!m) return null; const p = m.getLatLng(); return [p.lat, p.lng]; }""")
+
+
+def open_via_list(pg, base_url, number):
+    pg.goto(base_url + "/index.html")
+    wait_list(pg)
+    pg.click('.seg-btn[data-tab="arrivals"]')
+    pg.locator("#arrivalList .flight-card", has_text=number).first.locator("a.fc-link").click()
+    pg.wait_for_url("**/flight-details.html*")
+    wait_details(pg)
+
+
+def test_airborne_flight_shows_live_position_and_places_the_plane(new_context, base_url, api):
+    ctx = new_context()
+    ctx.add_init_script(MARKER_SPY)
+    pg = ctx.new_page()
+    with_position(api)
+    open_via_list(pg, base_url, "FR 750")                            # list caches the flight, so its status is known
+    pg.wait_for_selector("#liveInfo:not([hidden])")
+    assert pg.inner_text("#liveInfo") == "In flight · 36,000 ft · 441 kt · position 2 min ago"
+    assert api.calls["flights_queries"][0].get("live") == ["1"], "asked for the live position because the flight is airborne"
+    pg.wait_for_function("(window.__markers || []).some(m => m.options && m.options.interactive === false)")
+    pg.wait_for_function("(() => { const m = (window.__markers||[]).filter(x => x.options && x.options.interactive === false).pop(); const p = m && m.getLatLng(); return p && Math.abs(p.lat - 49.5) < 1e-6 && Math.abs(p.lng + 4.25) < 1e-6; })()", timeout=8000)
+    lat, lon = plane_latlng(pg)
+    assert (round(lat, 3), round(lon, 3)) == (49.5, -4.25), "plane sits on its real position, not on the route animation"
+
+
+def test_shared_link_to_an_airborne_flight_asks_again_for_the_position(page, base_url, api):
+    with_position(api)
+    open_flight(page, base_url, api, "FR 750", "arrival")            # no cache: first fetch can't know it is airborne
+    page.wait_for_selector("#liveInfo:not([hidden])", timeout=8000)
+    lives = [q.get("live") for q in api.calls["flights_queries"]]
+    assert lives[0] is None and ["1"] in lives, lives
+    assert lives.count(["1"]) == 1, "asks once, not in a loop"
+
+
+def test_no_live_request_or_line_for_a_flight_that_has_not_left(new_context, base_url, api):
+    ctx = new_context()
+    pg = ctx.new_page()
+    f = api.find("EZY 51", "arrival")[0]                              # status: scheduled
+    f["position"] = {"lat": 40, "lon": 0, "altitudeFt": 1, "speedKt": 1, "trackDeg": 0, "reportedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    open_via_list(pg, base_url, "EZY 51")
+    pg.wait_for_timeout(500)
+    assert all("live" not in q for q in api.calls["flights_queries"]) and pg.is_hidden("#liveInfo")
+
+
+def test_stale_or_landed_positions_are_not_shown(page, base_url, api):
+    with_position(api, minutes_ago=40)                                 # last report too old
+    open_flight(page, base_url, api, "FR 750", "arrival")
+    page.wait_for_timeout(800)
+    assert page.is_hidden("#liveInfo")
+    with_position(api, minutes_ago=1)
+    api.find("FR 750", "arrival")[0]["status"] = "landed"              # landed: position is meaningless
+    open_flight(page, base_url, api, "FR 750", "arrival")
+    page.wait_for_timeout(800)
+    assert page.is_hidden("#liveInfo")
+
+
+def test_missing_altitude_and_speed_are_left_out_of_the_line(page, base_url, api):
+    with_position(api, altitudeFt=None, speedKt=None)
+    open_flight(page, base_url, api, "FR 750", "arrival")
+    page.wait_for_selector("#liveInfo:not([hidden])", timeout=8000)
+    assert page.inner_text("#liveInfo") == "In flight · position 2 min ago"
