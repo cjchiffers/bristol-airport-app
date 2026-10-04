@@ -1026,6 +1026,13 @@ if (els.arrKv) {
     }
     updateWakeButton(meeting);
 
+    // Pickup info for people meeting a flight, parking/transport info for people flying out.
+    const infoLink = document.getElementById("heroInfoLink");
+    if (infoLink) {
+      infoLink.setAttribute("href", atDeparture ? "getting-here.html#fly" : "getting-here.html#pickup");
+      infoLink.textContent = atDeparture ? "Parking, security and transport info →" : "Where to park and wait for passengers →";
+    }
+
     renderCountdown();
   }
 

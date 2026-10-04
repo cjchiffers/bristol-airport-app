@@ -1022,3 +1022,6 @@ body.details-page{ --maxw: 720px; }
   background: color-mix(in srgb, var(--good) 20%, transparent);
   border-color: color-mix(in srgb, var(--good) 50%, var(--stroke));
 }
+
+.hero-link{ display:inline-block; margin: -4px 2px 12px; color: var(--accent); text-decoration: none; font-weight: 700; }
+.hero-link:hover, .hero-link:focus-visible{ text-decoration: underline; }

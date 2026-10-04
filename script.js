@@ -510,6 +510,22 @@ function initOverflowMenu(){
 }
 
 // =======================
+// Install app (menu item shown only where installing is possible)
+// =======================
+function initInstallMenu(){
+  const btn = document.getElementById("installBtn");
+  const I = window.BrsInstall;
+  if (!btn || !I) return;
+  const sync = () => { btn.hidden = !I.available(); };
+  btn.addEventListener("click", async () => {
+    const r = await I.install();
+    if (r === "accepted") toast("Installing…");
+  });
+  I.onChange(sync);
+  sync();
+}
+
+// =======================
 // Error banner
 // =======================
 function ensureErrorBanner(){
@@ -668,6 +684,7 @@ function startAutoRefresh(){
   // Load airport index in the background (non-blocking). Once loaded, re-render so missing IATA names fill in.
   loadAirportIndexBestEffort().then(()=>{ try{ renderLists(); renderMyFlights(); }catch{} }).catch(()=>{});
   initOverflowMenu();
+  initInstallMenu();
   initSearch();
   initSavedUI();
 

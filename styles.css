@@ -574,3 +574,24 @@ body{ font-size: 16px; }
     grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   }
 }
+
+/* ---- modal sheet (iPhone install steps) ---- */
+.sheet{
+  width: min(420px, calc(100% - 32px));
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+.sheet::backdrop{ background: rgba(0,0,0,.5); }
+.sheet h2{ font-size: 18px; margin: 0 0 10px; }
+.sheet ol{ margin: 0 0 12px; padding-left: 20px; line-height: 1.5; }
+.sheet .btn{
+  border: 1px solid var(--stroke); background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text); padding: 10px 16px; border-radius: 14px; font-weight: 800; cursor: pointer;
+}
+.menu-item[hidden]{ display:none; }
+
+a.menu-item{ display:block; text-decoration:none; }
