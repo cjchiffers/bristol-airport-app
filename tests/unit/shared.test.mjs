@@ -1,6 +1,8 @@
 import { test, describe } from "node:test";
+import fs from "node:fs";
+import path from "node:path";
 import assert from "node:assert/strict";
-import { loadShared, readJson, makeStorage } from "./load.mjs";
+import { loadShared, readJson, makeStorage, ROOT } from "./load.mjs";
 
 const w = loadShared(["shared/time.js", "shared/flights.js", "shared/aircraft.js"]);
 const T = w.BrsTime, F = w.BrsFlights, A = w.BrsAircraft;
@@ -185,6 +187,39 @@ describe("airports.js", () => {
     assert.ok(Math.abs(p.lat - 51.38) < 0.05 && Math.abs(p.lon + 2.72) < 0.05);
     assert.equal(win.BrsAirports.getAirportDisplayName("AGP", "airport"), "Málaga-Costa del Sol Airport");
   });
+  test("travellers' names for airports where the municipality is misleading", async () => {
+    const index = readJson("airports.min.json");
+    const win = loadShared(["shared/airports.js"], { fetch: async () => ({ ok: true, json: async () => index }), localStorage: makeStorage() });
+    await win.BrsAirports.loadAirportIndexBestEffort();
+    const want = {
+      ATH: "Athens", BRU: "Brussels", CHQ: "Chania", NAP: "Naples", CGN: "Cologne", VCE: "Venice", FUE: "Fuerteventura",
+      OTP: "Bucharest", LIN: "Milan Linate", MRS: "Marseille", LYS: "Lyon", TIA: "Tirana", ADB: "Izmir", SAW: "Istanbul Sabiha Gökçen",
+      LEI: "Almería", FNI: "Nîmes", JSY: "Syros", NIM: "Niamey", SYR: "Syracuse", JFK: "New York JFK", HAJ: "Hanover", LGW: "London Gatwick",
+    };
+    for (const [code, name] of Object.entries(want)) assert.equal(win.BrsAirports.getAirportDisplayName(code), name, code);
+  });
+
+  test("every curated city name belongs to the airport it is attached to (guards against wrong codes)", () => {
+    const index = readJson("airports.min.json");
+    const text = fs.readFileSync(path.join(ROOT, "shared/airports.js"), "utf8");
+    const block = text.slice(text.indexOf("const CITY_OVERRIDES = {"), text.indexOf("  };", text.indexOf("const CITY_OVERRIDES = {")));
+    const pairs = [...block.matchAll(/([A-Z0-9]{3}): "([^"]+)"/g)].map((m) => [m[1], m[2]]);
+    assert.ok(pairs.length > 400);
+    const fold = (x) => x.normalize("NFKD").replace(/[^\x00-\x7f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, "");
+    // Names that deliberately differ from the file's municipality/airport name (checked by hand).
+    const intentional = new Set(("ADB ANU AOI AUA BDA BGI BGY BLR BVC CUR DPS EFL FNC GND GOT HAJ KBP KIT LXS MJT MRU PDL POS PTY RAK SID SKB TAB TPE UVF VRA").split(" "));
+    const seen = new Set();
+    for (const [code, name] of pairs) {
+      assert.ok(!seen.has(code), `duplicate ${code}`); seen.add(code);
+      const rec = index[code];
+      assert.ok(rec, `${code} (${name}) is not in the airport file — wrong IATA code?`);
+      if (intentional.has(code)) continue;
+      const hay = fold(`${rec[0]} ${rec[1]}`);
+      const words = fold(name).split(" ").filter((w) => !["city", "international", "north", "de", "world", "central"].includes(w));
+      assert.ok(words.some((w) => hay.includes(w)), `${code}: "${name}" does not match "${rec[0] || rec[1]}"`);
+    }
+  });
+
   test("the airport file is compact and well-formed", () => {
     const index = readJson("airports.min.json");
     const rows = Object.entries(index);

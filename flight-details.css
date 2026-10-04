@@ -1025,3 +1025,12 @@ body.details-page{ --maxw: 720px; }
 
 .hero-link{ display:inline-block; margin: -4px 2px 12px; color: var(--accent); text-decoration: none; font-weight: 700; }
 .hero-link:hover, .hero-link:focus-visible{ text-decoration: underline; }
+
+/* ---- Incoming aircraft (previous flight of this plane) ---- */
+.inbound-card[hidden]{ display:none; }
+.inbound-line{ margin: 0 0 4px; font-size: 13px; font-weight: 700; line-height: 1.4; }
+.inbound-effect{ margin: 0; min-height: 0; }
+.inbound-effect:empty{ display:none; }
+.inbound-card.is-warn{ border-color: color-mix(in srgb, var(--warn) 55%, var(--stroke)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
+.inbound-card.is-bad{ border-color: color-mix(in srgb, var(--bad) 55%, var(--stroke)); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+.inbound-card.is-warn .inbound-effect, .inbound-card.is-bad .inbound-effect{ color: var(--text); font-weight: 700; }

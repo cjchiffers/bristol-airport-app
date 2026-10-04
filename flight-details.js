@@ -206,6 +206,7 @@
     countdownTimer: null,
     aircraftKind: null,
     history: { loaded: false, loading: false },
+    inbound: { at: 0, loading: false },
     lastOkAt: 0,
     staleFrom: null,   // set when the worker served a last-good copy (ISO time of that data)
     updatedText: "",
@@ -597,6 +598,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
       window.BrsFlights.saveCached(state.route, state.current);
       state.lastOkAt = Date.now();
       render(state.current, prev);
+      maybeLoadInbound(state.current);
       setNetBanner(false);
       if (state.staleFrom !== null) {
         const t = window.BrsTime.fmtTime(state.staleFrom);
@@ -1170,6 +1172,88 @@ if (els.arrKv) {
       <div class="kpi-chip"><span class="kpi-k">CO₂e</span><span class="kpi-v" title="Rough estimate per passenger">${escapeHtml(fmtKg(co2))}</span></div>
       <div class="kpi-chip"><span class="kpi-k">Delay</span><span class="kpi-v">${escapeHtml(delayLabel)}</span></div>
     `;
+  }
+
+// ---------- Incoming aircraft: is this plane running late on its previous flight? ----------
+  const INBOUND_EVERY_MS = 5 * 60 * 1000;
+  const INBOUND_SKIP = new Set(["departed", "enroute", "approaching", "landed", "cancelled", "diverted"]);
+
+  async function maybeLoadInbound(flight) {
+    const ib = state.inbound;
+    if (!state.route || ib.loading || !flight) return;
+    if (Date.now() - ib.at < INBOUND_EVERY_MS) return;
+
+    const status = String(flight.status || flight.flight_status || "").toLowerCase();
+    const reg = flight.aircraft && flight.aircraft.regNumber;
+    if (!reg || INBOUND_SKIP.has(status)) { hideInbound(); return; }   // nothing useful once it has left / without a tail number
+
+    try { await window.BrsConfig.featuresReady; } catch { /* ignore */ }
+    if (!window.BrsConfig.features.inbound) return;               // an older worker without the route
+
+    ib.loading = true;
+    ib.at = Date.now();
+    try {
+      const url = new URL(`${window.BrsConfig.API_BASE}/inbound`);
+      url.searchParams.set("flight_iata", state.route.flight);
+      url.searchParams.set("type", state.route.type);
+      url.searchParams.set("date", state.route.date);
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`Inbound HTTP ${res.status}`);
+      renderInbound(await res.json());
+    } catch (e) {
+      console.warn("Inbound aircraft unavailable:", e);
+      hideInbound();
+    } finally {
+      ib.loading = false;
+    }
+  }
+
+  function hideInbound() {
+    const card = document.getElementById("inboundCard");
+    if (card) card.hidden = true;
+  }
+
+  function renderInbound(data) {
+    const card = document.getElementById("inboundCard");
+    const line = document.getElementById("inboundLine");
+    const effect = document.getElementById("inboundEffect");
+    if (!card || !line || !effect) return;
+    if (!data || !data.available || !data.inbound) { card.hidden = true; return; }
+
+    const T = window.BrsTime;
+    const i = data.inbound;
+    const departure = state.route.type === "departure";
+    const from = getCityName(i.from) || i.from;
+    const to = getCityName(i.to) || i.to;
+    const delay = Number(i.delay);
+    const t = T.fmtTime(i.actualArrival || i.estimatedArrival || i.scheduledArrival);
+
+    let what;
+    if (i.status === "cancelled") what = "was cancelled";
+    else if (i.landed) what = `landed at ${t}`;
+    else if (Number.isFinite(delay) && delay >= 10) what = `is due ${t} (${delay} min late)`;
+    else if (Number.isFinite(delay) && delay <= -5) what = `is due ${t} (${Math.abs(delay)} min early)`;
+    else what = `is due ${t}, on time`;
+
+    line.textContent = departure
+      ? `Your aircraft is operating ${i.number} from ${from}, which ${what}.`
+      : `This aircraft’s previous flight, ${i.number} (${from} → ${to}), ${what}.`;
+
+    const extra = Number(data.additionalDelayMin) || 0;
+    let tone = "";
+    let text = "";
+    if (i.status === "cancelled") { tone = "bad"; text = "This flight could be affected."; }
+    else if (extra >= 10) {
+      tone = "warn";
+      text = departure
+        ? `This could delay your departure by about ${extra} minutes.`
+        : `This flight may leave ${to} about ${extra} minutes late, so it could land at Bristol later than shown.`;
+    } else if (!i.landed) text = "No knock-on delay expected.";
+
+    effect.textContent = text;
+    card.classList.toggle("is-warn", tone === "warn");
+    card.classList.toggle("is-bad", tone === "bad");
+    card.hidden = false;
   }
 
 // ---------- Keep screen on while waiting (Screen Wake Lock API) ----------

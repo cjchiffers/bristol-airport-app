@@ -31,8 +31,13 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
 @pytest.fixture(scope="session")
 def base_url():
     handler = functools.partial(_Quiet, directory=str(ROOT))
-    socketserver.TCPServer.allow_reuse_address = True
-    srv = socketserver.ThreadingTCPServer(("127.0.0.1", 0), handler)
+    class QuietServer(socketserver.ThreadingTCPServer):
+        allow_reuse_address = True
+
+        def handle_error(self, request, client_address):   # browsers abort connections mid-test; that's not an error
+            pass
+
+    srv = QuietServer(("127.0.0.1", 0), handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{srv.server_address[1]}"
     srv.shutdown()

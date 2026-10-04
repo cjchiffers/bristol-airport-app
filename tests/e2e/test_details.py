@@ -401,3 +401,91 @@ def test_share_link_falls_back_to_the_app_url_with_an_older_worker(page, base_ur
     page.evaluate("window.__shared=null; navigator.share = (d) => { window.__shared = d; return Promise.resolve(); }")
     page.click("#shareIconBtn")
     assert page.evaluate("window.__shared.url") == page.url
+
+
+# ----------------------------------------------------------------------------- incoming aircraft
+def inbound_stub(api, payload, seen=None):
+    def handler(route, json_resp):
+        if seen is not None:
+            seen.append(urllib.parse.parse_qs(urllib.parse.urlparse(route.request.url).query))
+        json_resp(route, payload)
+    api.extra["/api/inbound"] = handler
+    api.features = {"tiles": True, "history": True, "inbound": True}
+
+
+def test_late_incoming_aircraft_warns_a_departing_passenger(page, base_url, api):
+    seen = []
+    inbound_stub(api, {"available": True, "reg": "G-UZHA", "turnaroundMin": 30, "additionalDelayMin": 15, "inbound": {
+        "number": "U2 7076", "from": "AMS", "to": "BRS", "status": "approaching", "landed": False,
+        "scheduledArrival": "2026-10-04 15:25+01:00", "estimatedArrival": "2026-10-04 16:00+01:00", "actualArrival": "", "delay": 35}}, seen)
+    open_flight(page, base_url, api, "U2 7075", "departure")
+    page.wait_for_selector("#inboundCard:not([hidden])")
+    assert page.inner_text("#inboundLine") == "Your aircraft is operating U2 7076 from Amsterdam, which is due 16:00 (35 min late)."
+    assert page.inner_text("#inboundEffect") == "This could delay your departure by about 15 minutes."
+    assert "is-warn" in page.get_attribute("#inboundCard", "class")
+    assert seen[0]["type"] == ["departure"] and seen[0]["flight_iata"] == ["U2 7075"] and len(seen) == 1
+
+
+def test_inbound_for_a_pickup_talks_about_the_origin_airport(page, base_url, api):
+    inbound_stub(api, {"available": True, "reg": "G-ATRX", "turnaroundMin": 30, "additionalDelayMin": 40, "inbound": {
+        "number": "U2 2805", "from": "ATH", "to": "BCN", "status": "approaching", "landed": False,
+        "scheduledArrival": "2026-10-04 12:00+01:00", "estimatedArrival": "2026-10-04 12:40+01:00", "actualArrival": "", "delay": 40}})
+    open_flight(page, base_url, api, "EZY 51", "arrival")
+    page.wait_for_selector("#inboundCard:not([hidden])")
+    assert page.inner_text("#inboundLine").startswith("This aircraft’s previous flight, U2 2805 (Athens → Barcelona), is due 12:40 (40 min late)")
+    assert "may leave Barcelona about 40 minutes late" in page.inner_text("#inboundEffect")
+
+
+def test_landed_inbound_is_calm_and_cancelled_inbound_is_flagged(page, base_url, api):
+    base = {"available": True, "reg": "G-UZHA", "turnaroundMin": 30, "additionalDelayMin": 0}
+    inbound_stub(api, {**base, "inbound": {"number": "U2 7076", "from": "AMS", "to": "BRS", "status": "landed", "landed": True,
+                                            "scheduledArrival": "2026-10-04 15:25+01:00", "estimatedArrival": "", "actualArrival": "2026-10-04 15:20+01:00", "delay": -5}})
+    open_flight(page, base_url, api, "U2 7075", "departure")
+    page.wait_for_selector("#inboundCard:not([hidden])")
+    assert "landed at 15:20" in page.inner_text("#inboundLine") and page.inner_text("#inboundEffect") == ""
+    assert "is-warn" not in page.get_attribute("#inboundCard", "class")
+
+    inbound_stub(api, {**base, "inbound": {"number": "U2 7076", "from": "AMS", "to": "BRS", "status": "cancelled", "landed": False,
+                                            "scheduledArrival": "2026-10-04 15:25+01:00", "estimatedArrival": "", "actualArrival": "", "delay": ""}})
+    open_flight(page, base_url, api, "U2 7075", "departure")
+    page.wait_for_selector("#inboundCard:not([hidden])")
+    assert "was cancelled" in page.inner_text("#inboundLine") and "is-bad" in page.get_attribute("#inboundCard", "class")
+
+
+def test_inbound_is_not_requested_when_it_cannot_help(page, base_url, api):
+    seen = []
+    inbound_stub(api, {"available": False, "reason": "no_inbound_found"}, seen)
+    # departed flight: nothing to warn about
+    open_flight(page, base_url, api, "FR 8296", "departure")
+    page.wait_for_timeout(500)
+    assert seen == [] and page.is_hidden("#inboundCard")
+    # no registration known yet
+    api.departures[0]["aircraft"]["regNumber"] = ""
+    open_flight(page, base_url, api, "U2 7075", "departure")
+    page.wait_for_timeout(500)
+    assert seen == []
+    # nothing found: card stays hidden
+    api.departures[0]["aircraft"]["regNumber"] = "G-UZHA"
+    open_flight(page, base_url, api, "U2 7075", "departure")
+    page.wait_for_timeout(500)
+    assert len(seen) == 1 and page.is_hidden("#inboundCard")
+
+
+def test_inbound_not_requested_from_an_older_worker(page, base_url, api):
+    seen = []
+    inbound_stub(api, {"available": True}, seen)
+    api.features = {"tiles": True, "history": True}            # worker without the inbound route
+    open_flight(page, base_url, api, "U2 7075", "departure")
+    page.wait_for_timeout(600)
+    assert seen == [] and page.is_hidden("#inboundCard")
+
+
+def test_inbound_failure_is_silent(page, base_url, api):
+    def handler(route, json_resp):
+        json_resp(route, {"error": "upstream", "status": 429}, 502)
+    api.extra["/api/inbound"] = handler
+    api.features = {"tiles": True, "history": True, "inbound": True}
+    open_flight(page, base_url, api, "U2 7075", "departure")
+    page.wait_for_timeout(600)
+    assert page.is_hidden("#inboundCard") and page.inner_text("#heroFlightNumber") == "U2 7075"
+    assert not page.errors
