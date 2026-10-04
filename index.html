@@ -36,6 +36,8 @@
     </button>
 
     <div class="menu" id="overflowMenu" role="menu" aria-label="More menu">
+      <button class="menu-item" id="installBtn" role="menuitem" hidden>Install app</button>
+      <a class="menu-item" id="hereLink" role="menuitem" href="getting-here.html">Getting here</a>
       <button class="menu-item" id="refreshBtn" role="menuitem">Refresh</button>
     </div>
   </header>
@@ -111,10 +113,22 @@
       </div>
     </section>
 
+    <dialog class="sheet" id="iosInstall" aria-labelledby="iosInstallTitle">
+      <h2 id="iosInstallTitle">Add to Home Screen</h2>
+      <ol>
+        <li>Tap the <strong>Share</strong> button <span aria-hidden="true">⎙</span> in Safari’s toolbar.</li>
+        <li>Choose <strong>Add to Home Screen</strong>.</li>
+        <li>Tap <strong>Add</strong> — then open Bristol Flights from your Home Screen.</li>
+      </ol>
+      <p class="small">Installed, it opens full-screen, works with a poor signal, and (on iPhone) is needed for flight notifications.</p>
+      <form method="dialog"><button class="btn" type="submit">Got it</button></form>
+    </dialog>
+
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   </main>
 
   <script src="shared/utils.js"></script>
+  <script src="shared/install.js"></script>
   <script src="shared/config.js"></script>
   <script src="shared/time.js"></script>
   <script src="shared/airports.js"></script>

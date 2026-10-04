@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Getting here · Bristol Airport Flights</title>
+  <meta name="description" content="Pick-up, parking and transport information from Bristol Airport." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Bristol Airport Flights" />
+  <meta property="og:title" content="Getting to Bristol Airport" />
+  <meta property="og:description" content="Pick-up, parking and transport information from Bristol Airport." />
+  <meta property="og:image" content="https://flightapp.chiffers.com/assets/icon-512.png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#F5F7FB" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#070B14" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" type="image/png" href="assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .info-group{ margin-top: 16px; scroll-margin-top: 80px; }
+    .info-group h2{ font-size: 15px; margin: 0 0 4px; }
+    .info-group > p{ margin: 0 0 8px; }
+    .info-links{ display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+    .info-link{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding: 12px 14px; border-radius: var(--radius2); border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 70%, transparent), color-mix(in srgb, var(--surface) 80%, transparent));
+      color: var(--text); text-decoration: none; font-weight: 700; font-size: 14px;
+    }
+    .info-link small{ display:block; font-weight: 500; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .info-link .ext{ color: var(--muted); font-size: 16px; flex-shrink: 0; }
+    @media (hover: hover){ .info-link:hover{ border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke)); } }
+    .info-note{ margin-top: 20px; }
+    @media (min-width: 720px){ .info-links{ grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a class="icon-btn" href="index.html" aria-label="Back to flights" style="display:grid;place-items:center;text-decoration:none">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15.5 19.5 8 12l7.5-7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <div class="brand-text">
+        <div class="brand-name">Getting here</div>
+        <div class="brand-sub">From Bristol Airport’s own site</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app">
+    <p class="small">These links open Bristol Airport’s website, where current prices, times and rules are kept up to date.</p>
+
+    <section class="info-group" id="pickup" aria-labelledby="h-pickup">
+      <h2 id="h-pickup">Meeting someone</h2>
+      <p class="small">Passengers usually reach the arrivals hall 20–30 minutes after landing.</p>
+      <ul class="info-links">
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/to-and-from-the-airport/drop-off-and-pick-up/" target="_blank" rel="noopener"><span>Drop off and pick up<small>Official guidance</small></span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/parking/drop-off-and-pick-up/" target="_blank" rel="noopener"><span>Drop Off &amp; Pick Up car park</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/parking/waiting-zone/" target="_blank" rel="noopener"><span>Waiting Zone</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/parking/short-stay-car-park/" target="_blank" rel="noopener"><span>Short Stay parking</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/parking/meet-and-greet-parking/" target="_blank" rel="noopener"><span>Meet &amp; Greet parking</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/arrivals-and-departures/arrivals/" target="_blank" rel="noopener"><span>Arrivals<small>What to expect on arrival</small></span><span class="ext" aria-hidden="true">↗</span></a></li>
+      </ul>
+    </section>
+
+    <section class="info-group" id="fly" aria-labelledby="h-fly">
+      <h2 id="h-fly">Flying from Bristol</h2>
+      <ul class="info-links">
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/arrivals-and-departures/departures/" target="_blank" rel="noopener"><span>Departures</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/at-the-airport/security/" target="_blank" rel="noopener"><span>Security</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/at-the-airport/fast-track-security/" target="_blank" rel="noopener"><span>Fast Track Security</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/at-the-airport/special-assistance/" target="_blank" rel="noopener"><span>Special Assistance</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/parking/" target="_blank" rel="noopener"><span>Parking<small>Short stay, mid stay, multi-storey, Silver Zone and more</small></span><span class="ext" aria-hidden="true">↗</span></a></li>
+      </ul>
+    </section>
+
+    <section class="info-group" id="transport" aria-labelledby="h-transport">
+      <h2 id="h-transport">Without a car</h2>
+      <ul class="info-links">
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/to-and-from-the-airport/by-airport-flyer/" target="_blank" rel="noopener"><span>Airport Flyer</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/to-and-from-the-airport/by-bus-and-coach/" target="_blank" rel="noopener"><span>Bus and coach</span><span class="ext" aria-hidden="true">↗</span></a></li>
+        <li><a class="info-link" href="https://www.bristolairport.co.uk/to-and-from-the-airport/taxis/" target="_blank" rel="noopener"><span>Taxis</span><span class="ext" aria-hidden="true">↗</span></a></li>
+      </ul>
+    </section>
+
+    <p class="small info-note">This is an unofficial flight-tracking app and is not run by Bristol Airport. <a href="https://www.bristolairport.co.uk/" target="_blank" rel="noopener">bristolairport.co.uk</a></p>
+  </main>
+</body>
+</html>

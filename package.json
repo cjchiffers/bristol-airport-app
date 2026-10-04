@@ -1,0 +1,10 @@
+{
+  "name": "bristol-airport-app",
+  "private": true,
+  "description": "Static PWA + Cloudflare Worker. No build step; this file only exists to run the tests.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/unit/*.test.mjs\" \"tests/worker/*.test.mjs\"",
+    "test:e2e": "python3 -m pytest tests/e2e"
+  }
+}

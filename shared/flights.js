@@ -175,6 +175,22 @@
     return u.href.replace(/\+/g, "%20");
   }
 
+  /**
+   * The link to hand to other people. If the deployed worker supports share previews, this is its /s/… address,
+   * which shows "U2 2806 from Kos — expected 15:25" in WhatsApp/Messages and then sends people on to the app.
+   * Otherwise it is the plain app URL. (Feature flag comes from BrsConfig.features, probed at page load, so this
+   * stays synchronous — iOS needs navigator.share to run inside the tap.)
+   */
+  function shareUrl(route, place){
+    const cfg = window.BrsConfig;
+    if (cfg && cfg.features && cfg.features.preview && cfg.WORKER_ORIGIN) {
+      const u = new URL(`${cfg.WORKER_ORIGIN}/s/${route.type}/${encodeURIComponent(route.flight)}/${route.date}`);
+      if (place) u.searchParams.set("p", String(place).slice(0, 40));
+      return u.href.replace(/\+/g, "%20");
+    }
+    return urlFor(route);
+  }
+
   /** Absolute details URL for a flight, e.g. https://…/flight-details.html?type=arrival&flight=U2%202806&date=2026-10-02 */
   function detailsUrl(f, mode){
     return urlFor(routeOf(f, mode));
@@ -299,7 +315,7 @@
     const payload = {
       title: `${flightNo(f) || "Flight"} · Bristol Airport`,
       text: shareText(f, type),
-      url: url || detailsUrl(f, type),
+      url: url || shareUrl(routeOf(f, type), cityOf(otherSeg(f, type).iataCode)),
     };
     const r = await shareLink(payload);
     if (toast) {
@@ -390,7 +406,7 @@
   window.BrsFlights = {
     isDep, normMode, flightNo, normFlightNo, sameFlightNo,
     seg, otherSeg, scheduledTime, keyTime, delayMin, statusInfo,
-    dedupe, dateKey, routeOf, urlFor, detailsUrl,
+    dedupe, dateKey, routeOf, urlFor, detailsUrl, shareUrl, cityOf,
     cacheKey, saveCached, loadCached, prepareDetails,
     shareText, shareLink, shareFlight, buildIcs, downloadIcs,
   };

@@ -48,7 +48,7 @@
     if (!d) return "";
     const p = {};
     for (const x of dayFmt.formatToParts(d)) p[x.type] = x.value;
-    return `${p.weekday} ${p.day} ${p.month}`;
+    return `${p.weekday} ${p.day} ${p.month === "Sept" ? "Sep" : p.month}`;   // newer ICU says "Sept"
   }
 
   /** London calendar date as "YYYY-MM-DD" */

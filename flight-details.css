@@ -960,3 +960,85 @@ body.details-page{ --maxw: 720px; }
 .details-actions{ display:flex; align-items:center; gap: 8px; flex-shrink: 0; }
 .details-topbar .details-title{ flex: 1; min-width: 0; padding: 0 10px; text-align: center; }
 .details-headline, .details-subhead{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Aircraft illustration (generic side view, see shared/aircraft.js) ---- */
+.aircraft-art{
+  margin: 0 0 12px;
+  padding: 14px 10px 4px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #86bbf0 0%, #d3e8fb 100%);
+}
+@media (prefers-color-scheme: dark){
+  .aircraft-art{ background: linear-gradient(180deg, #12203a 0%, #2c4f7c 100%); }
+}
+.aircraft-art[hidden]{ display:none; }
+.ac-svg{ display:block; width:100%; max-width:480px; height:auto; margin:0 auto; overflow:visible; }
+.ac-fuse{ fill:#f8fafd; stroke:#9fb0c7; stroke-width:1; }
+.ac-wing{ fill:#dce4ef; stroke:#9fb0c7; stroke-width:1; }
+.ac-engine{ fill:#cbd5e4; stroke:#8fa1ba; stroke-width:1; }
+.ac-pylon{ fill:#b9c5d7; }
+.ac-dark{ fill:#4d5c75; }
+.ac-tail{ fill: var(--accent); stroke:#5b9fdc; stroke-width:1; }
+.ac-stripe{ stroke: var(--accent); stroke-width:3; fill:none; stroke-linecap:round; }
+.ac-win, .ac-cockpit{ fill:#51627e; }
+.ac-prop{ fill: rgba(255,255,255,.38); }
+.ac-prop-blade{ stroke:#51627e; stroke-width:2; opacity:.55; }
+.ac-shadow{ fill: rgba(0,0,0,.10); }
+
+/* ---- Recent history (loaded when opened) ---- */
+.history-card summary{
+  display:flex; flex-direction:column; gap:2px;
+  cursor:pointer; list-style:none; padding-right: 28px; position:relative;
+}
+.history-card summary::-webkit-details-marker{ display:none; }
+.history-card summary::after{
+  content:""; position:absolute; right:4px; top:50%; width:8px; height:8px; margin-top:-6px;
+  border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+  transform: rotate(45deg); transition: transform .15s ease;
+}
+.history-card[open] summary::after{ transform: rotate(-135deg); margin-top:-2px; }
+.history-body{ margin-top: 12px; font-size: 12px; }
+.history-summary{ margin: 0 0 10px; font-size: 13px; font-weight: 700; }
+.history-table{ width:100%; border-collapse: collapse; }
+.history-table th{ text-align:left; font-weight:600; color: var(--muted); font-size: 11px; padding: 4px 6px 6px 0; }
+.history-table td{ padding: 7px 6px 7px 0; border-top: 1px solid var(--stroke); font-variant-numeric: tabular-nums; }
+.history-table td.num, .history-table th.num{ text-align:right; padding-right:0; }
+.hist-chip{
+  display:inline-block; padding: 3px 8px; border-radius: 999px; font-weight: 800; font-size: 11px; white-space: nowrap;
+  border: 1px solid var(--stroke); color: var(--text);
+}
+.hist-chip.good{ background: color-mix(in srgb, var(--good) 18%, transparent); border-color: color-mix(in srgb, var(--good) 46%, var(--stroke)); }
+.hist-chip.warn{ background: color-mix(in srgb, var(--warn) 20%, transparent); border-color: color-mix(in srgb, var(--warn) 50%, var(--stroke)); }
+.hist-chip.bad{  background: color-mix(in srgb, var(--bad) 16%, transparent);  border-color: color-mix(in srgb, var(--bad) 48%, var(--stroke)); }
+.hist-chip.neutral{ background: color-mix(in srgb, var(--surface2) 70%, transparent); }
+.history-note{ margin-top: 8px; }
+.history-retry{ margin-top: 8px; }
+
+/* "Meeting someone": likely-out window + keep-awake toggle */
+.hero-hint strong{ color: var(--text); font-weight: 800; }
+.wake-btn{ display:block; width:100%; margin: 0 0 14px; font-size: 13px; cursor:pointer; }
+.wake-btn[hidden]{ display:none; }
+.wake-btn[aria-pressed="true"]{
+  background: color-mix(in srgb, var(--good) 20%, transparent);
+  border-color: color-mix(in srgb, var(--good) 50%, var(--stroke));
+}
+
+.hero-link{ display:inline-block; margin: -4px 2px 12px; color: var(--accent); text-decoration: none; font-weight: 700; }
+.hero-link:hover, .hero-link:focus-visible{ text-decoration: underline; }
+
+/* ---- Incoming aircraft (previous flight of this plane) ---- */
+.inbound-card[hidden]{ display:none; }
+.inbound-line{ margin: 0 0 4px; font-size: 13px; font-weight: 700; line-height: 1.4; }
+.inbound-effect{ margin: 0; min-height: 0; }
+.inbound-effect:empty{ display:none; }
+.inbound-card.is-warn{ border-color: color-mix(in srgb, var(--warn) 55%, var(--stroke)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
+.inbound-card.is-bad{ border-color: color-mix(in srgb, var(--bad) 55%, var(--stroke)); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+.inbound-card.is-warn .inbound-effect, .inbound-card.is-bad .inbound-effect{ color: var(--text); font-weight: 700; }
+
+/* ---- Notify bell ---- */
+.icon-btn[hidden]{ display:none; }
+#notifyIconBtn[aria-pressed="true"]{
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--stroke));
+}
+#notifyIconBtn[aria-pressed="true"] .bell{ fill: currentColor; fill-opacity: .25; }

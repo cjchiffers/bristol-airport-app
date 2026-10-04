@@ -145,6 +145,7 @@
     shareBtn: document.getElementById("shareBtn"),
     calendarBtn: document.getElementById("calendarBtn"),
     shareIconBtn: document.getElementById("shareIconBtn"),
+    notifyBtn: document.getElementById("notifyIconBtn"),
 
     overflowBtn: document.getElementById("overflowDetailsBtn"),
     menu: document.getElementById("detailsMenu"),
@@ -153,6 +154,9 @@
     airlineLogo: document.getElementById("airlineLogo"),
     airlineName: document.getElementById("airlineName"),
     airlineCodeLine: document.getElementById("airlineCodeLine"),
+    aircraftArt: document.getElementById("aircraftArt"),
+    historyCard: document.getElementById("historyCard"),
+    historyBody: document.getElementById("historyBody"),
     aircraftType: document.getElementById("aircraftType"),
     aircraftReg: document.getElementById("aircraftReg"),
     aircraftImageWrap: document.getElementById("aircraftImageWrap"),
@@ -201,7 +205,16 @@
     intervalMs: 60000,
     timer: null,
     countdownTimer: null,
+    aircraftKind: null,
+    history: { loaded: false, loading: false },
+    inbound: { at: 0, loading: false },
+    notify: { available: false, iosNeedsInstall: false },
+    livePosition: null,
+    routePoints: null,
+    liveRequested: false,   // has a request with the live option been made yet?
+    liveRetried: false,
     lastOkAt: 0,
+    staleFrom: null,   // set when the worker served a last-good copy (ISO time of that data)
     updatedText: "",
 
     fetching: false,
@@ -406,8 +419,10 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
 
   function shareCurrent() {
     if (!state.current || !state.route) return;
-    // Share exactly the URL being viewed (type/flight/date) so the link always resolves.
-    window.BrsFlights.shareFlight(state.current, state.route.type, showToast, window.BrsFlights.urlFor(state.route));
+    // The link carries type/flight/date, so it always resolves (via the worker's preview page when available).
+    const F = window.BrsFlights;
+    const other = F.otherSeg(state.current, state.route.type).iataCode;
+    F.shareFlight(state.current, state.route.type, showToast, F.shareUrl(state.route, F.cityOf(other)));
   }
 
   if (els.backBtn) els.backBtn.addEventListener("click", goBack);
@@ -523,6 +538,7 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
       setText(els.subhead, "Loading…");
     }
 
+    initNotify();
     refreshNow(false);
     startAuto();
   }
@@ -589,9 +605,22 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
       window.BrsFlights.saveCached(state.route, state.current);
       state.lastOkAt = Date.now();
       render(state.current, prev);
+      maybeLoadInbound(state.current);
+      // A shared link has no cached status, so the first fetch couldn't know to ask for the position:
+      // once we see the flight is airborne, ask again straight away (once).
+      if (isAirborne(state.current) && !state.liveRequested && !state.liveRetried) {
+        state.liveRetried = true;
+        setTimeout(() => refreshNow(false), 0);
+      }
       setNetBanner(false);
-      setUpdated(Date.now(), false);
-      if (forceFeedback) showToast("Updated");
+      if (state.staleFrom !== null) {
+        const t = window.BrsTime.fmtTime(state.staleFrom);
+        state.updatedText = `Live feed delayed — showing data from ${t || "earlier"}`;
+        setText(els.updatedLine, state.updatedText);
+      } else {
+        setUpdated(Date.now(), false);
+      }
+      if (forceFeedback) showToast(state.staleFrom !== null ? "Live feed delayed — showing recent data" : "Updated");
     } catch (e) {
       console.error(e);
       if (!state.current) showNotFound("network");
@@ -653,6 +682,11 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     return m === null ? null : Math.abs(m);
   }
 
+  const AIRBORNE = new Set(["departed", "enroute", "approaching", "active"]);   // "active" = older worker's word
+  function isAirborne(flight) {
+    return !!flight && AIRBORNE.has(String(flight.status || flight.flight_status || "").toLowerCase());
+  }
+
   /** Ask the worker for this flight; returns the best matching record, null if not listed. Throws on network/HTTP errors. */
   async function fetchBestEffortUpdate(route, current) {
     const F = window.BrsFlights;
@@ -662,9 +696,12 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     url.searchParams.set("flight_iata", route.flight);
     url.searchParams.set(route.type === "departure" ? "dep_iata" : "arr_iata", home);
     url.searchParams.set("date", route.date);
+    if (isAirborne(current)) { url.searchParams.set("live", "1"); state.liveRequested = true; }   // real-time position, only worth asking for in the air
 
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) throw new Error(`Flight HTTP ${res.status}`);
+    // The worker serves its last good copy (and says so) when the flight data provider is unavailable.
+    state.staleFrom = res.headers.get("X-Data-Stale") === "1" ? (res.headers.get("X-Data-Updated") || "") : null;
 
     const data = await res.json();
     const list = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
@@ -721,6 +758,8 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     // Hero card (app-style flight overview) + operational info
     renderHeroCard(flight, flat, id);
     renderOpsBar(flight);
+    applyLivePosition(flight);
+    updateNotifyButton();
 
     if (state.route) document.title = `${displayNo} ${route.replace(" → ", "→")} · BRS Flights`;
 
@@ -752,6 +791,17 @@ function setHeroAirline(airlineName, airlineIata, flightNo) {
     if (els.aircraftType) {
       els.aircraftType.textContent = acText ? `${acText}${acCode ? ` (${acCode})` : ""}` : acCode ? `Aircraft ${acCode}` : "Aircraft —";
     }
+    // Generic side-view illustration chosen from the model name (not a photo of the actual aircraft)
+    if (els.aircraftArt && window.BrsAircraft) {
+      const kind = window.BrsAircraft.kindFor(acText);
+      if (kind !== state.aircraftKind) {
+        state.aircraftKind = kind;
+        els.aircraftArt.innerHTML = window.BrsAircraft.svg(kind);
+        els.aircraftArt.setAttribute("aria-label", `Illustration of a ${window.BrsAircraft.label(kind)}${acText ? ` (${acText})` : ""}`);
+        els.aircraftArt.hidden = false;
+      }
+    }
+
     const reg = pickAny(flat, ["aircraft.regNumber", "flight.aircraft.registration", "aircraft.registration", "registration"]) || "";
     if (els.aircraftReg) {
   els.aircraftReg.textContent = reg
@@ -982,12 +1032,30 @@ if (els.arrKv) {
       els.heroBaggage.textContent = belt || "TBC";
     }
 
-    // Pickup tip: passengers need time to get through the terminal after landing.
+    // Pickup helper: passengers usually reach the arrivals hall 20–30 minutes after landing.
     const hint = document.getElementById("heroHint");
+    const meeting = !atDeparture && info.key !== "cancelled" && info.key !== "diverted";
     if (hint) {
-      const show = !atDeparture && info.key !== "cancelled" && info.key !== "diverted";
-      hint.textContent = show ? "Passengers usually reach the arrivals hall 20–30 minutes after landing." : "";
-      setShown(hint, show);
+      const land = meeting ? F.keyTime(flight, mode) : null;
+      if (land) {
+        const T = window.BrsTime;
+        const from = T.fmtTime(new Date(land.getTime() + 20 * 60000));
+        const to = T.fmtTime(new Date(land.getTime() + 30 * 60000));
+        hint.innerHTML = `<strong>Likely out ${escapeHtml(from)}–${escapeHtml(to)}</strong> · passengers usually take 20–30 minutes after landing`;
+      } else if (meeting) {
+        hint.textContent = "Passengers usually reach the arrivals hall 20–30 minutes after landing.";
+      } else {
+        hint.textContent = "";
+      }
+      setShown(hint, meeting);
+    }
+    updateWakeButton(meeting);
+
+    // Pickup info for people meeting a flight, parking/transport info for people flying out.
+    const infoLink = document.getElementById("heroInfoLink");
+    if (infoLink) {
+      infoLink.setAttribute("href", atDeparture ? "getting-here.html#fly" : "getting-here.html#pickup");
+      infoLink.textContent = atDeparture ? "Parking, security and transport info →" : "Where to park and wait for passengers →";
     }
 
     renderCountdown();
@@ -1125,6 +1193,321 @@ if (els.arrKv) {
       <div class="kpi-chip"><span class="kpi-k">CO₂e</span><span class="kpi-v" title="Rough estimate per passenger">${escapeHtml(fmtKg(co2))}</span></div>
       <div class="kpi-chip"><span class="kpi-k">Delay</span><span class="kpi-v">${escapeHtml(delayLabel)}</span></div>
     `;
+  }
+
+// ---------- Incoming aircraft: is this plane running late on its previous flight? ----------
+  const INBOUND_EVERY_MS = 5 * 60 * 1000;
+  const INBOUND_SKIP = new Set(["departed", "enroute", "approaching", "landed", "cancelled", "diverted"]);
+
+  async function maybeLoadInbound(flight) {
+    const ib = state.inbound;
+    if (!state.route || ib.loading || !flight) return;
+    if (Date.now() - ib.at < INBOUND_EVERY_MS) return;
+
+    const status = String(flight.status || flight.flight_status || "").toLowerCase();
+    const reg = flight.aircraft && flight.aircraft.regNumber;
+    if (!reg || INBOUND_SKIP.has(status)) { hideInbound(); return; }   // nothing useful once it has left / without a tail number
+
+    try { await window.BrsConfig.featuresReady; } catch { /* ignore */ }
+    if (!window.BrsConfig.features.inbound) return;               // an older worker without the route
+
+    ib.loading = true;
+    ib.at = Date.now();
+    try {
+      const url = new URL(`${window.BrsConfig.API_BASE}/inbound`);
+      url.searchParams.set("flight_iata", state.route.flight);
+      url.searchParams.set("type", state.route.type);
+      url.searchParams.set("date", state.route.date);
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`Inbound HTTP ${res.status}`);
+      renderInbound(await res.json());
+    } catch (e) {
+      console.warn("Inbound aircraft unavailable:", e);
+      hideInbound();
+    } finally {
+      ib.loading = false;
+    }
+  }
+
+  function hideInbound() {
+    const card = document.getElementById("inboundCard");
+    if (card) card.hidden = true;
+  }
+
+  function renderInbound(data) {
+    const card = document.getElementById("inboundCard");
+    const line = document.getElementById("inboundLine");
+    const effect = document.getElementById("inboundEffect");
+    if (!card || !line || !effect) return;
+    if (!data || !data.available || !data.inbound) { card.hidden = true; return; }
+
+    const T = window.BrsTime;
+    const i = data.inbound;
+    const departure = state.route.type === "departure";
+    const from = getCityName(i.from) || i.from;
+    const to = getCityName(i.to) || i.to;
+    const delay = Number(i.delay);
+    const t = T.fmtTime(i.actualArrival || i.estimatedArrival || i.scheduledArrival);
+
+    let what;
+    if (i.status === "cancelled") what = "was cancelled";
+    else if (i.landed) what = `landed at ${t}`;
+    else if (Number.isFinite(delay) && delay >= 10) what = `is due ${t} (${delay} min late)`;
+    else if (Number.isFinite(delay) && delay <= -5) what = `is due ${t} (${Math.abs(delay)} min early)`;
+    else what = `is due ${t}, on time`;
+
+    line.textContent = departure
+      ? `Your aircraft is operating ${i.number} from ${from}, which ${what}.`
+      : `This aircraft’s previous flight, ${i.number} (${from} → ${to}), ${what}.`;
+
+    const extra = Number(data.additionalDelayMin) || 0;
+    let tone = "";
+    let text = "";
+    if (i.status === "cancelled") { tone = "bad"; text = "This flight could be affected."; }
+    else if (extra >= 10) {
+      tone = "warn";
+      text = departure
+        ? `This could delay your departure by about ${extra} minutes.`
+        : `This flight may leave ${to} about ${extra} minutes late, so it could land at Bristol later than shown.`;
+    } else if (!i.landed) text = "No knock-on delay expected.";
+
+    effect.textContent = text;
+    card.classList.toggle("is-warn", tone === "warn");
+    card.classList.toggle("is-bad", tone === "bad");
+    card.hidden = false;
+  }
+
+// ---------- Live position: plane on its real position + "In flight" line ----------
+  const POSITION_FRESH_MS = 15 * 60 * 1000;
+
+  function applyLivePosition(flight) {
+    const info = document.getElementById("liveInfo");
+    const p = flight && flight.position;
+    const ts = p ? Date.parse(p.reportedAt) : NaN;
+    const fresh = !!p && Number.isFinite(p.lat) && Number.isFinite(p.lon) && (!Number.isFinite(ts) || Date.now() - ts < POSITION_FRESH_MS);
+    if (!fresh || !isAirborne(flight)) {
+      state.livePosition = null;
+      if (info) info.hidden = true;
+      return;
+    }
+    state.livePosition = p;
+
+    if (info) {
+      const bits = ["In flight"];
+      if (Number.isFinite(p.altitudeFt)) bits.push(`${(Math.round(p.altitudeFt / 100) * 100).toLocaleString("en-GB")} ft`);
+      if (Number.isFinite(p.speedKt)) bits.push(`${Math.round(p.speedKt)} kt`);
+      if (Number.isFinite(ts)) {
+        const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+        bits.push(mins < 1 ? "position just now" : `position ${mins} min ago`);
+      }
+      info.textContent = bits.join(" · ");
+      info.hidden = false;
+    }
+    placePlaneAtLivePosition();
+  }
+
+  // Put the plane marker on the aircraft's real position (rotated to its track). The route animation may still be
+  // running or the map may not exist yet; this is called again when the animation finishes.
+  function placePlaneAtLivePosition() {
+    const p = state.livePosition;
+    if (!p || !state.map || !state.planeMarker || !window.L) return;
+    if (state.animRaf) { cancelAnimationFrame(state.animRaf); state.animRaf = null; }
+    if (state.routeLine && state.routePoints) state.routeLine.setLatLngs(state.routePoints);
+    state.planeMarker.setLatLng([p.lat, p.lon]);
+    state.planeMarker.setIcon(makePlaneIcon(Number.isFinite(p.trackDeg) ? p.trackDeg : 0));
+  }
+
+// ---------- Notifications (Web Push): follow this flight ----------
+  // When there is nothing left to tell them about. For an arrival, "departed/en route" still means it is on its way here.
+  const NOTIFY_DONE = {
+    arrival: new Set(["landed", "cancelled", "diverted"]),
+    departure: new Set(["departed", "enroute", "approaching", "landed", "cancelled", "diverted"]),
+  };
+
+  async function initNotify() {
+    const btn = els.notifyBtn;
+    if (!btn || !window.BrsPush) return;
+    try { await window.BrsConfig.featuresReady; } catch { /* ignore */ }
+    if (!window.BrsConfig.features.push) return;               // worker without notifications set up
+
+    const I = window.BrsInstall;
+    state.notify.iosNeedsInstall = !!(I && I.isIosSafari() && !I.isStandalone());
+    if (!window.BrsPush.supported() && !state.notify.iosNeedsInstall) return;   // nothing this browser can do
+    state.notify.available = true;
+    btn.addEventListener("click", onNotifyClick);
+    updateNotifyButton();
+  }
+
+  /** Bell visible only while it can still help: before landing (arrivals) / departure (departures). */
+  function updateNotifyButton() {
+    const btn = els.notifyBtn;
+    if (!btn || !state.notify.available || !state.route) return;
+    const status = String(state.current && (state.current.status || state.current.flight_status) || "").toLowerCase();
+    const finished = NOTIFY_DONE[state.route.type].has(status);
+    const on = window.BrsPush.isFollowing(state.route);
+    btn.hidden = finished && !on;
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    const blocked = !state.notify.iosNeedsInstall && window.BrsPush.permission() === "denied" && !on;
+    btn.title = on ? "Notifications are on — tap to turn off" : (blocked ? "Notifications are blocked in your browser settings" : "Notify me about this flight");
+    btn.setAttribute("aria-label", btn.title);
+  }
+
+  async function onNotifyClick() {
+    const route = state.route;
+    if (!route) return;
+    if (state.notify.iosNeedsInstall) { await window.BrsInstall.install(); return; }     // shows the Add to Home Screen steps
+
+    const name = route.flight;
+    if (window.BrsPush.isFollowing(route)) {
+      await window.BrsPush.unfollow(route);
+      showToast(`Notifications off for ${name}`);
+    } else {
+      const F = window.BrsFlights;
+      const other = state.current ? F.otherSeg(state.current, route.type).iataCode : "";
+      const due = state.current ? F.scheduledTime(state.current, route.type) : null;
+      try {
+        await window.BrsPush.follow(route, other ? F.cityOf(other) : "", due ? due.toISOString() : "");
+        showToast(`We’ll notify you about ${name}`);
+      } catch (e) {
+        const msg = {
+          denied: "Notifications are blocked — allow them in your browser settings",
+          limit: "You can follow up to 10 flights",
+          disabled: "Notifications aren’t available right now",
+          unsupported: "This browser can’t show notifications",
+        }[e && e.code] || "Couldn’t turn on notifications — try again";
+        showToast(msg);
+      }
+    }
+    updateNotifyButton();
+  }
+
+// ---------- Keep screen on while waiting (Screen Wake Lock API) ----------
+  // Only offered when someone is meeting a flight and the browser supports it. The lock is released by the
+  // browser whenever the tab is hidden, so it is re-requested when the page becomes visible again.
+  let wakeLock = null;
+  let wakeWanted = false;
+
+  async function acquireWake() {
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+      return true;
+    } catch {
+      wakeLock = null;
+      return false;
+    }
+  }
+
+  async function setWake(on) {
+    const btn = document.getElementById("wakeBtn");
+    wakeWanted = on;
+    if (on) {
+      const ok = await acquireWake();
+      if (!ok) { wakeWanted = false; showToast("Couldn’t keep the screen on"); }
+    } else if (wakeLock) {
+      try { await wakeLock.release(); } catch { /* already released */ }
+      wakeLock = null;
+    }
+    if (btn) {
+      btn.setAttribute("aria-pressed", wakeWanted ? "true" : "false");
+      btn.textContent = wakeWanted ? "Screen will stay on — tap to turn off" : "Keep screen on while I wait";
+    }
+  }
+
+  function updateWakeButton(meeting) {
+    const btn = document.getElementById("wakeBtn");
+    if (!btn) return;
+    const supported = !!(navigator.wakeLock && typeof navigator.wakeLock.request === "function");
+    btn.hidden = !(meeting && supported);
+    if (!btn.dataset.bound) {
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => setWake(!wakeWanted));
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && wakeWanted && !wakeLock) acquireWake();
+      });
+    }
+    if (!meeting && wakeWanted) setWake(false);   // flight cancelled / not a pickup any more
+  }
+
+// ---------- Recent history (last 7 days of this flight at Bristol) ----------
+  // Loaded only when the section is opened: the worker uses a pricier upstream endpoint and caches it.
+  function fmtDelta(delay, status) {
+    if (status === "cancelled") return { text: "Cancelled", tone: "bad" };
+    const n = Number(delay);
+    if (delay === "" || delay == null || !Number.isFinite(n)) return { text: "—", tone: "neutral" };
+    if (n === 0) return { text: "On time", tone: "good" };
+    if (n < 0) return { text: `${Math.abs(n)} min early`, tone: "good" };
+    return { text: `+${n} min`, tone: n > 15 ? "warn" : (n <= 5 ? "good" : "neutral") };
+  }
+
+  function renderHistory(data) {
+    const T = window.BrsTime;
+    const body = els.historyBody;
+    const rows = (data && Array.isArray(data.rows)) ? data.rows : [];
+    const arrival = state.route && state.route.type === "arrival";
+
+    if (!rows.length) {
+      body.innerHTML = `<p class="small">No recent history found for this flight.</p>`;
+      return;
+    }
+
+    const st = data.stats || {};
+    const parts = [];
+    if (st.avgDelay !== null && st.avgDelay !== undefined) {
+      const a = st.avgDelay;
+      parts.push(`Average ${a === 0 ? "on time" : a > 0 ? `${a} min late` : `${Math.abs(a)} min early`}`);
+      parts.push(`${st.onTime} of ${st.measured} within 15 min`);
+    }
+    if (st.cancelled) parts.push(`${st.cancelled} cancelled`);
+
+    const trs = rows.map((r) => {
+      const d = fmtDelta(r.delay, r.status);
+      const sched = T.fmtTime(r.scheduled) || "—";
+      const actual = r.status === "cancelled" ? "—" : (T.fmtTime(r.actual) || "—");
+      return `<tr>
+        <td>${escapeHtml(T.fmtDay(r.scheduled) || r.date || "—")}</td>
+        <td>${escapeHtml(sched)}</td>
+        <td>${escapeHtml(actual)}</td>
+        <td class="num"><span class="hist-chip ${d.tone}">${escapeHtml(d.text)}</span></td>
+      </tr>`;
+    }).join("");
+
+    body.innerHTML = `
+      ${parts.length ? `<p class="history-summary">${escapeHtml(parts.join(" · "))}</p>` : ""}
+      <table class="history-table">
+        <caption class="sr-only">Scheduled and actual ${arrival ? "arrival" : "departure"} times at Bristol, most recent first</caption>
+        <thead><tr><th scope="col">Date</th><th scope="col">Scheduled</th><th scope="col">${arrival ? "Landed" : "Departed"}</th><th scope="col" class="num">Difference</th></tr></thead>
+        <tbody>${trs}</tbody>
+      </table>
+      <p class="small history-note">UK times. Differences within 15 minutes count as on time.</p>`;
+  }
+
+  async function loadHistory() {
+    const h = state.history;
+    if (!state.route || h.loading || h.loaded || !els.historyBody) return;
+    h.loading = true;
+    els.historyBody.textContent = "Loading…";
+    try {
+      const url = new URL(`${window.BrsConfig.API_BASE}/history`);
+      url.searchParams.set("flight_iata", state.route.flight);
+      url.searchParams.set(state.route.type === "departure" ? "dep_iata" : "arr_iata", window.BrsConfig.AIRPORT);
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`History HTTP ${res.status}`);
+      renderHistory(await res.json());
+      h.loaded = true;
+    } catch (e) {
+      console.warn("History unavailable:", e);
+      els.historyBody.innerHTML = `
+        <p class="small">Flight history isn’t available right now.</p>
+        <button class="btn history-retry" id="historyRetry" type="button">Try again</button>`;
+      document.getElementById("historyRetry")?.addEventListener("click", loadHistory);
+    } finally {
+      h.loading = false;
+    }
+  }
+
+  if (els.historyCard) {
+    els.historyCard.addEventListener("toggle", () => { if (els.historyCard.open) loadHistory(); });
   }
 
 // ---------- Weather (5-day one-card + icons + local time + extras) ----------
@@ -1567,42 +1950,51 @@ if (els.arrKv) {
 
     L.control.zoom({ position: "bottomright" }).addTo(state.map);
 
-    state.tileLight = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      subdomains: "abc",
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
-    });
+    // Map tiles come from our worker (/api/tiles/...), which adds the CARTO API key server-side so the
+    // key never reaches the browser. If the worker can't serve tiles (not deployed yet, secret missing,
+    // CARTO down) we fall back to plain OpenStreetMap tiles so the map never goes blank.
+    const tileBase = `${window.BrsConfig.API_BASE}/tiles`;
+    const cartoAttr = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+    const osmAttr = '&copy; OpenStreetMap contributors';
 
-    state.tileDark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      subdomains: "abcd",
+    state.tileLight = L.tileLayer(`${tileBase}/rastertiles/voyager/{z}/{x}/{y}{r}.png`, {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      attribution: cartoAttr,
+    });
+    state.tileDark = L.tileLayer(`${tileBase}/dark_all/{z}/{x}/{y}{r}.png`, {
+      maxZoom: 19,
+      attribution: cartoAttr,
       className: "tiles-dark",
     });
 
-    // Fallback if CARTO tiles are blocked: use OSM tiles with a dark filter.
-    const tileDarkFallback = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const osmLight = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       subdomains: "abc",
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
+      attribution: osmAttr,
+    });
+    // OSM with a CSS dark filter (see .tiles-dark-fallback)
+    const osmDark = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      subdomains: "abc",
+      maxZoom: 19,
+      attribution: osmAttr,
       className: "tiles-dark-fallback",
     });
 
-    // If tiles fail to load (common on some networks), switch to a fallback layer.
-    state.tileLight.on("tileerror", () => {
-      // OSM is already state.tileLight, so nothing to do here.
-    });
-
-    state.tileDark.on("tileerror", () => {
-      // Swap dark layer to the fallback once, then re-apply the current theme.
-      if (state.tileDark === tileDarkFallback) return;
-      try {
-        if (state.mapTheme === "dark") state.map.removeLayer(state.tileDark);
-      } catch {}
-      state.tileDark = tileDarkFallback;
-      state.mapTheme = null; // reset so applyTheme doesn't short-circuit
-      applyTheme("dark");
-    });
+    // After a few failed tiles (one stray failure is normal), swap that theme's layer for its fallback.
+    const guardTiles = (which, theme, fallback) => {
+      let failures = 0;
+      state[which].on("tileerror", () => {
+        if (++failures < 3 || state[which] === fallback) return;
+        try { state.map.removeLayer(state[which]); } catch {}
+        state[which] = fallback;
+        if (state.mapTheme === theme) {
+          state.mapTheme = null;   // so applyTheme doesn't short-circuit
+          applyTheme(theme);
+        }
+      });
+    };
+    guardTiles("tileLight", "light", osmLight);
+    guardTiles("tileDark", "dark", osmDark);
 
     // initial theme
     const initial = state.prefersDark && state.prefersDark.matches ? "dark" : "light";
@@ -1748,6 +2140,7 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
     if (!dep || !arr) return;
 
     const points = greatCirclePoints(dep.lat, dep.lon, arr.lat, arr.lon, 84);
+    state.routePoints = points;
     const bounds = L.latLngBounds(points.map((p) => L.latLng(p[0], p[1])));
 
     // Clear previous layers
@@ -1795,6 +2188,7 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
       const prev = points[points.length - 2] || last;
       state.planeMarker.setLatLng(last);
       state.planeMarker.setIcon(makePlaneIcon(bearingDeg(prev[0], prev[1], last[0], last[1])));
+      placePlaneAtLivePosition();
       setTimeout(() => { try { state.map.invalidateSize(); } catch {} }, 120);
       return;
     }
@@ -1815,7 +2209,7 @@ const p1 = projectLonLatToSvg(depGeo.lon, depGeo.lat);
       state.planeMarker.setIcon(makePlaneIcon(brg));
 
       if (t < 1) state.animRaf = requestAnimationFrame(step);
-      else state.animRaf = null;
+      else { state.animRaf = null; placePlaneAtLivePosition(); }
     };
 
     state.animRaf = requestAnimationFrame(step);
